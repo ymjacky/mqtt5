@@ -45,6 +45,6 @@
     "test": "deno test --allow-net --allow-read --trace-leaks test/deno/",
     "tsc": "deno check deno/mod.ts browser/index.ts node/index.ts",
     "check": "deno lint && deno task tsc && deno test",
-    "build_ems": "deno run --allow-read --allow-write --allow-net --allow-env browzer/bundle.ts"
+    "build_ems": "deno run --allow-read --allow-write --allow-net --allow-env browser/bundle.ts"
   }
 }

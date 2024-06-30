@@ -15,7 +15,7 @@
 
       async function main() {
         const client = new WebSocketMqttClient({
-          url: new URL('ws://127.0.0.1:9001'),
+          url: new URL('wss://localhost:18083'),
           clientId: 'publisherB',
           clean: true,
           logger: logger,
@@ -24,16 +24,18 @@
         });
 
         const decoder = new TextDecoder('utf-8');
-        const messages = document.getElementById('messages');
 
-        client.on('message', (topic, message) => {
+        client.on('publish', (event) => {
+          const packet = event.detail;
+          const messages = document.getElementById('messages');
           const li = document.createElement('li');
-          li.textContent = `${topic} ${decoder.decode(message)}`;
+          li.textContent = `${packet.topic} ${decoder.decode(packet.payload)}`;
           messages.appendChild(li);
         });
 
         await client.connect();
-        await client.subscribe('#');
+        await client.subscribe('device/vol');
+
       }
 
       main();

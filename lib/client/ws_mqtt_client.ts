@@ -1,6 +1,7 @@
 import { MqttPackets } from '../mod.ts';
 import { BaseMqttClient } from './base_mqtt_client.ts';
 import { ClientOptions } from './client_types.ts';
+import { Deferred } from './promise.ts';
 
 export class WebSocketMqttClient extends BaseMqttClient {
   protected conn?: WebSocket;
@@ -13,7 +14,7 @@ export class WebSocketMqttClient extends BaseMqttClient {
   }
 
   protected open(): Promise<void> {
-    const { promise, resolve } = Promise.withResolvers<void>();
+    const deferred = new Deferred<void>();
 
     this.conn = new WebSocket(this.url, 'mqtt');
     this.conn.binaryType = 'arraybuffer';
@@ -47,9 +48,9 @@ export class WebSocketMqttClient extends BaseMqttClient {
     };
 
     this.conn.onopen = (_e: Event) => {
-      resolve();
+      deferred.resolve();
     };
-    return promise;
+    return deferred.promise;
   }
 
   protected async close() {

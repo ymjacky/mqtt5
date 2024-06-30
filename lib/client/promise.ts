@@ -19,9 +19,9 @@ export class Deferred<T> {
   reject!: (err: Error) => void;
 
   constructor() {
-    const { promise, resolve, reject } = Promise.withResolvers<T>();
-    this.promise = promise;
-    this.resolve = resolve;
-    this.reject = reject;
+    this.promise = new Promise((resolve, reject) => {
+      this.resolve = resolve;
+      this.reject = reject;
+    });
   }
 }
