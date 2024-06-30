@@ -10,7 +10,7 @@ We have confirmed that deno version 1.44.2 or later works.
 
 ### Deno CLI
 ```
-import { Mqtt, MqttProperties, MqttClient } from "https://github.com/ymjacky/mqtt5/raw/main/deno/mod.ts";
+import { Mqtt, MqttProperties, MqttClient } from "https://deno.land/x/mqtt5/deno/mod.ts";
 ```
 
 ### Browser
