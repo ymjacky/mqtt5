@@ -1,4 +1,7 @@
 {
+  "name": "@ymjacky/mqtt5",
+  "version": "0.0.4",
+  "exports": "./deno/mod.ts",
   "imports": {
     "std/": "https://deno.land/std@0.219.0/"
   },
