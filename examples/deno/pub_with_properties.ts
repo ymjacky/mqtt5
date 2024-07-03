@@ -14,7 +14,7 @@ async function main() {
   });
   await client.connect();
 
-  const pubProperties: MqttProperties.PublishProperties = {
+  const pubProperties: MqttProperties.UserPublishProperties = {
     payloadFormatIndicator: 1,
     messageExpiryInterval: 60,
     responseTopic: 'responseTopicA',

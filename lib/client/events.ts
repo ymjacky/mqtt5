@@ -2,10 +2,10 @@ import { MqttPackets } from '../mod.ts';
 
 export interface CustomEventMap {
   'publish': CustomEvent<MqttPackets.PublishPacket>;
+  'connack': CustomEvent<MqttPackets.ConnackPacket>;
   'disconnect': CustomEvent<MqttPackets.DisconnectPacket>;
   'auth': CustomEvent<MqttPackets.AuthPacket>;
   'closed': CustomEvent<void>;
-  'error': CustomEvent<Error>;
 }
 
 export interface CustomEventListener<T = unknown> {

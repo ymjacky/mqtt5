@@ -3,6 +3,9 @@ import { BaseMqttClient } from './base_mqtt_client.ts';
 import { ClientOptions } from './client_types.ts';
 import { Deferred } from './promise.ts';
 
+/**
+ * MQTT client for WebSocket and WebSocket Secure
+ */
 export class WebSocketMqttClient extends BaseMqttClient {
   protected conn?: WebSocket;
 

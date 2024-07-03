@@ -1,4 +1,4 @@
-import { Mqtt, MqttClient } from 'https://deno.land/x/mqtt5/deno/mod.ts';
+import { Mqtt, MqttClient, MqttProperties } from 'https://deno.land/x/mqtt5/deno/mod.ts';
 
 const logger = (msg: string, ...args: unknown[]) => {
   console.log('[Subscriber]', msg, ...args);

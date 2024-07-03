@@ -18,6 +18,9 @@ const writerFactory: WriterFactory = (
   };
 };
 
+/**
+ * MQTT Client.
+ */
 export class MqttClient extends BaseMqttClient {
   protected conn?: Deno.Conn;
   private reader?: ReadableStreamBYOBReader;
