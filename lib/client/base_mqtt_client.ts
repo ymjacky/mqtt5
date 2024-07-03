@@ -142,12 +142,13 @@ export abstract class BaseMqttClient {
    * @returns Promise<ConnackPacket>
    * @example
    * mqtt
-   * ```
+   * ```ts
    * const client = new MqttClient();
    * await client.connect();
    * ```
+   *
    * using properties
-   * ```
+   * ```ts
    *   const properties: MqttProperties.ConnectProperties = {
    *     sessionExpiryInterval: 300,
    *     receiveMaximum: 10,
@@ -166,7 +167,7 @@ export abstract class BaseMqttClient {
    * ```
    *
    * using will
-   * ```
+   * ```ts
    *   const client = new MqttClient();
    *   const willPayload = new TextEncoder().encode('will message');
    *   await client.connect({
@@ -261,7 +262,7 @@ export abstract class BaseMqttClient {
    * @param properties UserPublishProperties
    * @returns Promise<PublishResult>
    * @example
-   * ```
+   * ```ts
    * await client.publish('topicA', 'payload', { qos: Mqtt.QoS.AT_MOST_ONCE });
    * await client.publish('topicA', 'payload', { qos: Mqtt.QoS.AT_LEAST_ONCE });
    * await client.publish('topicA', 'payload', { qos: Mqtt.QoS.EXACTRY_ONCE });
@@ -361,7 +362,7 @@ export abstract class BaseMqttClient {
    * @param qos Mqtt.QoS
    * @param properties MqttProperties.SubscribeProperties
    * @example
-   * ```
+   * ```ts
    * await client.subscribe('topicA', Mqtt.QoS.AT_MOST_ONCE);
    * ```
    */
@@ -377,7 +378,7 @@ export abstract class BaseMqttClient {
    * @param qos Mqtt.QoS
    * @param properties MqttProperties.SubscribeProperties
    * @example
-   * ```
+   * ```ts
    * await client.subscribe(['topicA', 'topicB'], Mqtt.QoS.AT_MOST_ONCE);
    * ```
    */
@@ -393,7 +394,7 @@ export abstract class BaseMqttClient {
    * @param qos Mqtt.QoS
    * @param properties MqttProperties.SubscribeProperties
    * @example
-   * ```
+   * ```ts
    * await client.subscribe({ topicFilter: 'topicA', qos: Mqtt.QoS.AT_MOST_ONCE, retainHandling: Mqtt.RetainHandling.DoNotSend, retainAsPublished: true, noLocal: true });
    * ```
    */
@@ -409,7 +410,7 @@ export abstract class BaseMqttClient {
    * @param qos Mqtt.QoS
    * @param properties MqttProperties.SubscribeProperties
    * @example
-   * ```
+   * ```ts
    * await client.subscribe(
    *   [
    *     { topicFilter: 'topicA', qos: Mqtt.QoS.AT_MOST_ONCE },
@@ -465,7 +466,7 @@ export abstract class BaseMqttClient {
    * @param topicFilter topic name and topic filter.
    * @param properties UnsubackProperties
    * @example
-   * ```
+   * ```ts
    * await client.unsubscribe('topicA');
    *
    * const properties: MqttProperties.UnsubscribeProperties = {
@@ -485,7 +486,7 @@ export abstract class BaseMqttClient {
    * @param topicFilters topic name and topic filter
    * @param properties UnsubackProperties
    * @example
-   * ```
+   * ```ts
    * await client.unsubscribe(
    *   [
    *     'topicA',
@@ -529,12 +530,12 @@ export abstract class BaseMqttClient {
    * @param properties DisconnectProperties
    * @example
    * normal disconnection
-   * ```
+   * ```ts
    * await client.disconnect();
    * ```
    *
    * using disconnect properties.
-   * ```
+   * ```ts
    * const properties: MqttProperties.DisconnectProperties = {
    *   reasonString: 'trouble',
    *   sessionExpiryInterval: 300,
@@ -542,7 +543,7 @@ export abstract class BaseMqttClient {
    * await client.disconnect(false, properties);
    * ```
    * force disconnect
-   * ```
+   * ```ts
    * await client.disconnect(true);
    * ```
    */
@@ -1009,7 +1010,7 @@ export abstract class BaseMqttClient {
    * @param callback
    * @example
    * Wait for receipt of a connack packet.
-   * ```
+   * ```ts
    * client.on('connack', (event) => {
    *   const connackPacket = event.detail;
    *   console.log(connackPacket);
@@ -1017,7 +1018,7 @@ export abstract class BaseMqttClient {
    * ```
    *
    * Wait for receipt of a publish message.
-   * ```
+   * ```ts
    * client.on('publish', (event) => {
    *   const packet = event.detail;
    *   const receiveMessage = decoder.decode(packet.payload);
@@ -1026,21 +1027,21 @@ export abstract class BaseMqttClient {
    * ```
    *
    * Wait for events when disconnected from the broker or disconnected by itself.
-   * ```
+   * ```ts
    * client.on('closed', () => {
    *   console.log('closed');
    * });
    * ```
    *
    * Waiting to receive Disconnect packets sent by the Broker
-   * ```
+   * ```ts
    * client.on('disconnect', (event) => {
    *   const disconnectPacket = event.detail;
    *   console.log(disconnectPacket.reasonCode);
    * });
    * ```
    * wait for Auth packet.
-   * ```
+   * ```ts
    * client.on('auth', (event) => {
    *   const authPacket = event.detail;
    *   console.log(authPacket);

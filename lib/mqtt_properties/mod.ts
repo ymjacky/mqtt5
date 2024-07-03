@@ -1,3 +1,8 @@
+/**
+ * This module contains definitions and functions for the properties of the MQTT protocol version 5.0
+ * @module
+ */
+
 import * as Mqtt from '../mqtt/mod.ts';
 
 import {

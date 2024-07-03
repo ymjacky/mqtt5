@@ -1,3 +1,8 @@
+/**
+ * This module contains definitions and functions for MQTT packets and functions for MQTT packets
+ * @module
+ */
+
 import * as MqttUtils from '../mqtt_utils/mod.ts';
 import type { ConnectPacket } from './connect.ts';
 import { parse as connectParse, toBytes as connectToBytes } from './connect.ts';

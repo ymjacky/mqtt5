@@ -1,3 +1,8 @@
+/**
+ * This module contains constant definitions for the MQTT protocol
+ * @module
+ */
+
 export const QoS = {
   AT_MOST_ONCE: 0,
   AT_LEAST_ONCE: 1,
