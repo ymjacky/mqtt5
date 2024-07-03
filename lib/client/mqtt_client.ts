@@ -79,7 +79,7 @@ export class MqttClient extends BaseMqttClient {
     })();
   }
 
-  protected async close() {
+  protected async close(): Promise<void> {
     if (this.conn) {
       if (this.reader) {
         await this.reader.cancel();

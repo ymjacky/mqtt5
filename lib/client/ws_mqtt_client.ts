@@ -56,7 +56,7 @@ export class WebSocketMqttClient extends BaseMqttClient {
     return deferred.promise;
   }
 
-  protected async close() {
+  protected async close(): Promise<void> {
     if (this.conn) {
       await this.conn.close();
     }

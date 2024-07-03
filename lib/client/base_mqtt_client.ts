@@ -249,7 +249,7 @@ export abstract class BaseMqttClient {
   /**
    * Returns the current number of sent publish messages that have not been completed
    */
-  public async publishInflightCount() {
+  public async publishInflightCount(): Promise<number> {
     return await this.session.publishInflightCount();
   }
 
@@ -1050,18 +1050,22 @@ export abstract class BaseMqttClient {
   public on = <T extends keyof CustomEventMap>(
     type: T,
     callback: CustomEventListener<CustomEventMap[T]>,
-  ) => {
+  ): void => {
     this.eventTarget.addEventListener(type, callback as EventListener);
   };
 
   public off = <T extends keyof CustomEventMap>(
     type: T,
     callback: CustomEventListener<CustomEventMap[T]>,
-  ) => {
+  ): void => {
     this.eventTarget.removeEventListener(type, callback as EventListener);
   };
 
-  public getClientId() {
+  /**
+   * return clientId.
+   * @returns clientId
+   */
+  public getClientId(): string {
     return this.clientId;
   }
 }

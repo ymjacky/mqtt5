@@ -7,18 +7,18 @@ export interface IncomingStore {
 }
 
 export class IncomingMemoryStore implements IncomingStore {
-  packets = new Set<number>();
+  packets: Set<number> = new Set<number>();
 
-  store(packetId: number) {
+  store(packetId: number): Promise<void> {
     this.packets.add(packetId);
     return Promise.resolve();
   }
 
-  has(packetId: number) {
+  has(packetId: number): Promise<boolean> {
     return Promise.resolve(this.packets.has(packetId));
   }
 
-  discard(packetId: number) {
+  discard(packetId: number): Promise<void> {
     this.packets.delete(packetId);
     return Promise.resolve();
   }
@@ -41,9 +41,12 @@ export interface OutgoingStore {
 }
 
 export class MemoryStore implements OutgoingStore {
-  packets = new Map</* packetId */ number, MqttPackets.PublishPacket | MqttPackets.PubrelPacket>();
+  packets: Map<number, MqttPackets.PublishPacket | MqttPackets.PubrelPacket> = new Map<
+    /* packetId */ number,
+    MqttPackets.PublishPacket | MqttPackets.PubrelPacket
+  >();
 
-  store(packet: MqttPackets.PublishPacket | MqttPackets.PubrelPacket) {
+  store(packet: MqttPackets.PublishPacket | MqttPackets.PubrelPacket): Promise<void> {
     if (!packet.packetId) {
       return Promise.reject(new Error('missing packet.packetId'));
     }
@@ -53,22 +56,22 @@ export class MemoryStore implements OutgoingStore {
     return Promise.resolve();
   }
 
-  has(packetId: number) {
+  has(packetId: number): Promise<boolean> {
     const exist = this.packets.has(packetId);
     return Promise.resolve(exist);
   }
 
-  discard(packetId: number) {
+  discard(packetId: number): Promise<void> {
     this.packets.delete(packetId);
 
     return Promise.resolve();
   }
 
-  count() {
+  count(): Promise<number> {
     return Promise.resolve(this.packets.size);
   }
 
-  clear() {
+  clear(): Promise<void> {
     this.packets.clear();
     return Promise.resolve();
   }

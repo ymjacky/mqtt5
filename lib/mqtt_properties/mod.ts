@@ -198,9 +198,9 @@ export type Properties =
   & SubackProperties
   & AuthProperties;
 
-export function propertiesToBytes(properties?: Properties) {
+export function propertiesToBytes(properties?: Properties): Uint8Array {
   if (typeof properties === 'undefined') {
-    return [0x00];
+    return new Uint8Array([0x00]);
   }
 
   const bytes = [];
