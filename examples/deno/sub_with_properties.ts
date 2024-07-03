@@ -1,8 +1,8 @@
-import { Mqtt, MqttProperties, MqttClient} from '../../deno/mod.ts'
+import { Mqtt, MqttClient } from 'https://deno.land/x/mqtt5/deno/mod.ts';
 
-const logger = (msg: string, ...args: unknown[]) =>  {
+const logger = (msg: string, ...args: unknown[]) => {
   console.log('[Subscriber]', msg, ...args);
-}
+};
 
 async function main() {
   const client = new MqttClient({
@@ -24,7 +24,7 @@ async function main() {
     logger(`topic: ${packet.topic}`, `message: ${receiveMessage}`);
   });
 
-  const subPproperties: MqttProperties.Properties = {
+  const subPproperties: MqttProperties.SubscribeProperties = {
     userProperties: [
       { key: 'userProp1', val: 'userData1' },
       { key: 'userProp2', val: 'userData2' },
@@ -33,7 +33,6 @@ async function main() {
     subscriptionIdentifier: 1,
   };
   await client.subscribe(['topicA', 'topicB', 'topicC'], Mqtt.QoS.AT_LEAST_ONCE, subPproperties);
-
 }
 
 main();

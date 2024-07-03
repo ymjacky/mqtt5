@@ -1,49 +1,37 @@
 {
   "imports": {
     "std/": "https://deno.land/std@0.219.0/"
-    // "std/": "https://deno.land/std@0.186.0/"
   },
   "fmt": {
     "indentWidth": 2,
     "singleQuote": true,
     "lineWidth": 160,
     "include": [
-      "browser/browser_client.ts",
-      "browser/index.ts",
+      "browser",
       "client",
       "deno",
       "lib",
-      "test",
-      "node/index.ts",
-      "node/node_client.ts"
+      "examples",
+      "test"
     ]
   },
   "lint": {
-    // lint対象に含めるファイル
     "include": ["deno", "lib", "test"],
-
-    // lint対象から除外するファイル
     "exclude": ["./exclude/"],
 
-    // lint対象のルールを指定する
     "rules": {
-      "tags": ["recommended"], // ベースのルールセット (デフォルトは"recommended")
-      // "include": ["ban-untagged-todo"], // tagsで指定したルールに対して追加したいルール
-      "exclude": ["ban-untagged-todo"] // tagsで指定したルールに対して除外したいルール
-      // ルール名は https://lint.deno.land/ を参照
+      "tags": ["recommended"],
+      "exclude": ["ban-untagged-todo"]
     },
 
-    // 結果の表示形式
-    "report": "pretty" // デフォルト
-    // "report": "compact" // 省略形
-    // "report": "json" // JSON形式
+    "report": "pretty"
   },
   "test": {
-    "include": ["test/deno/client", "test/deno/mqtt_packets"]
+    "include": ["test/deno"]
   },
   "tasks": {
     "test": "deno test --allow-net --allow-read --trace-leaks test/deno/",
-    "tsc": "deno check deno/mod.ts browser/index.ts node/index.ts",
+    "tsc": "deno check deno/mod.ts browser/mode.ts",
     "check": "deno lint && deno task tsc && deno test",
     "build_ems": "deno run --allow-read --allow-write --allow-net --allow-env browser/bundle.ts"
   }

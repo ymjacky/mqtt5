@@ -1,10 +1,9 @@
-import { Mqtt, MqttProperties, MqttClient} from '../../deno/mod.ts'
+import { Mqtt, MqttClient, MqttProperties } from 'https://deno.land/x/mqtt5/deno/mod.ts';
 
-const logger = (msg: string, ...args: unknown[]) =>  {
+const logger = (msg: string, ...args: unknown[]) => {
   console.log('[Publisher]', msg, ...args);
-}
+};
 async function main() {
-
   const client = new MqttClient({
     url: new URL('mqtt://127.0.0.1:1883'),
     clientId: 'publisherB',
@@ -15,7 +14,7 @@ async function main() {
   });
   await client.connect();
 
-  const pubProperties: MqttProperties.Properties = {
+  const pubProperties: MqttProperties.PublishProperties = {
     payloadFormatIndicator: 1,
     messageExpiryInterval: 60,
     responseTopic: 'responseTopicA',
@@ -28,8 +27,7 @@ async function main() {
     subscriptionIdentifier: 3,
     contentType: 'application/json',
   };
-  await client.publish('topicA', 'payload', { qos: Mqtt.QoS.AT_MOST_ONCE} , pubProperties);
-
+  await client.publish('topicA', 'payload', { qos: Mqtt.QoS.AT_MOST_ONCE }, pubProperties);
 }
 
 main();

@@ -1,15 +1,15 @@
-import { Mqtt, MqttProperties, MqttClient} from '../../deno/mod.ts'
+import { Mqtt, MqttClient } from 'https://deno.land/x/mqtt5/deno/mod.ts';
 
-const logger = (msg: string, ...args: unknown[]) =>  {
+const logger = (msg: string, ...args: unknown[]) => {
   console.log('[Subscriber]', msg, ...args);
-}
+};
 
 async function main() {
   const client = new MqttClient({
     url: new URL('mqtt://127.0.0.1:1883'),
     clientId: 'subscriberA',
     logger: logger,
-    clean: false,
+    clean: true,
     protocolVersion: Mqtt.ProtocolVersion.MQTT_V5,
     keepAlive: 30,
   });
@@ -25,7 +25,6 @@ async function main() {
   });
 
   await client.subscribe(['topicA', 'topicB', 'topicC'], Mqtt.QoS.AT_LEAST_ONCE);
-
 }
 
 main();
