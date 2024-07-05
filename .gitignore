@@ -1,1 +1,3 @@
 browser/*.mjs
+docs/
+.DS_Store
