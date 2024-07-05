@@ -1,0 +1,24 @@
+name: ci
+
+on: [pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: clone repository
+        uses: actions/checkout@v4
+
+      - name: install deno
+        uses: denoland/setup-deno@v1
+        with:
+          deno-version: v1.x
+
+      - name: check format
+        run: deno fmt --check
+
+      - name: check linting
+        run: deno lint
+
+      - name: run tests generating coverage
+        run: deno task test
