@@ -120,6 +120,5 @@ The following functions are not supported.
 (*) marks are features that will be supported in future versions.
 
 1. (*) persistent session file store
-2. (*) Use of client certificates for connections
-3. (*) Specifying CA certificates in websocket secure (WSS)
-4. Use of the ``rejectunauthorized`` option for TLS connections
+2. Specifying CA certificates in websocket secure (WSS)
+3. Use of the ``rejectunauthorized`` option for TLS connections
