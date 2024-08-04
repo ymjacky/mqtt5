@@ -1,4 +1,4 @@
-import { Mqtt, MqttClient, MqttProperties } from 'https://deno.land/x/mqtt5/deno/mod.ts';
+import { Mqtt, MqttClient, MqttProperties } from 'jsr:@ymjacky/mqtt5';
 
 const logger = (msg: string, ...args: unknown[]) => {
   console.log('[Publisher]', msg, ...args);

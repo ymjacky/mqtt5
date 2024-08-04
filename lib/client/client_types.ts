@@ -16,6 +16,8 @@ export type ClientOptions = {
   outgoingStore?: OutgoingStore;
   logger?: (msg: string, ...args: unknown[]) => void;
   caCerts?: string[];
+  cert?: string;
+  privateKey?: string;
   pingrespTimeoutMS?: number;
   topicAliasMaximumAboutSend?: number;
   topicAliasMaximumAboutReceive?: number;

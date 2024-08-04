@@ -1,4 +1,5 @@
 # mqtt5
+[![jsr](https://jsr.io/badges/@ymjacky/mqtt5)](https://jsr.io/badges/@ymjacky/mqtt5)
 
 ``mqtt5`` is a client library for the MQTT protocol, written in Typescript for deno and the browser.
 
@@ -9,14 +10,45 @@ We have confirmed that deno version 1.44.2 or later works.
 ## Usage
 
 ### Deno CLI
-[deno.land](https://deno.land/x/mqtt5@0.0.5)
-```
-import { Mqtt, MqttProperties, MqttClient } from "https://deno.land/x/mqtt5@^0.0.5/deno/mod.ts";
-```
+
 
 [jsr](https://jsr.io/@ymjacky/mqtt5)
-```
-import { Mqtt, MqttProperties, MqttClient } from "jsr:@ymjacky/mqtt5@^0.0.5";
+
+
+```ts
+import { Mqtt, MqttProperties, MqttClient } from "jsr:@ymjacky/mqtt5";
+
+const logger = (msg: string, ...args: unknown[]) => {
+  console.log('[Subscriber]', msg, ...args);
+};
+
+async function main() {
+  const client = new MqttClient({
+    url: new URL('mqtt://127.0.0.1:1883'),
+    clientId: 'clientA',
+    password: 'pass',
+    logger: logger,
+    clean: true,
+    protocolVersion: Mqtt.ProtocolVersion.MQTT_V5,
+    keepAlive: 30,
+  });
+
+  await client.connect();
+
+  const decoder = new TextDecoder();
+
+  client.on('publish', (event) => {
+    const packet = event.detail;
+    const receiveMessage = decoder.decode(packet.payload);
+    logger(`topic: ${packet.topic}`, `message: ${receiveMessage}`);
+  });
+
+  await client.subscribe(['topicA', 'topicB', 'topicC'], Mqtt.QoS.AT_LEAST_ONCE);
+
+  await client.publish('topicA', 'payload', { qos: Mqtt.QoS.AT_MOST_ONCE });
+}
+
+main();
 ```
 
 ### Browser
