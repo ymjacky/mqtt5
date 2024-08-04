@@ -37,11 +37,24 @@ export class MqttClient extends BaseMqttClient {
           port: Number(this.url.port),
         });
       } else if (this.url.protocol === 'mqtts:') {
-        return await Deno.connectTls({
+        const tlsOpt: Deno.ConnectTlsOptions = {
           hostname: this.url.hostname,
           port: Number(this.url.port),
           caCerts: this.caCerts,
-        });
+        };
+        if (this.privateKey && this.cert) {
+          type TlsType = Deno.ConnectTlsOptions & Deno.TlsCertifiedKeyPem;
+          const tls: TlsType = {
+            hostname: this.url.hostname,
+            port: Number(this.url.port),
+            caCerts: this.caCerts,
+            cert: this.cert,
+            key: this.privateKey,
+          };
+          return await Deno.connectTls(tls);
+        } else {
+          return await Deno.connectTls(tlsOpt);
+        }
       } else {
         throw new UnexpectedUrlProtocol(`${this.url.protocol.slice(0, -1)}`);
       }

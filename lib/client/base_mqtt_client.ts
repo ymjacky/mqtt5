@@ -56,7 +56,30 @@ export abstract class BaseMqttClient {
   private incomingStore: IncomingStore;
   private timers: { [key: string]: ReturnType<typeof setTimeout> };
   protected log: (msg: string, ...args: unknown[]) => void;
+  /**
+   * ca certificate.
+   * @example
+   * ```
+   * ["-----BEGIN CERTIFICATE-----\n...\n-----END CERTIFICATE-----\n"]
+   * ```
+   */
   protected caCerts?: string[];
+  /**
+   * client certificate.
+   * @example
+   * ```
+   * "-----BEGIN CERTIFICATE-----\n...\n-----END CERTIFICATE-----\n"
+   * ```
+   */
+  protected cert?: string;
+  /**
+   * client private key.
+   * @example
+   * ```
+   * "-----BEGIN RSA PRIVATE KEY-----\n...\n-----END RSA PRIVATE KEY-----\n"
+   * ```
+   */
+  protected privateKey?: string;
 
   private connectProperties?: MqttProperties.ConnectProperties;
 
@@ -101,6 +124,8 @@ export abstract class BaseMqttClient {
     }
 
     this.caCerts = options?.caCerts;
+    this.cert = options?.cert;
+    this.privateKey = options?.privateKey;
 
     this.eventTarget = new EventTarget();
     this.pingrespTimeoutMs = options?.pingrespTimeoutMS || defaultPingrespTimeout;
