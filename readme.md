@@ -12,9 +12,10 @@ We have confirmed that deno version 1.44.2 or later works.
 ### Deno CLI
 
 
-[jsr](https://jsr.io/@ymjacky/mqtt5)
+you can use [jsr](https://jsr.io/@ymjacky/mqtt5).
 
 
+#### connect mqtt
 ```ts
 import { Mqtt, MqttProperties, MqttClient } from "jsr:@ymjacky/mqtt5";
 
@@ -46,6 +47,61 @@ async function main() {
   await client.subscribe(['topicA', 'topicB', 'topicC'], Mqtt.QoS.AT_LEAST_ONCE);
 
   await client.publish('topicA', 'payload', { qos: Mqtt.QoS.AT_MOST_ONCE });
+}
+
+main();
+```
+
+#### connect mqtts (mqtt over TLS)
+
+```ts
+import { Mqtt, MqttProperties, MqttClient } from "jsr:@ymjacky/mqtt5";
+
+const logger = (msg: string, ...args: unknown[]) => {
+  console.log('[Subscriber]', msg, ...args);
+};
+
+async function main() {
+  const client = new MqttClient({
+    url: new URL('mqtts://127.0.0.1:1883'),
+    clientId: 'clientA',
+    password: 'pass',
+    logger: logger,
+    clean: true,
+    protocolVersion: Mqtt.ProtocolVersion.MQTT_V5,
+    keepAlive: 30,
+  });
+
+  await client.connect();
+}
+
+main();
+```
+
+
+#### connect mqtts using CA
+
+```ts
+import { Mqtt, MqttProperties, MqttClient } from "jsr:@ymjacky/mqtt5";
+
+const logger = (msg: string, ...args: unknown[]) => {
+  console.log('[Subscriber]', msg, ...args);
+};
+
+async function main() {
+  const client = new MqttClient({
+    url: new URL('mqtts://127.0.0.1:1883'),
+    clientId: 'clientA',
+    password: 'pass',
+    logger: logger,
+    clean: true,
+    protocolVersion: Mqtt.ProtocolVersion.MQTT_V5,
+    keepAlive: 30,
+    caCerts: [Deno.readTextFileSync('xxx/ca.crt.pem')],
+
+  });
+
+  await client.connect();
 }
 
 main();

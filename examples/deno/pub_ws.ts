@@ -5,7 +5,7 @@ const logger = (msg: string, ...args: unknown[]) => {
 };
 async function main() {
   const client = new WebSocketMqttClient({
-    url: new URL('ws://127.0.0.1:9001'),
+    url: new URL('ws://127.0.0.1:3000'),
     clientId: 'publisherB',
     clean: true,
     logger: logger,
