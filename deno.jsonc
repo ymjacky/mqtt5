@@ -1,6 +1,6 @@
 {
   "name": "@ymjacky/mqtt5",
-  "version": "0.0.10",
+  "version": "0.0.11",
   "exports": {
     ".": "./deno/mod.ts",
     "./browser": "./browser/mod.ts"
@@ -22,7 +22,7 @@
     ]
   },
   "lint": {
-    "include": ["deno", "lib", "test"],
+    "include": ["deno", "lib", "test", "examples"],
     "exclude": ["./exclude/"],
 
     "rules": {

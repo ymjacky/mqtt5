@@ -1,5 +1,5 @@
-import { Mqtt, MqttClient, MqttProperties } from '../../../deno/mod.ts';
-import { TestBroker } from '../broker/test_broker.ts';
+import { Mqtt, MqttProperties, WebSocketMqttClient } from '../../../deno/mod.ts';
+import { TestWsBroker } from '../broker/test_ws_broker.ts';
 import { assertEquals, fail } from 'std/assert/mod.ts';
 
 function logger(msg: string, ...args: unknown[]): void {
@@ -12,13 +12,14 @@ Deno.test({ name: '@receive disconnect', only: false }, async (context) => {
     async () => {
       const { promise, resolve, reject } = Promise.withResolvers<void>();
 
-      const broker = new TestBroker();
+      const broker = new TestWsBroker();
 
       try {
         broker.listen();
 
-        const client = new MqttClient({
+        const client = new WebSocketMqttClient({
           clientId: 'cid',
+          url: new URL('ws://127.0.0.1:3000/'),
           logger: logger,
           clean: true,
           connectTimeoutMS: 10000,
@@ -31,7 +32,6 @@ Deno.test({ name: '@receive disconnect', only: false }, async (context) => {
         });
 
         await client.connect();
-        broker.startRead(client.getClientId());
 
         const properties: MqttProperties.DisconnectProperties = {
           reasonString: 'trouble',
@@ -48,6 +48,7 @@ Deno.test({ name: '@receive disconnect', only: false }, async (context) => {
         client.on('closed', () => {
           resolve();
         });
+
         await broker.sendDisconnect('cid', Mqtt.ReasonCode.ServerShuttingDown, properties);
 
         await promise;
