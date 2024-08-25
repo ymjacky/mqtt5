@@ -1,6 +1,6 @@
 {
   "name": "@ymjacky/mqtt5",
-  "version": "0.0.13",
+  "version": "0.0.14",
   "exports": {
     ".": "./deno/mod.ts",
     "./browser": "./browser/mod.ts"
@@ -37,8 +37,8 @@
   },
   "tasks": {
     "test": "deno test --allow-net --allow-read --trace-leaks test/deno/",
-    "tsc": "deno check deno/mod.ts browser/mode.ts",
-    "check": "deno lint && deno task tsc && deno test",
+    "tsc": "deno check deno/mod.ts browser/mod.ts",
+    "check": "deno lint && deno task tsc && deno task test",
     "build_ems": "deno run --allow-read --allow-write --allow-net --allow-env browser/bundle.ts"
   }
 }

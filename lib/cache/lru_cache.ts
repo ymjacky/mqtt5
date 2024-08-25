@@ -12,24 +12,24 @@ export class LruCache<K, V> {
     this._ages = new Map<K, number>();
   }
 
-  *[Symbol.iterator]() {
+  *[Symbol.iterator](): IterableIterator<[K, V]> {
     for (const val of this._values.entries()) {
       yield val;
     }
   }
 
-  public capacity() {
+  public capacity(): number {
     return this._capacity;
   }
 
-  public lruKey() {
+  public lruKey(): K {
     const sortedByValueAsc = new Map([...this._ages].sort((a, b) => a[1] - b[1]));
     const firstEntry = sortedByValueAsc.keys().next();
     const key: K = firstEntry.value;
     return key;
   }
 
-  public set(key: K, value: V) {
+  public set(key: K, value: V): void {
     if (!this._values.has(key)) {
       if (this._ages.size == this._capacity) {
         this.delete(this.lruKey());
@@ -39,7 +39,7 @@ export class LruCache<K, V> {
     this._ages.set(key, 1);
   }
 
-  public get(key: K) {
+  public get(key: K): V | undefined {
     const value = this._values.get(key);
     if (value) {
       let age = this._ages.get(key);
@@ -57,31 +57,31 @@ export class LruCache<K, V> {
     }
     return value;
   }
-  public clear() {
+  public clear(): void {
     this._ages.clear();
     this._values.clear();
   }
-  public delete(key: K) {
+  public delete(key: K): boolean {
     this._ages.delete(key);
     return this._values.delete(key);
   }
 
-  public size() {
+  public size(): number {
     return this._values.size;
   }
 
-  public has(key: K) {
+  public has(key: K): boolean {
     return this._values.has(key);
   }
 
-  public keys() {
+  public keys(): IterableIterator<K> {
     return this._values.keys();
   }
-  public values() {
+  public values(): IterableIterator<V> {
     return this._values.values();
   }
 
-  public entries() {
+  public entries(): IterableIterator<[K, V]> {
     return this._values.entries();
   }
 }

@@ -1,6 +1,7 @@
 {
   "deno.enable": true,
   "deno.unstable": false,
+  "deno.lint": true,
   "deno.config": "./deno.jsonc",
   "editor.formatOnSave": true,
   "[typescript]": {
