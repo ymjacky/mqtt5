@@ -1,4 +1,4 @@
-import { MqttPackets } from '../mod.ts';
+import { MqttPackets, MqttUtils } from '../mod.ts';
 import { BaseMqttClient } from './base_mqtt_client.ts';
 import { ClientOptions } from './client_types.ts';
 import { Deferred } from './promise.ts';
@@ -8,12 +8,60 @@ import { Deferred } from './promise.ts';
  */
 export class WebSocketMqttClient extends BaseMqttClient {
   protected conn?: WebSocket;
+  private readBuffers: Array<number>;
 
   constructor(options?: ClientOptions) {
     if (!options?.url) {
       throw new Error('uri required');
     }
     super(options);
+    this.readBuffers = [];
+  }
+
+  private adjustReadBytes(data: Uint8Array): Array<Uint8Array> | undefined {
+    const results: Array<Uint8Array> = [];
+
+    this.readBuffers.push(...data);
+
+    do {
+      if (this.readBuffers.length < 2) {
+        break;
+      }
+      const remainingLengthBytes = [];
+      let offset = 1;
+      const rb = new Uint8Array([...this.readBuffers]);
+      do {
+        const byte = rb[offset];
+
+        remainingLengthBytes.push(byte);
+        if ((byte >> 7) == 0) {
+          break;
+        } else if (offset == 5) {
+          throw new Error('malformed packet');
+        }
+        offset++;
+      } while (offset < 5);
+
+      const remainingLength = MqttUtils.variableByteIntegerToNum(
+        new Uint8Array([...remainingLengthBytes]),
+        0,
+      );
+
+      const fixedHeaderSize = 1 + remainingLength.size;
+      if (fixedHeaderSize + remainingLength.number > this.readBuffers.length) {
+        break;
+      }
+
+      const receiveByte = new Uint8Array([...this.readBuffers.slice(0, remainingLength.number + fixedHeaderSize)]);
+      results.push(receiveByte);
+      this.readBuffers = this.readBuffers.slice(remainingLength.number + fixedHeaderSize);
+    } while (this.readBuffers.length > 0);
+
+    if (results.length === 0) {
+      return undefined;
+    } else {
+      return results;
+    }
   }
 
   protected open(): Promise<void> {
@@ -34,11 +82,18 @@ export class WebSocketMqttClient extends BaseMqttClient {
     };
 
     this.conn.onmessage = (e: MessageEvent<unknown>) => {
-      const receiveBytes = new Uint8Array(e.data as ArrayBuffer);
-      this.log('receive bytes', receiveBytes);
-      const packet = MqttPackets.decode(receiveBytes, this.protocolVersion);
-      this.log('receive packet', packet);
-      this.packetReceived(packet);
+      const temporaryReceiveBytes = new Uint8Array(e.data as ArrayBuffer);
+      const array: Array<Uint8Array> | undefined = this.adjustReadBytes(temporaryReceiveBytes);
+      if (typeof array === 'undefined') {
+        return;
+      }
+
+      array.forEach((receiveBytes) => {
+        this.log('receive bytes', receiveBytes);
+        const packet = MqttPackets.decode(receiveBytes, this.protocolVersion);
+        this.log('receive packet', packet);
+        this.packetReceived(packet);
+      });
     };
 
     this.conn.onerror = (e: Event) => {
