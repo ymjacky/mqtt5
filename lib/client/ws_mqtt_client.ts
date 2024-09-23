@@ -21,7 +21,9 @@ export class WebSocketMqttClient extends BaseMqttClient {
   private adjustReadBytes(data: Uint8Array): Array<Uint8Array> | undefined {
     const results: Array<Uint8Array> = [];
 
-    this.readBuffers.push(...data);
+    data.forEach((byte) => {
+      this.readBuffers.push(byte);
+    });
 
     do {
       if (this.readBuffers.length < 2) {
