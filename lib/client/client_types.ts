@@ -45,3 +45,18 @@ export type SubscriptionOption = Subscription;
 export type WriterFunction = (bytes: Uint8Array) => Promise<void>;
 // deno-lint-ignore no-explicit-any
 export type WriterFactory = (...args: any[]) => WriterFunction;
+
+export type PublishResult = {
+  result: number;
+  reason?: string;
+};
+
+export type SubscribeResults = {
+  reasons: number[];
+  reason?: string;
+};
+
+export type UnsubscribeResults = {
+  reasonCodes?: number[];
+  reason?: string;
+};

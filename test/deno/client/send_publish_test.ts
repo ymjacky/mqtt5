@@ -1,4 +1,4 @@
-import { Mqtt, MqttClient, MqttProperties, PublishResult } from '../../../deno/mod.ts';
+import { ClientTypes, Mqtt, MqttClient, MqttProperties } from '../../../deno/mod.ts';
 import { TestBroker } from '../broker/test_broker.ts';
 import { assertEquals, fail } from 'std/assert/mod.ts';
 
@@ -350,7 +350,7 @@ Deno.test({ name: '@publish_qos1', only: false }, async (context) => {
           );
           resolve();
         });
-        const result: PublishResult = await client.publish(
+        const result: ClientTypes.PublishResult = await client.publish(
           'topicA',
           new TextEncoder().encode('payloadA'),
           {
@@ -661,7 +661,7 @@ Deno.test({ name: '@publish_qos2', only: false }, async (context) => {
           resolve();
         });
 
-        const result: PublishResult = await client.publish(
+        const result: ClientTypes.PublishResult = await client.publish(
           'topicA',
           new TextEncoder().encode('payloadA'),
           {

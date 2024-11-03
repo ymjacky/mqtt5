@@ -1,10 +1,10 @@
 import { Mqtt, MqttPackets, MqttProperties } from '../mod.ts';
 import { Session } from './session.ts';
 import { TopicAliasManager } from './topic_alias.ts';
-import { ClientOptions, ConnectOptions, PublishOptions, SubscriptionOption } from './client_types.ts';
+import { ClientOptions, ConnectOptions, PublishOptions, PublishResult, SubscribeResults, SubscriptionOption, UnsubscribeResults } from './client_types.ts';
 import { ConnectTimeout, SendPacketError, StateIsNotOfflineError, StateIsNotOnlineError } from './error.ts';
 import { InvalidQoSError } from '../mqtt_utils/mod.ts';
-import { Deferred, PublishResult, SubscribeResults, UnsubscribeResults } from './promise.ts';
+import { Deferred } from './promise.ts';
 import { IncomingMemoryStore, IncomingStore } from './store.ts';
 import { createCustomEvent, CustomEventListener, CustomEventMap } from './events.ts';
 

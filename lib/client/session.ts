@@ -1,6 +1,7 @@
 import { IdProvider, MqttPackets } from '../mod.ts';
 import { MemoryStore, OutgoingStore } from './store.ts';
-import { Deferred, PublishResult, SubscribeResults, UnsubscribeResults } from './promise.ts';
+import { Deferred } from './promise.ts';
+import { PublishResult, SubscribeResults, UnsubscribeResults } from './client_types.ts';
 
 export class Session {
   private sessionId: string;
