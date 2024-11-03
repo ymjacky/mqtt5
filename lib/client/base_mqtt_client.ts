@@ -153,7 +153,8 @@ export abstract class BaseMqttClient {
       this.startKeepAliveTimer();
       await this.write(bytes);
     } catch (err) {
-      this.log(err, err.cause);
+      const e = err instanceof Error ? err : err as Error;
+      this.log(e.message, e.cause);
       throw err;
     }
   }
@@ -261,11 +262,12 @@ export abstract class BaseMqttClient {
       const bytes = MqttPackets.packetToBytes(connectPacket, this.protocolVersion);
       await this.write(bytes);
     } catch (err) {
-      this.log(`caught error opening connection: ${err.message}`);
+      const e = err instanceof Error ? err : err as Error;
+      this.log(`caught error opening connection: ${e.message}`);
 
       this.detectClosed();
       if (this.unresolvedConnect) {
-        this.unresolvedConnect.reject(err);
+        this.unresolvedConnect.reject(e);
       }
     }
 

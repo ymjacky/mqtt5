@@ -38,11 +38,13 @@ export class TopicAliasManager {
     } else {
       if (this.isFull()) {
         const lruTopic = this.topicAliasMap.lruKey();
-        const tid = this.topicAliasMap.get(lruTopic);
-        if (tid) {
-          this.topicIdProvider.release(tid);
+        if (lruTopic) {
+          const tid = this.topicAliasMap.get(lruTopic);
+          if (tid) {
+            this.topicIdProvider.release(tid);
+          }
+          this.topicAliasMap.delete(lruTopic);
         }
-        this.topicAliasMap.delete(lruTopic);
       }
 
       const topicId = await this.aquireTopicId();

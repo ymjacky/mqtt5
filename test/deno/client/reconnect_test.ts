@@ -44,7 +44,7 @@ Deno.test({ name: '@reconnect', only: false }, async (context) => {
 
         await promise;
       } catch (err) {
-        fail(err);
+        fail(`error occured: ${err}`);
       } finally {
         await broker.destroy();
       }
@@ -93,7 +93,7 @@ Deno.test({ name: '@reconnect', only: false }, async (context) => {
         });
         await client.disconnect();
       } catch (err) {
-        fail(err);
+        fail(`error occured: ${err}`);
       } finally {
         await broker.destroy();
       }

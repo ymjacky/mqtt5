@@ -35,7 +35,7 @@ Deno.test({ name: '@connack reaction', only: false }, async (context) => {
         assertEquals(connack.properties?.assignedClientIdentifier, 'generated_cid');
         assertEquals(client.getClientId(), 'generated_cid');
       } catch (err) {
-        fail(err);
+        fail(`error occured: ${err}`);
       } finally {
         await broker.destroy();
       }
@@ -82,7 +82,7 @@ Deno.test({ name: '@connack reaction', only: false }, async (context) => {
 
         await promise;
       } catch (err) {
-        fail(err);
+        fail(`error occured: ${err}`);
       } finally {
         await broker.destroy();
       }

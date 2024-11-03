@@ -51,7 +51,7 @@ Deno.test({ name: '@publish_qos0', only: false }, async (context) => {
 
         await promise;
       } catch (err) {
-        fail(err);
+        fail(`error occured: ${err}`);
       } finally {
         await broker.destroy();
       }
@@ -101,7 +101,7 @@ Deno.test({ name: '@publish_qos0', only: false }, async (context) => {
 
         await promise;
       } catch (err) {
-        fail(err);
+        fail(`error occured: ${err}`);
       } finally {
         await broker.destroy();
       }
@@ -151,7 +151,7 @@ Deno.test({ name: '@publish_qos0', only: false }, async (context) => {
 
         await promise;
       } catch (err) {
-        fail(err);
+        fail(`error occured: ${err}`);
       } finally {
         await broker.destroy();
       }
@@ -208,7 +208,7 @@ Deno.test({ name: '@publish_qos0', only: false }, async (context) => {
 
         await promise;
       } catch (err) {
-        fail(err);
+        fail(`error occured: ${err}`);
       } finally {
         await broker.destroy();
       }
@@ -295,7 +295,7 @@ Deno.test({ name: '@publish_qos0', only: false }, async (context) => {
 
         await promise;
       } catch (err) {
-        fail(err);
+        fail(`error occured: ${err}`);
       } finally {
         await broker.destroy();
       }
@@ -363,7 +363,7 @@ Deno.test({ name: '@publish_qos1', only: false }, async (context) => {
 
         await promise;
       } catch (err) {
-        fail(err);
+        fail(`error occured: ${err}`);
       } finally {
         await broker.destroy();
       }
@@ -426,7 +426,7 @@ Deno.test({ name: '@publish_qos1', only: false }, async (context) => {
         assertEquals(await client.publishInflightCount(), 0);
         await promise;
       } catch (err) {
-        fail(err);
+        fail(`error occured: ${err}`);
       } finally {
         await broker.destroy();
       }
@@ -496,7 +496,7 @@ Deno.test({ name: '@publish_qos1', only: false }, async (context) => {
 
         await promise;
       } catch (err) {
-        fail(err);
+        fail(`error occured: ${err}`);
       } finally {
         await broker.destroy();
       }
@@ -593,7 +593,7 @@ Deno.test({ name: '@publish_qos1', only: false }, async (context) => {
 
         await promise;
       } catch (err) {
-        fail(err);
+        fail(`error occured: ${err}`);
       } finally {
         await broker.destroy();
       }
@@ -674,7 +674,7 @@ Deno.test({ name: '@publish_qos2', only: false }, async (context) => {
 
         await promise;
       } catch (err) {
-        fail(err);
+        fail(`error occured: ${err}`);
       } finally {
         await broker.destroy();
       }
@@ -751,7 +751,7 @@ Deno.test({ name: '@publish_qos2', only: false }, async (context) => {
 
         await promise;
       } catch (err) {
-        fail(err);
+        fail(`error occured: ${err}`);
       } finally {
         await broker.destroy();
       }
@@ -822,7 +822,7 @@ Deno.test({ name: '@publish_qos2', only: false }, async (context) => {
 
         await promise;
       } catch (err) {
-        fail(err);
+        fail(`error occured: ${err}`);
       } finally {
         await broker.destroy();
       }
@@ -931,7 +931,7 @@ Deno.test({ name: '@publish_qos2', only: false }, async (context) => {
 
         await promise;
       } catch (err) {
-        fail(err);
+        fail(`error occured: ${err}`);
       } finally {
         await broker.destroy();
       }

@@ -45,7 +45,7 @@ Deno.test({ name: '@unsubscribe', only: false }, async (context) => {
         const result = await client.unsubscribe('topicA');
         assertEquals(result.reasonCodes![0], Mqtt.ReasonCode.Success);
       } catch (err) {
-        fail(err);
+        fail(`error occured: ${err}`);
       } finally {
         await broker.destroy();
       }
@@ -90,7 +90,7 @@ Deno.test({ name: '@unsubscribe', only: false }, async (context) => {
         const result = await client.unsubscribe('topicA');
         assertExists(result);
       } catch (err) {
-        fail(err);
+        fail(`error occured: ${err}`);
       } finally {
         await broker.destroy();
       }
@@ -150,7 +150,7 @@ Deno.test({ name: '@unsubscribe', only: false }, async (context) => {
         assertEquals(result.reasonCodes![2], Mqtt.ReasonCode.Success);
         assertEquals(result.reasonCodes![3], Mqtt.ReasonCode.UnspecifiedError);
       } catch (err) {
-        fail(err);
+        fail(`error occured: ${err}`);
       } finally {
         await broker.destroy();
       }
@@ -207,7 +207,7 @@ Deno.test({ name: '@unsubscribe', only: false }, async (context) => {
         );
         assertExists(result);
       } catch (err) {
-        fail(err);
+        fail(`error occured: ${err}`);
       } finally {
         await broker.destroy();
       }
@@ -270,7 +270,7 @@ Deno.test({ name: '@unsubscribe', only: false }, async (context) => {
         const result = await client.unsubscribe('topicA', properties);
         assertEquals(result.reasonCodes![0], Mqtt.ReasonCode.Success);
       } catch (err) {
-        fail(err);
+        fail(`error occured: ${err}`);
       } finally {
         await broker.destroy();
       }
@@ -354,7 +354,7 @@ Deno.test({ name: '@unsubscribe', only: false }, async (context) => {
         assertEquals(result.reasonCodes![3], Mqtt.ReasonCode.UnspecifiedError);
         assertEquals(result.reason, 'unspecified error');
       } catch (err) {
-        fail(err);
+        fail(`error occured: ${err}`);
       } finally {
         await broker.destroy();
       }

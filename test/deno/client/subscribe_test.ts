@@ -47,7 +47,7 @@ Deno.test({ name: '@subscribe', only: false }, async (context) => {
         const result = await client.subscribe('topicA', Mqtt.QoS.AT_MOST_ONCE);
         assertEquals(result.reasons[0], Mqtt.ReasonCode.GrantedQoS0);
       } catch (err) {
-        fail(err);
+        fail(`error occured: ${err}`);
       } finally {
         await broker.destroy();
       }
@@ -94,7 +94,7 @@ Deno.test({ name: '@subscribe', only: false }, async (context) => {
         const result = await client.subscribe('topicA', Mqtt.QoS.AT_LEAST_ONCE);
         assertEquals(result.reasons[0], Mqtt.ReasonCode.GrantedQoS1);
       } catch (err) {
-        fail(err);
+        fail(`error occured: ${err}`);
       } finally {
         await broker.destroy();
       }
@@ -141,7 +141,7 @@ Deno.test({ name: '@subscribe', only: false }, async (context) => {
         const result = await client.subscribe('topicA', Mqtt.QoS.EXACTRY_ONCE);
         assertEquals(result.reasons[0], Mqtt.ReasonCode.GrantedQoS2);
       } catch (err) {
-        fail(err);
+        fail(`error occured: ${err}`);
       } finally {
         await broker.destroy();
       }
@@ -189,7 +189,7 @@ Deno.test({ name: '@subscribe', only: false }, async (context) => {
         const result = await client.subscribe('topicA', Mqtt.QoS.AT_MOST_ONCE);
         assertEquals(result.reasons[0], Mqtt.ReasonCode.GrantedQoS0);
       } catch (err) {
-        fail(err);
+        fail(`error occured: ${err}`);
       } finally {
         await broker.destroy();
       }
@@ -237,7 +237,7 @@ Deno.test({ name: '@subscribe', only: false }, async (context) => {
         const result = await client.subscribe('topicA', Mqtt.QoS.AT_LEAST_ONCE);
         assertEquals(result.reasons[0], Mqtt.ReasonCode.GrantedQoS1);
       } catch (err) {
-        fail(err);
+        fail(`error occured: ${err}`);
       } finally {
         await broker.destroy();
       }
@@ -285,7 +285,7 @@ Deno.test({ name: '@subscribe', only: false }, async (context) => {
         const result = await client.subscribe('topicA', Mqtt.QoS.EXACTRY_ONCE);
         assertEquals(result.reasons[0], Mqtt.ReasonCode.GrantedQoS2);
       } catch (err) {
-        fail(err);
+        fail(`error occured: ${err}`);
       } finally {
         await broker.destroy();
       }
@@ -353,7 +353,7 @@ Deno.test({ name: '@subscribe', only: false }, async (context) => {
         assertEquals(result.reasons[2], Mqtt.ReasonCode.GrantedQoS2);
         assertEquals(result.reasons[3], Mqtt.ReasonCode.UnspecifiedError);
       } catch (err) {
-        fail(err);
+        fail(`error occured: ${err}`);
       } finally {
         await broker.destroy();
       }
@@ -427,7 +427,7 @@ Deno.test({ name: '@subscribe', only: false }, async (context) => {
         assertEquals(result.reasons[2], Mqtt.V3_1_1_SubscribeReturnCode.Success_MaximumQoS2);
         assertEquals(result.reasons[3], Mqtt.V3_1_1_SubscribeReturnCode.Failure);
       } catch (err) {
-        fail(err);
+        fail(`error occured: ${err}`);
       } finally {
         await broker.destroy();
       }
@@ -480,7 +480,7 @@ Deno.test({ name: '@subscribe', only: false }, async (context) => {
 
         assertEquals(result.reasons[0], Mqtt.ReasonCode.GrantedQoS0);
       } catch (err) {
-        fail(err);
+        fail(`error occured: ${err}`);
       } finally {
         await broker.destroy();
       }
@@ -561,7 +561,7 @@ Deno.test({ name: '@subscribe', only: false }, async (context) => {
 
         assertEquals(result.reasons[0], Mqtt.ReasonCode.GrantedQoS0);
       } catch (err) {
-        fail(err);
+        fail(`error occured: ${err}`);
       } finally {
         await broker.destroy();
       }
@@ -627,7 +627,7 @@ Deno.test({ name: '@subscribe', only: false }, async (context) => {
         const result = await client.subscribe('topicA', Mqtt.QoS.AT_MOST_ONCE, properties);
         assertEquals(result.reasons[0], Mqtt.ReasonCode.GrantedQoS0);
       } catch (err) {
-        fail(err);
+        fail(`error occured: ${err}`);
       } finally {
         await broker.destroy();
       }
@@ -714,7 +714,7 @@ Deno.test({ name: '@subscribe', only: false }, async (context) => {
 
         assertEquals(result.reasons[0], Mqtt.ReasonCode.GrantedQoS0);
       } catch (err) {
-        fail(err);
+        fail(`error occured: ${err}`);
       } finally {
         await broker.destroy();
       }

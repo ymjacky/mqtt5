@@ -22,17 +22,18 @@ export class LruCache<K, V> {
     return this._capacity;
   }
 
-  public lruKey(): K {
+  public lruKey(): K | undefined {
     const sortedByValueAsc = new Map([...this._ages].sort((a, b) => a[1] - b[1]));
     const firstEntry = sortedByValueAsc.keys().next();
-    const key: K = firstEntry.value;
+    const key = firstEntry.value;
     return key;
   }
 
   public set(key: K, value: V): void {
     if (!this._values.has(key)) {
       if (this._ages.size == this._capacity) {
-        this.delete(this.lruKey());
+        const key = this.lruKey();
+        if (key) this.delete(key);
       }
     }
     this._values.set(key, value);

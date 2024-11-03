@@ -84,7 +84,7 @@ export class MqttClient extends BaseMqttClient {
           } else if (e instanceof ConnectionReset) {
             break;
           } else {
-            this.log(e);
+            this.log('error', e);
             throw e;
           }
         }

@@ -58,7 +58,7 @@ Deno.test({ name: '@send topic alias', only: false }, async (context) => {
         await promise;
       } catch (err) {
         reject();
-        fail(err);
+        fail(`error occured: ${err}`);
       } finally {
         await broker.destroy();
       }
@@ -137,7 +137,7 @@ Deno.test({ name: '@send topic alias', only: false }, async (context) => {
         await promise;
       } catch (err) {
         reject();
-        fail(err);
+        fail(`error occured: ${err}`);
       } finally {
         await broker.destroy();
       }

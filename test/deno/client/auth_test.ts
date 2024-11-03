@@ -72,7 +72,7 @@ Deno.test({ name: '@auth', only: false }, async (context) => {
         await promise;
       } catch (err) {
         reject();
-        fail(err);
+        fail(`error occured: ${err}`);
       } finally {
         await broker.destroy();
       }
