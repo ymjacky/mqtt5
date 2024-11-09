@@ -226,4 +226,102 @@ Deno.test({ name: '@closing', only: false }, async (context) => {
       }
     },
   );
+
+  await context.step(
+    'disconnect twice',
+    async () => {
+      const { promise, resolve } = Promise.withResolvers<void>();
+
+      const broker = new TestBroker();
+
+      try {
+        broker.listen();
+
+        const client = new MqttClient({
+          clientId: 'cid',
+          logger: logger,
+          clean: true,
+          connectTimeoutMS: 10000,
+          keepAlive: 10,
+        });
+
+        broker.on('connect', (event) => {
+          const packet = event.detail;
+          broker.sendConnack(packet.clientId, false, packet.protocolVersion);
+        });
+
+        await client.connect();
+        broker.startRead(client.getClientId());
+
+        broker.on('disconnect', (event) => {
+          const packet = event.detail;
+          assertExists(packet);
+          resolve();
+        });
+        client.disconnect();
+        client.disconnect();
+
+        await promise;
+      } catch (err) {
+        fail(`error occured: ${err}`);
+      } finally {
+        await broker.destroy();
+      }
+    },
+  );
+
+  await context.step(
+    'disconnect while connecting',
+    async () => {
+      const { promise, resolve, reject } = Promise.withResolvers<void>();
+
+      let succeeded = false;
+      const broker = new TestBroker();
+
+      try {
+        broker.listen();
+
+        const client = new MqttClient({
+          clientId: 'cid',
+          logger: logger,
+          clean: true,
+          connectTimeoutMS: 10000,
+          keepAlive: 10,
+        });
+
+        const properties: MqttProperties.DisconnectProperties = {
+          reasonString: 'trouble',
+          sessionExpiryInterval: 300,
+        };
+
+        broker.on('disconnect', (event) => {
+          const packet = event.detail;
+          assertEquals(packet.properties?.reasonString, 'trouble');
+          assertEquals(packet.properties?.sessionExpiryInterval, 300);
+          succeeded = true;
+          resolve();
+        });
+        broker.on('connect', (event) => {
+          broker.startRead(client.getClientId());
+
+          const packet = event.detail;
+          client.disconnect(false, properties);
+          broker.sendConnack(packet.clientId, false, packet.protocolVersion);
+        });
+
+        client.on('closed', () => {
+          if (!succeeded) {
+            reject('Disconnect packet has not been verified');
+          }
+        });
+        client.connect();
+
+        await promise;
+      } catch (err) {
+        fail(`error occured: ${err}`);
+      } finally {
+        await broker.destroy();
+      }
+    },
+  );
 }); // closing

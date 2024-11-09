@@ -1,9 +1,11 @@
 import { LruCache } from '../cache/mod.ts';
 import { ReuseIdProvider } from '../id_provider/mod.ts';
+import { Deferred } from './promise.ts';
 
 export class TopicAliasManager {
   private topicIdProvider: ReuseIdProvider;
   private topicAliasMap: LruCache<string, number>;
+  private deferred?: Deferred<void>;
 
   constructor(topicAliasMaximum: number) {
     this.topicIdProvider = new ReuseIdProvider(1, topicAliasMaximum);
@@ -18,15 +20,24 @@ export class TopicAliasManager {
     return this.topicAliasMap.size() == this.topicAliasMap.capacity();
   }
 
-  public getTopicId(topic: string) {
-    if (this.topicAliasMap.has(topic)) {
-      return this.topicAliasMap.get(topic);
+  public async getTopicId(topic: string): Promise<[boolean, number]> {
+    if (this.deferred) {
+      await this.deferred.promise;
     } else {
-      return undefined;
+      this.deferred = new Deferred<void>();
     }
+
+    let topicId = this.topicAliasMap.get(topic);
+    let generated = false;
+    if (!topicId) {
+      topicId = await this.registerTopic(topic);
+      generated = true;
+    }
+    this.deferred.resolve();
+    return [generated, topicId];
   }
 
-  public async registerTopic(topic: string) {
+  private async registerTopic(topic: string) {
     if (this.topicAliasMap.has(topic)) {
       const tid = this.topicAliasMap.get(topic);
       if (tid) {
@@ -51,9 +62,6 @@ export class TopicAliasManager {
       this.topicAliasMap.set(topic, topicId);
       return topicId;
     }
-  }
-
-  private releaseYounger(): void {
   }
 
   public releaseTopic(topic: string) {

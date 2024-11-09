@@ -5,7 +5,7 @@ import { ClientOptions, ConnectOptions, PublishOptions, PublishResult, Subscribe
 import { ConnectTimeout, SendPacketError, StateIsNotOfflineError, StateIsNotOnlineError } from './error.ts';
 import { InvalidQoSError } from '../mqtt_utils/mod.ts';
 import { Deferred } from './promise.ts';
-import { IncomingMemoryStore, IncomingStore } from './store.ts';
+import { IncomingMemoryStore, IncomingStore } from '../mqtt_store/mod.ts';
 import { createCustomEvent, CustomEventListener, CustomEventMap } from './events.ts';
 
 import {
@@ -50,7 +50,6 @@ export abstract class BaseMqttClient {
   private connectTimeout: number;
   private disconnectTimeout: number;
   private connectionState: ConnectionStates;
-  private disconnectRequested = false;
   private session: Session;
   private unresolvedConnect?: Deferred<ConnackPacket>;
   private incomingStore: IncomingStore;
@@ -153,8 +152,7 @@ export abstract class BaseMqttClient {
       this.startKeepAliveTimer();
       await this.write(bytes);
     } catch (err) {
-      const e = err instanceof Error ? err : err as Error;
-      this.log(e.message, e.cause);
+      this.log('sendPacket: ', err);
       throw err;
     }
   }
@@ -235,8 +233,6 @@ export abstract class BaseMqttClient {
     }
 
     this.connectionState = 'connecting';
-    this.disconnectRequested = false;
-    this.waitForClose = undefined;
 
     const deferred = new Deferred<ConnackPacket>();
     this.unresolvedConnect = deferred;
@@ -331,14 +327,15 @@ export abstract class BaseMqttClient {
     const buffer: Uint8Array = (typeof payload === 'string') ? new TextEncoder().encode(payload) : payload;
 
     // resolve topic alias
-    let topicId;
+    let omittedTopic;
+    let topicId: number = 0; // 0 = not use
     if (this.topicAliasManagerAboutSend) {
-      topicId = this.topicAliasManagerAboutSend.getTopicId(topic);
-      if (topicId) {
+      const [generated, tid] = await this.topicAliasManagerAboutSend.getTopicId(topic);
+      if (!generated) {
+        omittedTopic = topic;
         topic = '';
-      } else {
-        topicId = await this.topicAliasManagerAboutSend.registerTopic(topic);
       }
+      topicId = tid;
     }
 
     let publishProperties = properties as MqttProperties.PublishProperties;
@@ -376,7 +373,7 @@ export abstract class BaseMqttClient {
         packetId,
         properties: publishProperties,
       };
-      await this.session.storePublish(packet, deferred);
+      await this.session.storePublish(packet, deferred, omittedTopic);
       await this.sendPacket(packet);
     }
 
@@ -580,12 +577,20 @@ export abstract class BaseMqttClient {
   ): Promise<void> {
     const deferred = new Deferred<void>();
     this.waitForClose = deferred;
-    this.disconnectRequested = true;
-    if (this.connectionState !== 'offline') {
-      await this.doDisconnect(force, properties);
-    } else {
-      deferred.resolve();
+
+    if (this.connectionState === 'connecting') {
+      this.log('A disconnect request was accepted while connected');
+      if (this.unresolvedConnect) {
+        await this.unresolvedConnect.promise;
+      }
     }
+
+    if (this.connectionState === 'offline') {
+      deferred.resolve();
+    } else {
+      await this.doDisconnect(force, properties);
+    }
+
     return deferred.promise;
   }
 
@@ -632,12 +637,13 @@ export abstract class BaseMqttClient {
     this.stopKeepAliveTimer();
     this.stopPingrespTimer();
 
-    this.eventTarget.dispatchEvent(
-      createCustomEvent('closed', {}),
-    );
     if (this.waitForClose) {
       this.waitForClose.resolve();
     }
+
+    this.eventTarget.dispatchEvent(
+      createCustomEvent('closed', {}),
+    );
   }
 
   protected packetReceived(packet: AnyPacket) {
@@ -680,30 +686,52 @@ export abstract class BaseMqttClient {
     }
   }
 
-  private handleConnack(packet: ConnackPacket) {
+  private async handleConnack(packet: ConnackPacket) {
     this.connectionState = 'online';
 
     this.stopConnectTimer();
 
-    // server  generates clientId
-    if (packet.properties?.assignedClientIdentifier) {
-      this.clientId = packet.properties.assignedClientIdentifier;
-    }
-    if (!packet.sessionPresent) {
-      this.session.clearAllStores(this.clientId);
+    let connectionSuceeded = false;
+    if (this.protocolVersion > Mqtt.ProtocolVersion.MQTT_V3_1_1) {
+      if (packet.reasonCode === Mqtt.ReasonCode.Success) {
+        connectionSuceeded = true;
+      } else {
+        this.log(`connection failed. reasonCode:${packet.reasonCode}`);
+      }
+    } else {
+      if (packet.returnCode === Mqtt.V3_1_1_ConnectReturnCode.ConnectionAccepted) {
+        connectionSuceeded = true;
+      } else {
+        this.log(`connection failed. reasonCode:${packet.reasonCode}`);
+      }
     }
 
-    if (packet.properties) {
-      if (packet.properties.serverKeepAlive) {
-        if (this.keepAlive > packet.properties.serverKeepAlive) {
-          this.keepAlive = packet.properties.serverKeepAlive;
+    if (connectionSuceeded) {
+      // server  generates clientId
+      if (packet.properties?.assignedClientIdentifier) {
+        this.clientId = packet.properties.assignedClientIdentifier;
+      }
+      if (!packet.sessionPresent) {
+        this.session.clearAllStores(this.clientId);
+      }
+
+      if (packet.properties) {
+        if (packet.properties.serverKeepAlive) {
+          if (this.keepAlive > packet.properties.serverKeepAlive) {
+            this.keepAlive = packet.properties.serverKeepAlive;
+          }
+        }
+
+        if (packet.properties.topicAliasMaximum) {
+          if (this.topicAliasManagerAboutSend && this.topicAliasManagerAboutSend.capacity() > packet.properties.topicAliasMaximum) {
+            this.topicAliasManagerAboutSend = new TopicAliasManager(packet.properties.topicAliasMaximum);
+          }
         }
       }
 
-      if (packet.properties.topicAliasMaximum) {
-        if (this.topicAliasManagerAboutSend && this.topicAliasManagerAboutSend.capacity() > packet.properties.topicAliasMaximum) {
-          this.topicAliasManagerAboutSend = new TopicAliasManager(packet.properties.topicAliasMaximum);
-        }
+      // resend publish and pubrel
+      for await (const packet of this.session.resendTargets()) {
+        this.sendPacket(packet);
       }
     }
 
@@ -715,9 +743,7 @@ export abstract class BaseMqttClient {
       createCustomEvent('connack', { detail: packet }),
     );
 
-    if (this.disconnectRequested) {
-      this.doDisconnect();
-    } else {
+    if (connectionSuceeded) {
       this.startKeepAliveTimer();
     }
   }

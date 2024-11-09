@@ -1,5 +1,5 @@
 import { Mqtt, MqttProperties } from '../mod.ts';
-import { IncomingStore, OutgoingStore } from './store.ts';
+import { IncomingStore, OutgoingStore } from '../mqtt_store/mod.ts';
 import { Subscription } from '../mqtt_packets/mod.ts';
 
 export type ClientOptions = {

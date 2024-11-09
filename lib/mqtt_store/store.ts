@@ -31,7 +31,7 @@ export interface OutgoingStore {
 
   discard(packetId: number): Promise<void>;
 
-  iterate(): AsyncIterable<MqttPackets.PublishPacket | MqttPackets.PubrelPacket>;
+  resendIterator(): AsyncIterableIterator<MqttPackets.PublishPacket | MqttPackets.PubrelPacket>;
 
   has(packet: number): Promise<boolean>;
 
@@ -42,7 +42,7 @@ export interface OutgoingStore {
 
 export class MemoryStore implements OutgoingStore {
   packets: Map<number, MqttPackets.PublishPacket | MqttPackets.PubrelPacket> = new Map<
-    /* packetId */ number,
+    number, /* packetId */
     MqttPackets.PublishPacket | MqttPackets.PubrelPacket
   >();
 
@@ -52,7 +52,6 @@ export class MemoryStore implements OutgoingStore {
     }
 
     this.packets.set(packet.packetId, packet);
-
     return Promise.resolve();
   }
 
@@ -76,7 +75,7 @@ export class MemoryStore implements OutgoingStore {
     return Promise.resolve();
   }
 
-  async *iterate(): AsyncIterable<MqttPackets.PublishPacket | MqttPackets.PubrelPacket> {
+  async *resendIterator(): AsyncIterableIterator<MqttPackets.PublishPacket | MqttPackets.PubrelPacket> {
     for (const value of this.packets.values()) {
       yield value;
     }

@@ -2,3 +2,4 @@ browser/*.mjs
 docs/
 .DS_Store
 cert
+temp.db

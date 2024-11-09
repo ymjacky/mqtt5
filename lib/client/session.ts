@@ -1,5 +1,5 @@
 import { IdProvider, MqttPackets } from '../mod.ts';
-import { MemoryStore, OutgoingStore } from './store.ts';
+import { MemoryStore, OutgoingStore } from '../mqtt_store/mod.ts';
 import { Deferred } from './promise.ts';
 import { PublishResult, SubscribeResults, UnsubscribeResults } from './client_types.ts';
 
@@ -39,6 +39,7 @@ export class Session {
     this.inflightPublish.clear();
     this.inflightSubscribe.clear();
     this.inflightUnsubscribe.clear();
+    this.packetIdProvider.clear();
   }
 
   public async packetIdInUse(packetId: number) {
@@ -62,12 +63,35 @@ export class Session {
     }
   }
 
+  public async *resendTargets(): AsyncIterable<MqttPackets.PublishPacket | MqttPackets.PubrelPacket> {
+    for await (const packet of this.outgoingStore.resendIterator()) {
+      if (packet.type === 'publish') {
+        packet.dup = true;
+      }
+      yield packet;
+    }
+  }
+
   public async storePublish(
     packet: MqttPackets.PublishPacket,
     deferred: Deferred<PublishResult>,
+    omittedTopic?: string,
   ) {
     this.inflightPublish.set(packet.packetId!, deferred);
-    return await this.outgoingStore.store(packet);
+
+    if (omittedTopic) {
+      const copiedPacket = { ...packet };
+      if (packet.properties) {
+        copiedPacket.properties = { ...packet.properties };
+        delete copiedPacket?.properties?.topicAlias;
+      }
+
+      // Restore omitted topics and then register them
+      copiedPacket.topic = omittedTopic;
+      return await this.outgoingStore.store(copiedPacket);
+    } else {
+      return await this.outgoingStore.store(packet);
+    }
   }
 
   public async storePubrel(packet: MqttPackets.PubrelPacket) {
