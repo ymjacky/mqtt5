@@ -3,7 +3,7 @@ import type { PingrespPacket } from '../../../lib/mqtt_packets/pingresp.ts';
 import { parse, toBytes } from '../../../lib/mqtt_packets/pingresp.ts';
 
 // Test PINGRESP packet encoding
-Deno.test('encodePingrespPacket', function () {
+Deno.test('encodePingrespPacket', function() {
   assertEquals(
     toBytes({
       type: 'pingresp',
@@ -17,7 +17,7 @@ Deno.test('encodePingrespPacket', function () {
 });
 
 // Test PINGRESP packet parsing
-Deno.test('decodePingrespPacket', function () {
+Deno.test('decodePingrespPacket', function() {
   assertEquals<PingrespPacket>(
     parse(
       0,

@@ -31,21 +31,24 @@ export function toBytes(
   const variableHeader = [...numToTwoByteInteger(packet.packetId)];
   if (protocolVersion > Mqtt.ProtocolVersion.MQTT_V3_1_1) {
     if (packet.properties) {
-      variableHeader.push(...MqttProperties.propertiesToBytes(packet.properties));
+      const propBytes = MqttProperties.propertiesToBytes(packet.properties);
+      variableHeader.push(...propBytes);
     } else {
-      variableHeader.push(0x00);
+      variableHeader.push(0x00); // Property length 0
     }
   }
 
   const payload = [];
   for (const sub of packet.subscriptions) {
     if (protocolVersion > Mqtt.ProtocolVersion.MQTT_V3_1_1) {
-      const subscriptionOptions = // 7-6bit = reserve, 5-4bit = retainHandling, 3bit = retainAsPublished, 2-1bit = qos
-        (sub.retainHandling ? (sub.retainHandling << 4) : 0) |
-        (sub.retainAsPublished ? 0b00001000 : 0) |
-        (sub.noLocal ? 0b00000100 : 0) |
-        (sub.qos === Mqtt.QoS.EXACTRY_ONCE ? 0b00000010 : 0) |
-        (sub.qos === Mqtt.QoS.AT_LEAST_ONCE ? 0b00000001 : 0);
+      const subscriptionOptions = (0b0) | // 7bit reserved
+        (0b0) | // 6bit reserved
+        (sub.retainHandling === Mqtt.RetainHandling.DoNotSend ? 0b00100000 : 0) | // 5bit for retainHandling
+        (sub.retainHandling === Mqtt.RetainHandling.AtSubscribeOnlyIfTheSubscriptionDoesNotCurrentlyExist ? 0b00010000 : 0) | // 4bit for retainHandling
+        (sub.retainAsPublished ? 0b00001000 : 0) | // 3bit for retainAsPublished
+        (sub.noLocal ? 0b00000100 : 0) | // 2bit for noLocal
+        (sub.qos === Mqtt.QoS.EXACTRY_ONCE ? 0b00000010 : 0) | // 1bit for qos
+        (sub.qos === Mqtt.QoS.AT_LEAST_ONCE ? 0b00000001 : 0); // 0bit for qos
 
       payload.push(...stringToUtfEncodedString(sub.topicFilter), subscriptionOptions);
     } else {
@@ -73,34 +76,36 @@ export function parse(
     if (protocolVersion > Mqtt.ProtocolVersion.MQTT_V3_1_1) {
       const { number: length, size: consumedBytesSize } = variableByteIntegerToNum(buffer, pos);
       pos += consumedBytesSize;
-      const prop = MqttProperties.parseMqttProperties(buffer, pos, length);
-      pos += length;
-      return prop;
+      if (length > 0) {
+        const props = MqttProperties.parseMqttProperties(buffer, pos, length);
+        pos += length;
+        return props;
+      } else {
+        return {}; // Return empty object if no properties
+      }
     } else {
       return undefined;
     }
   })();
 
-  // const subscriptionsStart = pos;
   const subscriptions: Subscription[] = [];
 
-  do {
+  while (pos < remainingLength) {
     const topicFilterInfo = utfEncodedStringToString(buffer, pos);
     pos += topicFilterInfo.length;
+
     if (protocolVersion > Mqtt.ProtocolVersion.MQTT_V3_1_1) {
       const subscribeOptions = buffer[pos++];
 
-      const retainHandling = (() => {
-        const retainHandlingVal = (subscribeOptions & 0b00110000) >> 4;
-        return retainHandlingVal as Mqtt.RetainHandling;
-      })();
+      // Get RetainHandling from 5-4bit (0b00110000 = 0x30)
+      const retainHandling = (subscribeOptions & 0b00110000) >> 4;
 
       subscriptions.push({
         topicFilter: topicFilterInfo.value,
-        qos: numToQoS(subscribeOptions & 0b00000011),
-        retainHandling: retainHandling,
-        retainAsPublished: (subscribeOptions & 0b00001000) === 0b00000000 ? false : true,
-        noLocal: (subscribeOptions & 0b00000100) === 0b00000000 ? false : true,
+        qos: numToQoS(subscribeOptions & 0b00000011), // QoS in lower 2 bits
+        retainHandling: retainHandling as Mqtt.RetainHandling,
+        retainAsPublished: !!(subscribeOptions & 0b00001000), // 3rd bit: retainAsPublished
+        noLocal: !!(subscribeOptions & 0b00000100), // 2nd bit: noLocal
       });
     } else {
       subscriptions.push({
@@ -108,7 +113,7 @@ export function parse(
         qos: numToQoS(buffer[pos++]),
       });
     }
-  } while (pos < remainingLength);
+  }
 
   if (protocolVersion > Mqtt.ProtocolVersion.MQTT_V3_1_1) {
     return {
