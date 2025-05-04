@@ -38,8 +38,8 @@ Deno.test({ name: '@resend from MemoryStore', only: false }, async (context) => 
 
         // test
         broker.on('publish', (event) => {
+          const packet = event.detail;
           if (sessionExists) {
-            const packet = event.detail;
             assertEquals(packet.qos, Mqtt.QoS.AT_LEAST_ONCE);
             assertEquals(packet.dup, true);
             assertEquals(packet.retain, false);
@@ -73,6 +73,12 @@ Deno.test({ name: '@resend from MemoryStore', only: false }, async (context) => 
 
             if (expectedPacketId > 3) {
               resolve();
+            }
+          } else {
+            assertEquals(packet.packetId, expectedPacketId++);
+            if (expectedPacketId > 3) {
+              expectedPacketId = 1;
+              broker.closeConnectionFromBroker(client.getClientId());
             }
           }
         });
@@ -122,8 +128,6 @@ Deno.test({ name: '@resend from MemoryStore', only: false }, async (context) => 
           }
         });
 
-        broker.closeConnectionFromBroker(client.getClientId());
-
         await promise;
       } catch (err) {
         fail(`error occured: ${err}`);
@@ -165,8 +169,8 @@ Deno.test({ name: '@resend from MemoryStore', only: false }, async (context) => 
 
         // test
         broker.on('publish', (event) => {
+          const packet = event.detail;
           if (sessionExists) {
-            const packet = event.detail;
             assertEquals(packet.qos, Mqtt.QoS.AT_LEAST_ONCE);
             assertEquals(packet.dup, true);
             assertEquals(packet.retain, false);
@@ -184,6 +188,12 @@ Deno.test({ name: '@resend from MemoryStore', only: false }, async (context) => 
 
             if (expectedPacketId > 3) {
               resolve();
+            }
+          } else {
+            assertEquals(packet.packetId, expectedPacketId++);
+            if (expectedPacketId > 3) {
+              expectedPacketId = 1;
+              broker.closeConnectionFromBroker(client.getClientId());
             }
           }
         });
@@ -218,8 +228,6 @@ Deno.test({ name: '@resend from MemoryStore', only: false }, async (context) => 
             await client.disconnect();
           }
         });
-
-        broker.closeConnectionFromBroker(client.getClientId());
 
         await promise;
       } catch (err) {
@@ -261,8 +269,8 @@ Deno.test({ name: '@resend from MemoryStore', only: false }, async (context) => 
 
         // test
         broker.on('publish', (event) => {
+          const packet = event.detail;
           if (sessionExists) {
-            const packet = event.detail;
             assertEquals(packet.qos, Mqtt.QoS.EXACTRY_ONCE);
             assertEquals(packet.dup, true);
             assertEquals(packet.retain, false);
@@ -296,6 +304,12 @@ Deno.test({ name: '@resend from MemoryStore', only: false }, async (context) => 
 
             if (expectedPacketId > 3) {
               resolve();
+            }
+          } else {
+            assertEquals(packet.packetId, expectedPacketId++);
+            if (expectedPacketId > 3) {
+              expectedPacketId = 1;
+              broker.closeConnectionFromBroker(client.getClientId());
             }
           }
         });
@@ -345,8 +359,6 @@ Deno.test({ name: '@resend from MemoryStore', only: false }, async (context) => 
           }
         });
 
-        broker.closeConnectionFromBroker(client.getClientId());
-
         await promise;
       } catch (err) {
         fail(`error occured: ${err}`);
@@ -388,8 +400,8 @@ Deno.test({ name: '@resend from MemoryStore', only: false }, async (context) => 
 
         // test
         broker.on('publish', (event) => {
+          const packet = event.detail;
           if (sessionExists) {
-            const packet = event.detail;
             assertEquals(packet.qos, Mqtt.QoS.EXACTRY_ONCE);
             assertEquals(packet.dup, true);
             assertEquals(packet.retain, false);
@@ -407,6 +419,12 @@ Deno.test({ name: '@resend from MemoryStore', only: false }, async (context) => 
 
             if (expectedPacketId > 3) {
               resolve();
+            }
+          } else {
+            assertEquals(packet.packetId, expectedPacketId++);
+            if (expectedPacketId > 3) {
+              expectedPacketId = 1;
+              broker.closeConnectionFromBroker(client.getClientId());
             }
           }
         });
@@ -441,8 +459,6 @@ Deno.test({ name: '@resend from MemoryStore', only: false }, async (context) => 
             await client.disconnect();
           }
         });
-
-        broker.closeConnectionFromBroker(client.getClientId());
 
         await promise;
       } catch (err) {

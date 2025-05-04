@@ -3,3 +3,5 @@ docs/
 .DS_Store
 cert
 temp.db
+.github/*.md
+.agent-doc

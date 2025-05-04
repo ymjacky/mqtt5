@@ -82,6 +82,7 @@ export class MqttClient extends BaseMqttClient {
           if (e instanceof ConnectionClosed) {
             break; // while
           } else if (e instanceof ConnectionReset) {
+            this.log('ConnectionReset.', e.message);
             break;
           } else {
             this.log('error', e);

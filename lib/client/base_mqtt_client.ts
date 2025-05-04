@@ -707,7 +707,7 @@ export abstract class BaseMqttClient {
     }
 
     if (connectionSuceeded) {
-      // server  generates clientId
+      // server generates clientId
       if (packet.properties?.assignedClientIdentifier) {
         this.clientId = packet.properties.assignedClientIdentifier;
       }

@@ -59,6 +59,9 @@ export async function readMqttBytes(
       if (e.name === 'ConnectionReset') {
         return Promise.reject(new ConnectionReset(e.message));
       }
+      if (e.name === 'Interrupted') {
+        return Promise.reject(new ConnectionReset(e.message));
+      }
     }
     return Promise.reject(e);
   }

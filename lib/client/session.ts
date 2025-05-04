@@ -68,6 +68,9 @@ export class Session {
       if (packet.type === 'publish') {
         packet.dup = true;
       }
+      if (packet.packetId) {
+        this.packetIdProvider.registerIfNotInUse(packet.packetId);
+      }
       yield packet;
     }
   }
