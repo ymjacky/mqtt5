@@ -9,9 +9,9 @@
     <script type="module">
       import { Mqtt, MqttProperties, WebSocketMqttClient } from './mqtt5.mjs';
 
-      const logger = (msg, ...args) =>  {
+      const logger = (msg, ...args) => {
         console.log('[WS-client]', msg, ...args);
-      }
+      };
 
       async function main() {
         const client = new WebSocketMqttClient({
@@ -36,7 +36,6 @@
         await client.connect();
         await client.subscribe('device/vol');
         await clinet.disconnect();
-
       }
 
       main();

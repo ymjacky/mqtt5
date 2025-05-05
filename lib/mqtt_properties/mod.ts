@@ -256,7 +256,7 @@ export function propertiesToBytes(properties?: Properties): Uint8Array {
     bytes.push(0x16, ...numToTwoByteInteger(authenticationDataLength), ...properties.authenticationData);
   }
   // id: 0x17
-  if (properties.requestProblemInformation) { // boolean ,
+  if (typeof properties.requestProblemInformation !== 'undefined') { // boolean ,
     bytes.push(0x17, properties.requestProblemInformation ? 1 : 0);
   }
   // id: 0x18
@@ -264,7 +264,7 @@ export function propertiesToBytes(properties?: Properties): Uint8Array {
     bytes.push(0x18, ...numToFourByteInteger(properties.willDelayInterval));
   }
   // id: 0x19
-  if (properties.requestResponseInformation) { // boolean,
+  if (typeof properties.requestResponseInformation !== 'undefined') { // boolean,
     bytes.push(0x19, properties.requestResponseInformation ? 1 : 0);
   }
   // id: 0x1A
@@ -296,7 +296,7 @@ export function propertiesToBytes(properties?: Properties): Uint8Array {
     bytes.push(0x24, properties.maximumQoS & 0xFF);
   }
   // id: 0x25, type: Byte
-  if (properties.retainAvailable) { // boolean,
+  if (typeof properties.retainAvailable !== 'undefined') { // boolean,
     bytes.push(0x25, properties.retainAvailable ? 1 : 0);
   }
   // id: 0x26, type: UTF-8 String Pair
@@ -314,15 +314,15 @@ export function propertiesToBytes(properties?: Properties): Uint8Array {
     bytes.push(0x27, ...numToFourByteInteger(properties.maximumPacketSize));
   }
   // id: 0x28, type: Byte
-  if (properties.wildcardSubscriptionAvailable) { // boolean,
+  if (typeof properties.wildcardSubscriptionAvailable !== 'undefined') { // boolean,
     bytes.push(0x28, properties.wildcardSubscriptionAvailable ? 1 : 0);
   }
   // id: 0x29, type: Byte
-  if (properties.subscriptionIdentifiersAvailable) { // boolean,
+  if (typeof properties.subscriptionIdentifiersAvailable !== 'undefined') { // boolean,
     bytes.push(0x29, properties.subscriptionIdentifiersAvailable ? 1 : 0);
   }
   // id: 0x2A, type: Byte
-  if (properties.sharedSubscriptionAvailable) { // boolean ,
+  if (typeof properties.sharedSubscriptionAvailable !== 'undefined') { // boolean ,
     bytes.push(0x2A, properties.sharedSubscriptionAvailable ? 1 : 0);
   }
 

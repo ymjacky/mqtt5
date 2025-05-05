@@ -62,7 +62,7 @@ export class ReuseIdProvider {
       this._use.splice(index, 1); // delete
 
       if (id === this._next - 1) {
-        this._next = id; // _nextを戻す
+        this._next = id;
       } else {
         this._reusable.push(id);
       }

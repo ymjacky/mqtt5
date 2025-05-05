@@ -271,7 +271,6 @@ Deno.test('decodeUnsubscribePacketMQTT5NoProperties', function () {
       type: 'unsubscribe',
       packetId: 1,
       topicFilters: ['a/b', 'c/d'],
-      properties: {},
     },
   );
 });

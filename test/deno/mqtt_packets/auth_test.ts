@@ -423,7 +423,6 @@ Deno.test('decodeAuthPacketWithEmptyProperties', function () {
     {
       type: 'auth',
       reasonCode: Mqtt.ReasonCode.Success,
-      properties: {},
     },
   );
 });

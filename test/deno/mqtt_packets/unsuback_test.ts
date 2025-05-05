@@ -205,7 +205,6 @@ Deno.test('decodeUnsubackPacketMQTT5WithReasonCodes', function () {
         Mqtt.ReasonCode.PacketIdentifierInUse,
       ],
       packetId: 1,
-      properties: {},
     },
   );
 });

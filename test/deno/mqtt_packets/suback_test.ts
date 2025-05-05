@@ -233,7 +233,6 @@ Deno.test('decodeSubackPacketMQTT5WithReasonCodes', function () {
         Mqtt.ReasonCode.SubscriptionIdentifiersNotSupported,
         Mqtt.ReasonCode.WildcardSubscriptionsNotSupported,
       ],
-      properties: {},
     },
   );
 });

@@ -52,22 +52,33 @@ export function parse(
     const properties = (() => {
       const { number: length, size: consumedBytesSize } = variableByteIntegerToNum(buffer, pos);
       pos += consumedBytesSize;
-      const prop = MqttProperties.parseMqttProperties(buffer, pos, length);
-      pos += length;
-      return prop;
+
+      if (length > 0) {
+        const prop = MqttProperties.parseMqttProperties(buffer, pos, length);
+        pos += length;
+        return prop;
+      }
+      return undefined;
     })();
 
     const reasonCodes = [];
     while (pos < remainingLength) {
       reasonCodes.push(buffer[pos++]);
     }
-
-    return {
-      type: 'unsuback',
-      packetId: packetId,
-      reasonCodes: reasonCodes,
-      properties: properties,
-    };
+    if (properties) {
+      return {
+        type: 'unsuback',
+        packetId: packetId,
+        reasonCodes: reasonCodes,
+        properties: properties,
+      };
+    } else {
+      return {
+        type: 'unsuback',
+        packetId: packetId,
+        reasonCodes: reasonCodes,
+      };
+    }
   } else {
     return {
       type: 'unsuback',

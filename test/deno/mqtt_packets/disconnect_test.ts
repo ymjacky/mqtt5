@@ -398,7 +398,6 @@ Deno.test('decodeDisconnectPacketMQTT5WithEmptyProperties', function () {
     {
       type: 'disconnect',
       reasonCode: Mqtt.ReasonCode.Success,
-      properties: {},
     },
   );
 });
