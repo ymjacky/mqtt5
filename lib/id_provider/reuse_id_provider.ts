@@ -28,7 +28,7 @@ export class ReuseIdProvider {
     this._next = this._start;
   }
 
-  public aquire(): number {
+  public acquire(): number {
     let id = this._reusable.shift(); // remove first entry
     if (id) { // found
       this._reuse.push(id);

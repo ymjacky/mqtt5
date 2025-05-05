@@ -26,8 +26,8 @@ export class Session {
     return this.sessionId;
   }
 
-  public async aquirePacketId() {
-    return await this.packetIdProvider.aquire();
+  public async acquirePacketId() {
+    return await this.packetIdProvider.acquire();
   }
 
   public async clearAllStores(newSessionId?: string) {
