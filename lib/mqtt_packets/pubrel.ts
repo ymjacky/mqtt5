@@ -44,7 +44,7 @@ export function parse(
   let pos = 0;
 
   if (remainingLength < 2) {
-    throw new MqttUtilsError.RemainingLengthError('pubrec packet');
+    throw new MqttUtilsError.RemainingLengthError('pubrel packet');
   }
   const packetId = twoByteIntegerToNum(buffer, pos);
   pos += 2;
@@ -68,15 +68,28 @@ export function parse(
   const properties = (() => {
     const { number: length, size: consumedBytesSize } = variableByteIntegerToNum(buffer, pos);
     pos += consumedBytesSize;
-    const prop = MqttProperties.parseMqttProperties(buffer, pos, length);
-    pos += length;
-    return prop;
+
+    if (length > 0) {
+      const prop = MqttProperties.parseMqttProperties(buffer, pos, length);
+      pos += length;
+      return prop;
+    } else {
+      return undefined;
+    }
   })();
 
-  return {
-    type: 'pubrel',
-    packetId: packetId,
-    reasonCode: reasonCode,
-    properties: properties,
-  };
+  if (properties) {
+    return {
+      type: 'pubrel',
+      packetId: packetId,
+      reasonCode: reasonCode,
+      properties: properties,
+    };
+  } else {
+    return {
+      type: 'pubrel',
+      packetId: packetId,
+      reasonCode: reasonCode,
+    };
+  }
 }

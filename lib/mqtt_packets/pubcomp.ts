@@ -68,15 +68,28 @@ export function parse(
   const properties = (() => {
     const { number: length, size: consumedBytesSize } = variableByteIntegerToNum(buffer, pos);
     pos += consumedBytesSize;
-    const prop = MqttProperties.parseMqttProperties(buffer, pos, length);
-    pos += length;
-    return prop;
+
+    if (length > 0) {
+      const prop = MqttProperties.parseMqttProperties(buffer, pos, length);
+      pos += length;
+      return prop;
+    } else {
+      return undefined;
+    }
   })();
 
-  return {
-    type: 'pubcomp',
-    packetId: packetId,
-    reasonCode: reasonCode,
-    properties: properties,
-  };
+  if (properties) {
+    return {
+      type: 'pubcomp',
+      packetId: packetId,
+      reasonCode: reasonCode,
+      properties: properties,
+    };
+  } else {
+    return {
+      type: 'pubcomp',
+      packetId: packetId,
+      reasonCode: reasonCode,
+    };
+  }
 }
