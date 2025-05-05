@@ -43,7 +43,7 @@ export class TopicAliasManager {
       if (tid) {
         this.topicIdProvider.release(tid);
       }
-      const topicId = await this.aquireTopicId();
+      const topicId = await this.acquireTopicId();
       this.topicAliasMap.set(topic, topicId);
       return topicId;
     } else {
@@ -58,7 +58,7 @@ export class TopicAliasManager {
         }
       }
 
-      const topicId = await this.aquireTopicId();
+      const topicId = await this.acquireTopicId();
       this.topicAliasMap.set(topic, topicId);
       return topicId;
     }
@@ -74,7 +74,7 @@ export class TopicAliasManager {
     }
   }
 
-  private async aquireTopicId() {
-    return await this.topicIdProvider.aquire();
+  private async acquireTopicId() {
+    return await this.topicIdProvider.acquire();
   }
 }

@@ -362,7 +362,7 @@ export abstract class BaseMqttClient {
       await this.sendPacket(packet);
       deferred.resolve({ result: 0, reason: '' });
     } else {
-      const packetId = await this.session.aquirePacketId();
+      const packetId = await this.session.acquirePacketId();
       const packet: PublishPacket = {
         type: 'publish',
         topic,
@@ -475,7 +475,7 @@ export abstract class BaseMqttClient {
     const deferred = new Deferred<SubscribeResults>();
     const packet: SubscribePacket = {
       type: 'subscribe',
-      packetId: await this.session.aquirePacketId(),
+      packetId: await this.session.acquirePacketId(),
       subscriptions: subs,
       properties: properties,
     };
@@ -534,7 +534,7 @@ export abstract class BaseMqttClient {
     const deferred = new Deferred<UnsubscribeResults>();
     const packet: UnsubscribePacket = {
       type: 'unsubscribe',
-      packetId: await this.session.aquirePacketId(),
+      packetId: await this.session.acquirePacketId(),
       topicFilters: unsubs,
       properties,
     };

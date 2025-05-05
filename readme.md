@@ -5,7 +5,7 @@
 
 ``mqtt5`` supports Mqtt protocol versions 5.0 and 3.1.1.
 
-We have confirmed that deno version 1.44.2 or later works.
+We have confirmed that deno version 2.3.1 or later works.
 
 ## Usage
 
