@@ -259,7 +259,6 @@ Deno.test({ name: '@closing', only: false }, async (context) => {
           resolve();
         });
         client.disconnect();
-        client.disconnect();
 
         await promise;
       } catch (err) {

@@ -44,9 +44,13 @@ export function parse(
     if (protocolVersion > Mqtt.ProtocolVersion.MQTT_V3_1_1) {
       const { number: length, size: consumedBytesSize } = variableByteIntegerToNum(buffer, pos);
       pos += consumedBytesSize;
-      const prop = MqttProperties.parseMqttProperties(buffer, pos, length);
-      pos += length;
-      return prop;
+
+      if (length > 0) {
+        const prop = MqttProperties.parseMqttProperties(buffer, pos, length);
+        pos += length;
+        return prop;
+      }
+      return undefined;
     } else {
       return undefined;
     }
@@ -59,15 +63,25 @@ export function parse(
   }
 
   if (protocolVersion > Mqtt.ProtocolVersion.MQTT_V3_1_1) {
+    if (properties) {
+      return {
+        type: 'suback',
+        packetId: packetId,
+        reasonCodes: rc,
+        properties: properties,
+      };
+    } else {
+      return {
+        type: 'suback',
+        packetId: packetId,
+        reasonCodes: rc,
+      };
+    }
+  } else {
     return {
       type: 'suback',
       packetId: packetId,
-      reasonCodes: (protocolVersion > 4) ? rc : undefined,
-      properties: properties,
+      returnCodes: rc,
     };
-  } else {return {
-      type: 'suback',
-      packetId: packetId,
-      returnCodes: !(protocolVersion > 4) ? rc : undefined,
-    };}
+  }
 }

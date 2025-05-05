@@ -29,7 +29,7 @@ export class ReuseIdProvider {
   }
 
   public aquire(): number {
-    let id = this._reusable.shift();
+    let id = this._reusable.shift(); // remove first entry
     if (id) { // found
       this._reuse.push(id);
     } else {
@@ -47,23 +47,25 @@ export class ReuseIdProvider {
   public release(id: number): boolean {
     let index = this._reuse.findIndex((v) => v === id);
     if (index >= 0) { // found
-      // delete
       this._reuse.splice(index, 1); // delete
 
-      if (this._next == id + 1) {
-        this._next--;
+      if (id === this._next - 1) {
+        this._next = id;
       } else {
         this._reusable.push(id);
       }
-
       return true;
     }
 
     index = this._use.findIndex((v) => v === id);
     if (index >= 0) { // found
       this._use.splice(index, 1); // delete
-      this._reusable.push(id);
 
+      if (id === this._next - 1) {
+        this._next = id;
+      } else {
+        this._reusable.push(id);
+      }
       return true;
     }
 
@@ -71,13 +73,15 @@ export class ReuseIdProvider {
   }
 
   public inUse(id: number) {
-    let index = this._reuse.findIndex((v) => v === id);
-    if (index >= 0) {
-      return true;
-    }
+    return this._reuse.includes(id) || this._use.includes(id);
+  }
 
-    index = this._use.findIndex((v) => v === id);
-    if (index >= 0) {
+  public registerIfNotInUse(id: number): boolean {
+    if (!this.inUse(id)) {
+      if (this._next <= id) {
+        this._next = id + 1;
+      }
+      this._use.push(id);
       return true;
     }
     return false;
