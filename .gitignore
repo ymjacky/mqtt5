@@ -5,3 +5,4 @@ cert
 temp.db
 .github/*.md
 .agent-doc
+.problem.md

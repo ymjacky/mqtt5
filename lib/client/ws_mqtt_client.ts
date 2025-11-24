@@ -1,4 +1,4 @@
-import { MqttPackets, MqttUtils } from '../mod.ts';
+import { Mqtt, MqttPackets, MqttUtils } from '../mod.ts';
 import { BaseMqttClient } from './base_mqtt_client.ts';
 import { ClientOptions } from './client_types.ts';
 import { Deferred } from './promise.ts';
@@ -92,9 +92,21 @@ export class WebSocketMqttClient extends BaseMqttClient {
 
       array.forEach((receiveBytes) => {
         this.log('receive bytes', receiveBytes);
-        const packet = MqttPackets.decode(receiveBytes, this.protocolVersion);
-        this.log('receive packet', packet);
-        this.packetReceived(packet);
+
+        // Wrap packet decoding to handle malformed packets
+        try {
+          const packet = MqttPackets.decode(receiveBytes, this.protocolVersion);
+          this.log('receive packet', packet);
+          this.packetReceived(packet);
+        } catch (decodeError) {
+          // Handle malformed packet
+          const error = decodeError instanceof Error ? decodeError : new Error(String(decodeError));
+          this.log(`Malformed packet received: ${error.message}`);
+          this.log(`Raw bytes (first 20): ${receiveBytes.slice(0, 20)}`);
+
+          // Send appropriate response based on protocol version
+          this.handleMalformedPacket(receiveBytes, error);
+        }
       });
     };
 
@@ -119,5 +131,26 @@ export class WebSocketMqttClient extends BaseMqttClient {
     }
 
     return Promise.resolve();
+  }
+
+  /**
+   * Handle malformed packet according to protocol version
+   */
+  private async handleMalformedPacket(_rawBytes: Uint8Array, error: Error): Promise<void> {
+    try {
+      this.log('handling malformed packet', error);
+      if (this.protocolVersion === Mqtt.ProtocolVersion.MQTT_V3_1_1) {
+        // MQTT v3.1.1: Send DISCONNECT and wait for broker to close connection
+        this.log('Sending DISCONNECT (v3.1.1) due to malformed packet');
+        await this.doDisconnect(false);
+      } else if (this.protocolVersion === Mqtt.ProtocolVersion.MQTT_V5) {
+        // MQTT v5.0: Send DISCONNECT with MalformedPacket reason code
+        this.log('Sending DISCONNECT (v5.0) with MalformedPacket reason code');
+        await this.doDisconnect(false, Mqtt.ReasonCode.MalformedPacket);
+      }
+    } catch (handlingError) {
+      // If we can't even send error responses, just log and close
+      this.log('Error while handling malformed packet:', handlingError);
+    }
   }
 }
