@@ -588,21 +588,27 @@ export abstract class BaseMqttClient {
     if (this.connectionState === 'offline') {
       deferred.resolve();
     } else {
-      await this.doDisconnect(force, properties);
+      await this.doDisconnect(force, undefined, properties);
     }
 
     return deferred.promise;
   }
 
-  private async doDisconnect(
+  protected async doDisconnect(
     force: boolean = false,
+    reasonCode?: Mqtt.ReasonCode,
     properties?: MqttProperties.Properties,
   ) {
     if (this.connectionState === 'online') {
       if (force) {
         await this.close();
       } else {
-        await this.sendPacket({ type: 'disconnect', properties: properties });
+        const disconnectPacket: DisconnectPacket = {
+          type: 'disconnect',
+          ...(reasonCode !== undefined && { reasonCode }),
+          ...(properties && { properties }),
+        };
+        await this.sendPacket(disconnectPacket);
         this.startDisconnectTimer();
       }
     }

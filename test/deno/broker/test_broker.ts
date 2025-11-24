@@ -615,4 +615,19 @@ export class TestBroker extends EventTarget {
     }
     this.clients.delete(clientId);
   }
+
+  /**
+   * Send raw bytes directly to the client (for testing malformed packets)
+   */
+  async sendRawBytes(
+    clientId: string,
+    bytes: Uint8Array,
+  ) {
+    const client = this.clients.get(clientId);
+    if (client) { // found
+      log(`sending raw bytes (length: ${bytes.length})`, bytes);
+      await client.writer.ready;
+      await client.writer.write(bytes);
+    }
+  }
 }

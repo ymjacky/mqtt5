@@ -1,4 +1,4 @@
-import { MqttPackets } from '../mod.ts';
+import { Mqtt, MqttPackets } from '../mod.ts';
 import { BaseMqttClient } from './base_mqtt_client.ts';
 import type { ClientOptions, WriterFactory, WriterFunction } from './client_types.ts';
 import * as MqttStream from '../mqtt_stream_utils/mod.ts';
@@ -74,9 +74,23 @@ export class MqttClient extends BaseMqttClient {
           const receiveBytes = await MqttStream.readMqttBytes(this.reader);
           this.log('receive bytes', receiveBytes);
 
-          const packet = MqttPackets.decode(receiveBytes, this.protocolVersion);
-          this.log('receive packet', packet);
-          this.packetReceived(packet);
+          // Wrap packet decoding to handle malformed packets
+          try {
+            const packet = MqttPackets.decode(receiveBytes, this.protocolVersion);
+            this.log('receive packet', packet);
+            this.packetReceived(packet);
+          } catch (decodeError) {
+            // Handle malformed packet
+            const error = decodeError instanceof Error ? decodeError : new Error(String(decodeError));
+            this.log(`Malformed packet received: ${error.message}`);
+            this.log(`Raw bytes (first 20): ${receiveBytes.slice(0, 20)}`);
+
+            // Send appropriate response based on protocol version and packet type
+            await this.handleMalformedPacket(receiveBytes, error);
+
+            // // Close connection (will cause reader to throw ConnectionClosed in next iteration)
+            // await this.close();
+          }
         } catch (e) {
           this.detectClosed();
           if (e instanceof ConnectionClosed) {
@@ -85,12 +99,16 @@ export class MqttClient extends BaseMqttClient {
             this.log('ConnectionReset.', e.message);
             break;
           } else {
-            this.log('error', e);
-            throw e;
+            this.log('fatal error in receive loop', e);
+            break;
           }
         }
       }
-    })();
+    })().catch((fatalError) => {
+      // Handle unexpected errors in receive loop
+      this.log('Unhandled error in receive loop:', fatalError);
+      this.close();
+    });
   }
 
   protected async close(): Promise<void> {
@@ -101,5 +119,28 @@ export class MqttClient extends BaseMqttClient {
     }
 
     return Promise.resolve();
+  }
+
+  /**
+   * Handle malformed packet according to protocol version
+   */
+  private async handleMalformedPacket(_rawBytes: Uint8Array, error: Error): Promise<void> {
+    try {
+      this.log('handling malformed packet', error);
+      if (this.protocolVersion === Mqtt.ProtocolVersion.MQTT_V3_1_1) {
+        // MQTT v3.1.1: Send DISCONNECT and wait for broker to close connection
+        this.log('Sending DISCONNECT (v3.1.1) due to malformed packet');
+        await this.doDisconnect(false);
+      } else if (this.protocolVersion === Mqtt.ProtocolVersion.MQTT_V5) {
+        // MQTT v5.0: Send DISCONNECT with MalformedPacket reason code
+        // Note: We don't send PUBACK/PUBREC/AUTH responses for malformed packets
+        // because we cannot trust the packet type or content in malformed data
+        this.log('Sending DISCONNECT (v5.0) with MalformedPacket reason code');
+        await this.doDisconnect(false, Mqtt.ReasonCode.MalformedPacket);
+      }
+    } catch (handlingError) {
+      // If we can't even send error responses, just log and close
+      this.log('Error while handling malformed packet:', handlingError);
+    }
   }
 }
