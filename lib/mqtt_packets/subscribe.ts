@@ -1,5 +1,6 @@
 import * as Mqtt from '../mqtt/mod.ts';
 import {
+  concatBytes,
   numToQoS,
   numToTwoByteInteger,
   numToVariableByteInteger,
@@ -28,17 +29,18 @@ export function toBytes(
   packet: SubscribePacket,
   protocolVersion: Mqtt.ProtocolVersion,
 ) {
-  const variableHeader = [...numToTwoByteInteger(packet.packetId)];
+  const variableHeaderChunks: (Uint8Array | number[])[] = [numToTwoByteInteger(packet.packetId)];
   if (protocolVersion > Mqtt.ProtocolVersion.MQTT_V3_1_1) {
     if (packet.properties) {
-      const propBytes = MqttProperties.propertiesToBytes(packet.properties);
-      variableHeader.push(...propBytes);
+      variableHeaderChunks.push(MqttProperties.propertiesToBytes(packet.properties));
     } else {
-      variableHeader.push(0x00); // Property length 0
+      variableHeaderChunks.push([0x00]); // Property length 0
     }
   }
 
-  const payload = [];
+  const variableHeader = concatBytes(variableHeaderChunks);
+
+  const payloadChunks: (Uint8Array | number[])[] = [];
   for (const sub of packet.subscriptions) {
     if (protocolVersion > Mqtt.ProtocolVersion.MQTT_V3_1_1) {
       const subscriptionOptions = (0b0) | // 7bit reserved
@@ -50,18 +52,20 @@ export function toBytes(
         (sub.qos === Mqtt.QoS.EXACTRY_ONCE ? 0b00000010 : 0) | // 1bit for qos
         (sub.qos === Mqtt.QoS.AT_LEAST_ONCE ? 0b00000001 : 0); // 0bit for qos
 
-      payload.push(...stringToUtfEncodedString(sub.topicFilter), subscriptionOptions);
+      payloadChunks.push(stringToUtfEncodedString(sub.topicFilter), [subscriptionOptions]);
     } else {
-      payload.push(...stringToUtfEncodedString(sub.topicFilter), sub.qos);
+      payloadChunks.push(stringToUtfEncodedString(sub.topicFilter), [sub.qos]);
     }
   }
+
+  const payload = concatBytes(payloadChunks);
 
   const fixedHeader = [
     (Mqtt.PacketType.SUBSCRIBE << 4) + Mqtt.fixexHeaderFlag.SUBSCRIBE,
     ...numToVariableByteInteger(variableHeader.length + payload.length),
   ];
 
-  return Uint8Array.from([...fixedHeader, ...variableHeader, ...payload]);
+  return concatBytes([fixedHeader, variableHeader, payload]);
 }
 
 export function parse(

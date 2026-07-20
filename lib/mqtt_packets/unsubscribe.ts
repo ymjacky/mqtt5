@@ -1,5 +1,6 @@
 import * as Mqtt from '../mqtt/mod.ts';
 import {
+  concatBytes,
   numToTwoByteInteger,
   numToVariableByteInteger,
   stringToUtfEncodedString,
@@ -19,26 +20,30 @@ export function toBytes(
   packet: UnsubscribePacket,
   protocolVersion: Mqtt.ProtocolVersion,
 ) {
-  const variableHeader = [...numToTwoByteInteger(packet.packetId)];
+  const variableHeaderChunks: (Uint8Array | number[])[] = [numToTwoByteInteger(packet.packetId)];
   if (protocolVersion > Mqtt.ProtocolVersion.MQTT_V3_1_1) {
     if (packet.properties) {
-      variableHeader.push(...MqttProperties.propertiesToBytes(packet.properties));
+      variableHeaderChunks.push(MqttProperties.propertiesToBytes(packet.properties));
     } else {
-      variableHeader.push(0x00);
+      variableHeaderChunks.push([0x00]);
     }
   }
 
-  const payload = [];
+  const variableHeader = concatBytes(variableHeaderChunks);
+
+  const payloadChunks: (Uint8Array | number[])[] = [];
   for (const topic of packet.topicFilters) {
-    payload.push(...stringToUtfEncodedString(topic));
+    payloadChunks.push(stringToUtfEncodedString(topic));
   }
+
+  const payload = concatBytes(payloadChunks);
 
   const fixedHeader = [
     (Mqtt.PacketType.UNSUBSCRIBE << 4) + Mqtt.fixexHeaderFlag.UNSUBSCRIBE,
     ...numToVariableByteInteger(variableHeader.length + payload.length),
   ];
 
-  return Uint8Array.from([...fixedHeader, ...variableHeader, ...payload]);
+  return concatBytes([fixedHeader, variableHeader, payload]);
 }
 
 export function parse(

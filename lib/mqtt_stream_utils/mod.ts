@@ -5,14 +5,17 @@ export async function readMqttBytes(
   reader: ReadableStreamBYOBReader,
 ) {
   try {
-    const receiveBytes = [];
+    // Collect received chunks and concatenate them at the end instead of
+    // spreading byte arrays into push(), which can overflow the call stack
+    // once a chunk (e.g. a large incoming PUBLISH payload) grows large.
+    const receiveChunks: (Uint8Array | number[])[] = [];
 
     let readValue = await reader.read(new Uint8Array(1));
     if (readValue.done) {
       throw new ConnectionClosed();
     }
 
-    receiveBytes.push(...readValue.value);
+    receiveChunks.push(readValue.value);
 
     // parse remainingLength
     const remainingLengthBytes = [];
@@ -26,7 +29,7 @@ export async function readMqttBytes(
       readLength++;
       remainingLengthBytes.push(readValue.value[0]);
 
-      receiveBytes.push(readValue.value[0]);
+      receiveChunks.push(readValue.value);
 
       if ((readValue.value[0] >> 7) == 0) {
         break;
@@ -36,7 +39,7 @@ export async function readMqttBytes(
     } while (readLength < 4);
 
     const remainingLength = MqttUtils.variableByteIntegerToNum(
-      new Uint8Array([...remainingLengthBytes]),
+      new Uint8Array(remainingLengthBytes),
       0,
     );
 
@@ -47,10 +50,10 @@ export async function readMqttBytes(
       if (readValue.done) {
         throw new ConnectionClosed();
       }
-      receiveBytes.push(...readValue.value);
+      receiveChunks.push(readValue.value);
     }
 
-    return Promise.resolve(new Uint8Array(receiveBytes));
+    return Promise.resolve(MqttUtils.concatBytes(receiveChunks));
   } catch (e) {
     if (e instanceof ConnectionClosed) {
       return Promise.reject(e);

@@ -1,6 +1,6 @@
 import * as Mqtt from '../mqtt/mod.ts';
 import * as MqttProperties from '../mqtt_properties/mod.ts';
-import { numToVariableByteInteger, variableByteIntegerToNum } from '../mqtt_utils/mod.ts';
+import { concatBytes, numToVariableByteInteger, variableByteIntegerToNum } from '../mqtt_utils/mod.ts';
 
 export type ConnackPacket = {
   type: 'connack';
@@ -14,23 +14,24 @@ export function toBytes(
   packet: ConnackPacket,
   protocolVersion: Mqtt.ProtocolVersion,
 ) {
-  const variableHeader = [];
-  variableHeader.push(packet.sessionPresent ? 1 : 0);
+  const variableHeaderChunks: (Uint8Array | number[])[] = [[packet.sessionPresent ? 1 : 0]];
   if (protocolVersion > 4) {
     const reasonCode = packet.reasonCode || 0x00; // 0x00 success
-    variableHeader.push(reasonCode & 0xFF);
-    variableHeader.push(...MqttProperties.propertiesToBytes(packet.properties));
+    variableHeaderChunks.push([reasonCode & 0xFF]);
+    variableHeaderChunks.push(MqttProperties.propertiesToBytes(packet.properties));
   } else {
     const returnCode = packet.returnCode || 0x00; // 0x00 success
-    variableHeader.push(returnCode & 0xFF);
+    variableHeaderChunks.push([returnCode & 0xFF]);
   }
+
+  const variableHeader = concatBytes(variableHeaderChunks);
 
   const fixedHeader = [
     (Mqtt.PacketType.CONNACK << 4) + Mqtt.fixexHeaderFlag.CONNACK,
     ...numToVariableByteInteger(variableHeader.length),
   ];
 
-  return Uint8Array.from([...fixedHeader, ...variableHeader]);
+  return concatBytes([fixedHeader, variableHeader]);
 }
 
 export function parse(
