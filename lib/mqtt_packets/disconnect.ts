@@ -1,6 +1,6 @@
 import * as Mqtt from '../mqtt/mod.ts';
 import * as MqttProperties from '../mqtt_properties/mod.ts';
-import { numToVariableByteInteger, variableByteIntegerToNum } from '../mqtt_utils/mod.ts';
+import { concatBytes, numToVariableByteInteger, variableByteIntegerToNum } from '../mqtt_utils/mod.ts';
 
 export type DisconnectPacket = {
   type: 'disconnect';
@@ -12,26 +12,31 @@ export function toBytes(
   packet: DisconnectPacket,
   protocolVersion: Mqtt.ProtocolVersion,
 ) {
-  const variableHeader = [];
+  // Collect variable header chunks and concatenate them at the end instead of
+  // spreading byte arrays into push()/Uint8Array.from(), which can overflow
+  // the call stack once the byte array grows large (e.g. many properties).
+  const variableHeaderChunks: (Uint8Array | number[])[] = [];
 
   if (protocolVersion > Mqtt.ProtocolVersion.MQTT_V3_1_1) {
     const reasonCode = packet.reasonCode || 0x00; // 0x00 success
     if (packet.properties) {
-      variableHeader.push(reasonCode & 0xFF);
-      variableHeader.push(...MqttProperties.propertiesToBytes(packet.properties));
+      variableHeaderChunks.push([reasonCode & 0xFF]);
+      variableHeaderChunks.push(MqttProperties.propertiesToBytes(packet.properties));
     } else {
       if (reasonCode != 0x00) {
-        variableHeader.push(reasonCode & 0xFF);
+        variableHeaderChunks.push([reasonCode & 0xFF]);
       }
     }
   }
+
+  const variableHeader = concatBytes(variableHeaderChunks);
 
   const fixedHeader = [
     (Mqtt.PacketType.DISCONNECT << 4) + Mqtt.fixexHeaderFlag.DISCONNECT,
     ...numToVariableByteInteger(variableHeader.length),
   ];
 
-  return Uint8Array.from([...fixedHeader, ...variableHeader]);
+  return concatBytes([fixedHeader, variableHeader]);
 }
 
 export function parse(

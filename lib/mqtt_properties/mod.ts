@@ -6,6 +6,7 @@
 import * as Mqtt from '../mqtt/mod.ts';
 
 import {
+  concatBytes,
   fourByteIntegerToNum,
   numToFourByteInteger,
   numToQoS,
@@ -208,125 +209,129 @@ export function propertiesToBytes(properties?: Properties): Uint8Array {
     return new Uint8Array([0x00]);
   }
 
-  const bytes = [];
+  // Collect property chunks and concatenate them at the end instead of
+  // spreading byte arrays into push(), which can overflow the call stack
+  // once a chunk (e.g. correlationData, authenticationData) grows large.
+  const chunks: (Uint8Array | number[])[] = [];
   // id: 0x01 , type: Byte
   if (properties.payloadFormatIndicator) {
-    bytes.push(0x01, properties.payloadFormatIndicator & 0xFF);
+    chunks.push([0x01, properties.payloadFormatIndicator & 0xFF]);
   }
   // id: 0x02 , type: Four Byte Integer
   if (properties.messageExpiryInterval) { // number ,
-    bytes.push(0x02, ...numToFourByteInteger(properties.messageExpiryInterval));
+    chunks.push([0x02], numToFourByteInteger(properties.messageExpiryInterval));
   }
   // id: 0x03
   if (properties.contentType) { // string,
-    bytes.push(0x03, ...stringToUtfEncodedString(properties.contentType));
+    chunks.push([0x03], stringToUtfEncodedString(properties.contentType));
   }
   // id: 0x08
   if (properties.responseTopic) { // string ,
-    bytes.push(0x08, ...stringToUtfEncodedString(properties.responseTopic));
+    chunks.push([0x08], stringToUtfEncodedString(properties.responseTopic));
   }
   // id: 0x09
   if (properties.correlationData) { // Uint8Array,
     const correlationDataLength = properties.correlationData.length;
-    bytes.push(0x09, ...numToTwoByteInteger(correlationDataLength), ...properties.correlationData);
+    chunks.push([0x09], numToTwoByteInteger(correlationDataLength), properties.correlationData);
   }
   // id: 0x0B, type: Variable Byte Integer
   if (properties.subscriptionIdentifier) { // number,
-    bytes.push(0x0B, ...numToVariableByteInteger(properties.subscriptionIdentifier));
+    chunks.push([0x0B], numToVariableByteInteger(properties.subscriptionIdentifier));
   }
   // id: 0x11, type: Four Byte Integer
   if (properties.sessionExpiryInterval) { // number ,
-    bytes.push(0x11, ...numToFourByteInteger(properties.sessionExpiryInterval));
+    chunks.push([0x11], numToFourByteInteger(properties.sessionExpiryInterval));
   }
   // id: 0x12
   if (properties.assignedClientIdentifier) { // string,
-    bytes.push(0x12, ...stringToUtfEncodedString(properties.assignedClientIdentifier));
+    chunks.push([0x12], stringToUtfEncodedString(properties.assignedClientIdentifier));
   }
   // id: 0x13, type: Two Byte Integer
   if (properties.serverKeepAlive) { // number ,
-    bytes.push(0x13, ...numToTwoByteInteger(properties.serverKeepAlive));
+    chunks.push([0x13], numToTwoByteInteger(properties.serverKeepAlive));
   }
   // id: 0x15
   if (properties.authenticationMethod) { // string ,
-    bytes.push(0x15, ...stringToUtfEncodedString(properties.authenticationMethod));
+    chunks.push([0x15], stringToUtfEncodedString(properties.authenticationMethod));
   }
   // id: 0x16
   if (properties.authenticationData) { // Uint8Array,
     const authenticationDataLength = properties.authenticationData.length;
-    bytes.push(0x16, ...numToTwoByteInteger(authenticationDataLength), ...properties.authenticationData);
+    chunks.push([0x16], numToTwoByteInteger(authenticationDataLength), properties.authenticationData);
   }
   // id: 0x17
   if (typeof properties.requestProblemInformation !== 'undefined') { // boolean ,
-    bytes.push(0x17, properties.requestProblemInformation ? 1 : 0);
+    chunks.push([0x17, properties.requestProblemInformation ? 1 : 0]);
   }
   // id: 0x18
   if (properties.willDelayInterval) { // number ,
-    bytes.push(0x18, ...numToFourByteInteger(properties.willDelayInterval));
+    chunks.push([0x18], numToFourByteInteger(properties.willDelayInterval));
   }
   // id: 0x19
   if (typeof properties.requestResponseInformation !== 'undefined') { // boolean,
-    bytes.push(0x19, properties.requestResponseInformation ? 1 : 0);
+    chunks.push([0x19, properties.requestResponseInformation ? 1 : 0]);
   }
   // id: 0x1A
   if (properties.responseInformation) { // string,
-    bytes.push(0x1A, ...stringToUtfEncodedString(properties.responseInformation));
+    chunks.push([0x1A], stringToUtfEncodedString(properties.responseInformation));
   }
   // id: 0x1C
   if (properties.serverReference) { // string,
-    bytes.push(0x1C, ...stringToUtfEncodedString(properties.serverReference));
+    chunks.push([0x1C], stringToUtfEncodedString(properties.serverReference));
   }
   // id: 0x1F
   if (properties.reasonString) { // string,
-    bytes.push(0x1F, ...stringToUtfEncodedString(properties.reasonString));
+    chunks.push([0x1F], stringToUtfEncodedString(properties.reasonString));
   }
   // id: 0x21 type: Two Byte Integer
   if (properties.receiveMaximum) { // number,
-    bytes.push(0x21, ...numToTwoByteInteger(properties.receiveMaximum));
+    chunks.push([0x21], numToTwoByteInteger(properties.receiveMaximum));
   }
   // id: 0x22 type: Two Byte Integer
   if (properties.topicAliasMaximum) { // number,
-    bytes.push(0x22, ...numToTwoByteInteger(properties.topicAliasMaximum));
+    chunks.push([0x22], numToTwoByteInteger(properties.topicAliasMaximum));
   }
   // id: 0x23, type: Two Byte Integer
   if (properties.topicAlias) { // number,
-    bytes.push(0x23, ...numToTwoByteInteger(properties.topicAlias));
+    chunks.push([0x23], numToTwoByteInteger(properties.topicAlias));
   }
   // id: 0x24, type: Byte
   if (properties.maximumQoS) { // Mqtt.QoS,
-    bytes.push(0x24, properties.maximumQoS & 0xFF);
+    chunks.push([0x24, properties.maximumQoS & 0xFF]);
   }
   // id: 0x25, type: Byte
   if (typeof properties.retainAvailable !== 'undefined') { // boolean,
-    bytes.push(0x25, properties.retainAvailable ? 1 : 0);
+    chunks.push([0x25, properties.retainAvailable ? 1 : 0]);
   }
   // id: 0x26, type: UTF-8 String Pair
   if (properties.userProperties) { // string,
     if (properties.userProperties.length !== 0) {
       properties.userProperties.forEach((entry) => {
-        bytes.push(0x26);
-        bytes.push(...stringToUtfEncodedString(entry.key));
-        bytes.push(...stringToUtfEncodedString(entry.val));
+        chunks.push([0x26]);
+        chunks.push(stringToUtfEncodedString(entry.key));
+        chunks.push(stringToUtfEncodedString(entry.val));
       });
     }
   }
   // id: 0x27, type: Four Byte Integer
   if (properties.maximumPacketSize) { // number,
-    bytes.push(0x27, ...numToFourByteInteger(properties.maximumPacketSize));
+    chunks.push([0x27], numToFourByteInteger(properties.maximumPacketSize));
   }
   // id: 0x28, type: Byte
   if (typeof properties.wildcardSubscriptionAvailable !== 'undefined') { // boolean,
-    bytes.push(0x28, properties.wildcardSubscriptionAvailable ? 1 : 0);
+    chunks.push([0x28, properties.wildcardSubscriptionAvailable ? 1 : 0]);
   }
   // id: 0x29, type: Byte
   if (typeof properties.subscriptionIdentifiersAvailable !== 'undefined') { // boolean,
-    bytes.push(0x29, properties.subscriptionIdentifiersAvailable ? 1 : 0);
+    chunks.push([0x29, properties.subscriptionIdentifiersAvailable ? 1 : 0]);
   }
   // id: 0x2A, type: Byte
   if (typeof properties.sharedSubscriptionAvailable !== 'undefined') { // boolean ,
-    bytes.push(0x2A, properties.sharedSubscriptionAvailable ? 1 : 0);
+    chunks.push([0x2A, properties.sharedSubscriptionAvailable ? 1 : 0]);
   }
 
-  return new Uint8Array([...numToVariableByteInteger(bytes.length), ...bytes]);
+  const bytes = concatBytes(chunks);
+  return concatBytes([numToVariableByteInteger(bytes.length), bytes]);
 }
 
 export function parseMqttProperties(

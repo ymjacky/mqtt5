@@ -1,5 +1,6 @@
 import * as Mqtt from '../mqtt/mod.ts';
 import {
+  concatBytes,
   numToQoS,
   numToTwoByteInteger,
   numToVariableByteInteger,
@@ -33,15 +34,17 @@ export function toBytes(
     (qos << 1) + // qos
     (packet.retain ? 1 : 0); // retain
 
-  const variableHeader = [...stringToUtfEncodedString(packet.topic)]; // topic
+  const variableHeaderChunks: (Uint8Array | number[])[] = [stringToUtfEncodedString(packet.topic)]; // topic
 
   if (qos === Mqtt.QoS.AT_LEAST_ONCE || qos === Mqtt.QoS.EXACTRY_ONCE) {
-    variableHeader.push(...numToTwoByteInteger(packet.packetId!));
+    variableHeaderChunks.push(numToTwoByteInteger(packet.packetId!));
   }
 
   if (protocolVersion > Mqtt.ProtocolVersion.MQTT_V3_1_1) {
-    variableHeader.push(...MqttProperties.propertiesToBytes(packet.properties));
+    variableHeaderChunks.push(MqttProperties.propertiesToBytes(packet.properties));
   }
+
+  const variableHeader = concatBytes(variableHeaderChunks);
 
   let payload = packet.payload;
 
@@ -54,7 +57,7 @@ export function toBytes(
     ...numToVariableByteInteger(variableHeader.length + payload.length),
   ];
 
-  return Uint8Array.from([...fixedHeader, ...variableHeader, ...payload]);
+  return concatBytes([fixedHeader, variableHeader, payload]);
 }
 
 export function parse(

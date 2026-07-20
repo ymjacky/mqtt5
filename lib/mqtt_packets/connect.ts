@@ -1,4 +1,5 @@
 import {
+  concatBytes,
   numToQoS,
   numToTwoByteInteger,
   numToVariableByteInteger,
@@ -52,51 +53,55 @@ export function toBytes(packet: ConnectPacket) {
 
   const keepAlive = packet.keepAlive || 0; // 0 = Not send KeepAlive
 
-  const variableHeader = [
-    ...protocolName,
-    protocolVersion,
-    connectFlags,
-    keepAlive >> 8,
-    keepAlive & 0xFF,
+  // Collect variable header / payload chunks and concatenate them at the end
+  // instead of spreading byte arrays into push()/Uint8Array.from(), which can
+  // overflow the call stack once a chunk (e.g. Will payload) grows large.
+  const variableHeaderChunks: (Uint8Array | number[])[] = [
+    protocolName,
+    [protocolVersion, connectFlags, keepAlive >> 8, keepAlive & 0xFF],
   ];
 
   if (protocolVersion > Mqtt.ProtocolVersion.MQTT_V3_1_1) {
-    variableHeader.push(...MqttProperties.propertiesToBytes(packet.properties));
+    variableHeaderChunks.push(MqttProperties.propertiesToBytes(packet.properties));
   }
 
-  const payload = [...stringToUtfEncodedString(packet.clientId)];
+  const variableHeader = concatBytes(variableHeaderChunks);
+
+  const payloadChunks: (Uint8Array | number[])[] = [stringToUtfEncodedString(packet.clientId)];
 
   // Will
   if (packet.will) {
     // Will Properties
     if (protocolVersion > Mqtt.ProtocolVersion.MQTT_V3_1_1) {
-      payload.push(...MqttProperties.propertiesToBytes(packet.will.properties));
+      payloadChunks.push(MqttProperties.propertiesToBytes(packet.will.properties));
     }
     // Will Topic
-    payload.push(...stringToUtfEncodedString(packet.will.topic)); // topic
+    payloadChunks.push(stringToUtfEncodedString(packet.will.topic)); // topic
     // Will Payload
     if (packet.will.payload) {
-      payload.push(...numToTwoByteInteger(packet.will.payload.length));
-      payload.push(...packet.will.payload);
+      payloadChunks.push(numToTwoByteInteger(packet.will.payload.length));
+      payloadChunks.push(packet.will.payload);
     } else {
-      payload.push(0x00, 0x00);
+      payloadChunks.push([0x00, 0x00]);
     }
   }
 
   if (packet.username) {
-    payload.push(...stringToUtfEncodedString(packet.username));
+    payloadChunks.push(stringToUtfEncodedString(packet.username));
   }
 
   if (packet.password) {
-    payload.push(...stringToUtfEncodedString(packet.password));
+    payloadChunks.push(stringToUtfEncodedString(packet.password));
   }
+
+  const payload = concatBytes(payloadChunks);
 
   const fixedHeader = [
     (Mqtt.PacketType.CONNECT << 4) + Mqtt.fixexHeaderFlag.CONNECT,
     ...numToVariableByteInteger(variableHeader.length + payload.length),
   ];
 
-  return Uint8Array.from([...fixedHeader, ...variableHeader, ...payload]);
+  return concatBytes([fixedHeader, variableHeader, payload]);
 }
 
 export function parse(

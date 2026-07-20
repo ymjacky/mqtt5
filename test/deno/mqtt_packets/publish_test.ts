@@ -596,3 +596,43 @@ Deno.test('decodePublishPacketWithExtraBytes', function () {
     },
   );
 });
+
+// Regression test for a bug where spreading a large byte array as function
+// call arguments (e.g. `array.push(...bytes)`) could throw
+// "RangeError: Maximum call stack size exceeded". This encodes then decodes
+// a PUBLISH packet with a payload well beyond the typical argument-spread
+// limit (tens of thousands of elements) and verifies the payload round-trips
+// correctly.
+Deno.test('encodeAndDecodePublishPacketWithLargePayload', function () {
+  const largePayloadSize = 200_000; // well beyond the ~65536 argument-spread limit
+  const largePayload = new Uint8Array(largePayloadSize).fill(0x61); // 'a'
+
+  const encoded = toBytes(
+    {
+      type: 'publish',
+      topic: 'a/b',
+      payload: largePayload,
+      dup: false,
+      retain: false,
+      qos: 0,
+      packetId: 0,
+    },
+    Mqtt.ProtocolVersion.MQTT_V3_1_1,
+  );
+
+  // fixedHeader = packetType/flags byte (1) + remainingLength (variable byte integer, 3 bytes for this size)
+  const topicBytesLength = 2 + 'a/b'.length; // topic length prefix (2 bytes) + topic bytes
+  const remainingLength = topicBytesLength + largePayloadSize;
+  const fixedHeaderSize = 1 + 3; // remainingLength encodes to 3 bytes for this size
+  assertEquals(encoded.length, fixedHeaderSize + remainingLength);
+
+  const decoded = parse(
+    0b0000, // packetFlag
+    encoded.slice(fixedHeaderSize), // skip fixedHeader
+    remainingLength,
+    Mqtt.ProtocolVersion.MQTT_V3_1_1,
+  );
+
+  assertEquals(decoded.topic, 'a/b');
+  assertEquals(decoded.payload, largePayload);
+});

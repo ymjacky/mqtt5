@@ -1,6 +1,6 @@
 import * as Mqtt from '../mqtt/mod.ts';
 import * as MqttProperties from '../mqtt_properties/mod.ts';
-import { numToVariableByteInteger, variableByteIntegerToNum } from '../mqtt_utils/mod.ts';
+import { concatBytes, numToVariableByteInteger, variableByteIntegerToNum } from '../mqtt_utils/mod.ts';
 
 export type AuthPacket = {
   type: 'auth';
@@ -12,24 +12,26 @@ export function toBytes(
   packet: AuthPacket,
   _protocolVersion: Mqtt.ProtocolVersion,
 ) {
-  const variableHeader = [];
+  const variableHeaderChunks: (Uint8Array | number[])[] = [];
 
   const reasonCode = packet.reasonCode || 0x00; // 0x00 success
   if (packet.properties) {
-    variableHeader.push(reasonCode & 0xFF);
-    variableHeader.push(...MqttProperties.propertiesToBytes(packet.properties));
+    variableHeaderChunks.push([reasonCode & 0xFF]);
+    variableHeaderChunks.push(MqttProperties.propertiesToBytes(packet.properties));
   } else {
     if (reasonCode != 0x00) {
-      variableHeader.push(reasonCode & 0xFF);
+      variableHeaderChunks.push([reasonCode & 0xFF]);
     }
   }
+
+  const variableHeader = concatBytes(variableHeaderChunks);
 
   const fixedHeader = [
     (Mqtt.PacketType.AUTH << 4) + Mqtt.fixexHeaderFlag.AUTH,
     ...numToVariableByteInteger(variableHeader.length),
   ];
 
-  return Uint8Array.from([...fixedHeader, ...variableHeader]);
+  return concatBytes([fixedHeader, variableHeader]);
 }
 
 export function parse(

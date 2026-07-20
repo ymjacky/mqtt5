@@ -1,13 +1,13 @@
 import { numToTwoByteInteger, twoByteIntegerToNum } from './two_byte_integer.ts';
+import { concatBytes } from './concat_bytes.ts';
 
 export function stringToUtfEncodedString(str: string): Uint8Array {
   const bytes: Uint8Array = new TextEncoder().encode(str);
-  return new Uint8Array([...numToTwoByteInteger(bytes.length), ...bytes]);
+  return concatBytes([numToTwoByteInteger(bytes.length), bytes]);
 }
 
 export function stringToBytes(str: string): Uint8Array {
-  const bytes: Uint8Array = new TextEncoder().encode(str);
-  return new Uint8Array([...bytes]);
+  return new TextEncoder().encode(str);
 }
 
 export function utfEncodedStringToString(

@@ -1,5 +1,5 @@
 import * as Mqtt from '../mqtt/mod.ts';
-import { numToTwoByteInteger, numToVariableByteInteger, twoByteIntegerToNum, variableByteIntegerToNum } from '../mqtt_utils/mod.ts';
+import { concatBytes, numToTwoByteInteger, numToVariableByteInteger, twoByteIntegerToNum, variableByteIntegerToNum } from '../mqtt_utils/mod.ts';
 import * as MqttProperties from '../mqtt_properties/mod.ts';
 
 export type SubackPacket = {
@@ -14,11 +14,13 @@ export function toBytes(
   packet: SubackPacket,
   protocolVersion: Mqtt.ProtocolVersion,
 ) {
-  const variableHeader = [...numToTwoByteInteger(packet.packetId)]; //packetId
+  const variableHeaderChunks: (Uint8Array | number[])[] = [numToTwoByteInteger(packet.packetId)]; //packetId
   if (protocolVersion > Mqtt.ProtocolVersion.MQTT_V3_1_1) {
     // MQTT V5.0
-    variableHeader.push(...MqttProperties.propertiesToBytes(packet.properties));
+    variableHeaderChunks.push(MqttProperties.propertiesToBytes(packet.properties));
   }
+
+  const variableHeader = concatBytes(variableHeaderChunks);
 
   const payload: number[] = (protocolVersion > Mqtt.ProtocolVersion.MQTT_V3_1_1) ? packet.reasonCodes! : packet.returnCodes!;
 
@@ -27,7 +29,7 @@ export function toBytes(
     ...numToVariableByteInteger(variableHeader.length + payload.length),
   ];
 
-  return Uint8Array.from([...fixedHeader, ...variableHeader, ...payload]);
+  return concatBytes([fixedHeader, variableHeader, payload]);
 }
 
 export function parse(
