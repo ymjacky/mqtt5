@@ -1,4 +1,4 @@
-import { ConnectionClosed, ConnectionReset } from '../client/error.ts';
+import { ConnectionClosed, ConnectionReset, MalformedPacketError } from '../client/error.ts';
 import * as MqttUtils from '../mqtt_utils/mod.ts';
 
 export async function readMqttBytes(
@@ -34,7 +34,7 @@ export async function readMqttBytes(
       if ((readValue.value[0] >> 7) == 0) {
         break;
       } else if (readLength == 4) {
-        throw new Error('malformed packet');
+        throw new MalformedPacketError('malformed variable byte integer: remaining length exceeds 4 bytes');
       }
     } while (readLength < 4);
 
