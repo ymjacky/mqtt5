@@ -1,7 +1,8 @@
-import { assertEquals } from 'std/assert/mod.ts';
+import { assertEquals, assertRejects } from 'std/assert/mod.ts';
 import * as MqttStream from '../../../lib/mqtt_stream_utils/mod.ts';
 import * as Publish from '../../../lib/mqtt_packets/publish.ts';
 import * as Mqtt from '../../../lib/mqtt/mod.ts';
+import { MalformedPacketError } from '../../../lib/client/error.ts';
 
 /**
  * Creates a `ReadableStream<Uint8Array>` of type `bytes` backed by a fixed
@@ -66,4 +67,22 @@ Deno.test('readMqttBytesWithLargePublishPacket', async function () {
   const receiveBytes = await MqttStream.readMqttBytes(reader);
 
   assertEquals(receiveBytes, encoded);
+});
+
+// A Remaining Length whose continuation bit is still set after 4 bytes is a
+// "Malformed Variable Byte Integer" per the MQTT spec. `readMqttBytes()` must
+// reject with `MalformedPacketError` so callers can distinguish this
+// (unrecoverable byte-stream framing error) from a plain `ConnectionClosed`.
+Deno.test('readMqttBytesRejectsWithMalformedPacketErrorForInvalidRemainingLength', async function () {
+  // Fixed header byte, followed by 4 Remaining Length bytes that all have
+  // the continuation bit (0x80) set.
+  const bytes = new Uint8Array([0x30, 0xFF, 0xFF, 0xFF, 0xFF]);
+
+  const stream = createByobStreamFromBytes(bytes);
+  const reader = stream.getReader({ mode: 'byob' });
+
+  await assertRejects(
+    () => MqttStream.readMqttBytes(reader),
+    MalformedPacketError,
+  );
 });

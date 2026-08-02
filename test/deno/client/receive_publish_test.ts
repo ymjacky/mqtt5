@@ -594,16 +594,15 @@ Deno.test({ name: '@receive malformed publish', only: false }, async (context) =
 
         broker.startRead(client.getClientId());
 
-        // Monitor disconnect event
-        broker.on('disconnect', (event) => {
-          const packet = event.detail;
-          logger('Broker received DISCONNECT from client', packet);
-          assertEquals(packet.type, 'disconnect');
-          resolve();
+        // v3.1.1 has no reason code on DISCONNECT, so the client closes the
+        // connection directly instead of sending a (misleading) DISCONNECT.
+        broker.on('disconnect', () => {
+          fail('client should not send a DISCONNECT packet for a malformed packet on v3.1.1');
         });
 
         client.on('closed', () => {
           logger('Client connection closed');
+          resolve();
         });
 
         // Create malformed PUBLISH packet with invalid QoS (3)

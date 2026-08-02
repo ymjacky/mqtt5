@@ -464,12 +464,12 @@ export abstract class BaseMqttClient {
       return (typeof sub === 'object')
         ? {
           topicFilter: sub.topicFilter,
-          qos: (sub.qos || qos || Mqtt.QoS.AT_MOST_ONCE),
+          qos: sub.qos || qos || Mqtt.QoS.AT_MOST_ONCE,
           retainHandling: sub.retainHandling,
           retainAsPublished: sub.retainAsPublished,
           noLocal: sub.noLocal,
         }
-        : { topicFilter: sub, qos: (qos || Mqtt.QoS.AT_MOST_ONCE) };
+        : { topicFilter: sub, qos: qos || Mqtt.QoS.AT_MOST_ONCE };
     });
 
     const deferred = new Deferred<SubscribeResults>();
@@ -634,6 +634,29 @@ export abstract class BaseMqttClient {
   protected write: (byte: Uint8Array) => void = (_byte: Uint8Array) => {};
 
   protected abstract close(): Promise<void>;
+
+  protected async handleMalformedPacket(error: Error): Promise<void> {
+    try {
+      this.log('handling malformed packet', error);
+      if (this.protocolVersion === Mqtt.ProtocolVersion.MQTT_V3_1_1) {
+        // MQTT v3.1.1: DISCONNECT has no reason code and unconditionally signals a
+        // clean disconnect, which also causes the broker to discard the Will message.
+        // Since this is an abnormal condition caused by the peer, close the connection
+        // directly instead of sending a misleading DISCONNECT.
+        this.log('Closing connection (v3.1.1) due to malformed packet');
+        await this.close();
+      } else if (this.protocolVersion === Mqtt.ProtocolVersion.MQTT_V5) {
+        // MQTT v5.0: Send DISCONNECT with MalformedPacket reason code
+        // Note: We don't send PUBACK/PUBREC/AUTH responses for malformed packets
+        // because we cannot trust the packet type or content in malformed data
+        this.log('Sending DISCONNECT (v5.0) with MalformedPacket reason code');
+        await this.doDisconnect(false, Mqtt.ReasonCode.MalformedPacket);
+      }
+    } catch (handlingError) {
+      // If we can't even send error responses, just log and close
+      this.log('Error while handling malformed packet:', handlingError);
+    }
+  }
 
   protected detectClosed() {
     this.log('connection closed.');

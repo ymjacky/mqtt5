@@ -612,4 +612,18 @@ export class TestWsBroker extends EventTarget {
     }
     this.clients.delete(clientId);
   }
+
+  /**
+   * Send raw bytes directly to the client (for testing malformed packets)
+   */
+  sendRawBytes(
+    clientId: string,
+    bytes: Uint8Array,
+  ) {
+    const client = this.clients.get(clientId);
+    if (client) { // found
+      log(`sending raw bytes (length: ${bytes.length})`, bytes);
+      client.conn.send(bytes);
+    }
+  }
 }

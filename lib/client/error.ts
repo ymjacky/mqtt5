@@ -5,6 +5,13 @@ export class ConnectionClosed extends Error {
   }
 }
 
+export class MalformedPacketError extends Error {
+  readonly #className = 'MalformedPacketError';
+  constructor(message: string) {
+    super(message);
+  }
+}
+
 export class ConnectionReset extends Error {
   readonly #className = 'ConnectionReset';
   constructor(message: string) {
