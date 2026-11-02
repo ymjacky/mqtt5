@@ -27,7 +27,6 @@ Deno.test({ name: '@unsubscribe', only: false }, async (context) => {
         });
 
         await client.connect();
-        broker.startRead(client.getClientId());
 
         // test
         broker.on('unsubscribe', (event) => {
@@ -73,7 +72,6 @@ Deno.test({ name: '@unsubscribe', only: false }, async (context) => {
         });
 
         await client.connect();
-        broker.startRead(client.getClientId());
 
         // test
         broker.on('unsubscribe', (event) => {
@@ -117,7 +115,6 @@ Deno.test({ name: '@unsubscribe', only: false }, async (context) => {
         });
 
         await client.connect();
-        broker.startRead(client.getClientId());
 
         // test
         broker.on('unsubscribe', (event) => {
@@ -178,7 +175,6 @@ Deno.test({ name: '@unsubscribe', only: false }, async (context) => {
         });
 
         await client.connect();
-        broker.startRead(client.getClientId());
 
         // test
         broker.on('unsubscribe', (event) => {
@@ -234,7 +230,6 @@ Deno.test({ name: '@unsubscribe', only: false }, async (context) => {
         });
 
         await client.connect();
-        broker.startRead(client.getClientId());
 
         // test
         const properties: MqttProperties.UnsubscribeProperties = {
@@ -297,7 +292,6 @@ Deno.test({ name: '@unsubscribe', only: false }, async (context) => {
         });
 
         await client.connect();
-        broker.startRead(client.getClientId());
 
         // test
         const properties: MqttProperties.UnsubscribeProperties = {
@@ -396,8 +390,6 @@ Deno.test({ name: '@receive malformed unsuback', only: false }, async (context) 
             reasonCode: Mqtt.ReasonCode.Success,
           },
         );
-
-        broker.startRead(client.getClientId());
 
         // Monitor DISCONNECT event
         broker.on('disconnect', (event) => {

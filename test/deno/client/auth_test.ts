@@ -26,8 +26,6 @@ Deno.test({ name: '@auth', only: false }, async (context) => {
         });
 
         broker.on('connect', (event) => {
-          broker.startRead(client.getClientId());
-
           const packet = event.detail;
           assertEquals(packet.properties?.authenticationMethod, 'SCRAM-SHA-1');
           const authPropertie: MqttProperties.AuthProperties = {
@@ -114,8 +112,6 @@ Deno.test({ name: '@receive malformed auth', only: false }, async (context) => {
             reasonCode: Mqtt.ReasonCode.Success,
           },
         );
-
-        broker.startRead(client.getClientId());
 
         // Monitor DISCONNECT event
         broker.on('disconnect', (event) => {

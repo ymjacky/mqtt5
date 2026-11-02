@@ -27,7 +27,6 @@ Deno.test({ name: '@subscribe', only: false }, async (context) => {
         });
 
         await client.connect();
-        broker.startRead(client.getClientId());
 
         // test
         broker.on('subscribe', (event) => {
@@ -74,7 +73,6 @@ Deno.test({ name: '@subscribe', only: false }, async (context) => {
         });
 
         await client.connect();
-        broker.startRead(client.getClientId());
 
         // test
         broker.on('subscribe', (event) => {
@@ -121,7 +119,6 @@ Deno.test({ name: '@subscribe', only: false }, async (context) => {
         });
 
         await client.connect();
-        broker.startRead(client.getClientId());
 
         // test
         broker.on('subscribe', (event) => {
@@ -169,7 +166,6 @@ Deno.test({ name: '@subscribe', only: false }, async (context) => {
         });
 
         await client.connect();
-        broker.startRead(client.getClientId());
 
         // test
         broker.on('subscribe', (event) => {
@@ -217,7 +213,6 @@ Deno.test({ name: '@subscribe', only: false }, async (context) => {
         });
 
         await client.connect();
-        broker.startRead(client.getClientId());
 
         // test
         broker.on('subscribe', (event) => {
@@ -265,7 +260,6 @@ Deno.test({ name: '@subscribe', only: false }, async (context) => {
         });
 
         await client.connect();
-        broker.startRead(client.getClientId());
 
         // test
         broker.on('subscribe', (event) => {
@@ -312,7 +306,6 @@ Deno.test({ name: '@subscribe', only: false }, async (context) => {
         });
 
         await client.connect();
-        broker.startRead(client.getClientId());
 
         // test
         broker.on('subscribe', (event) => {
@@ -381,7 +374,6 @@ Deno.test({ name: '@subscribe', only: false }, async (context) => {
         });
 
         await client.connect();
-        broker.startRead(client.getClientId());
 
         // test
         broker.on('subscribe', (event) => {
@@ -454,7 +446,6 @@ Deno.test({ name: '@subscribe', only: false }, async (context) => {
         });
 
         await client.connect();
-        broker.startRead(client.getClientId());
 
         // test
         broker.on('subscribe', (event) => {
@@ -507,7 +498,6 @@ Deno.test({ name: '@subscribe', only: false }, async (context) => {
         });
 
         await client.connect();
-        broker.startRead(client.getClientId());
 
         // test
         broker.on('subscribe', (event) => {
@@ -588,7 +578,6 @@ Deno.test({ name: '@subscribe', only: false }, async (context) => {
         });
 
         await client.connect();
-        broker.startRead(client.getClientId());
 
         // test
         const properties: MqttProperties.SubscribeProperties = {
@@ -654,7 +643,6 @@ Deno.test({ name: '@subscribe', only: false }, async (context) => {
         });
 
         await client.connect();
-        broker.startRead(client.getClientId());
 
         // test
         const properties: MqttProperties.SubscribeProperties = {
@@ -756,8 +744,6 @@ Deno.test({ name: '@receive malformed suback', only: false }, async (context) =>
             reasonCode: Mqtt.ReasonCode.Success,
           },
         );
-
-        broker.startRead(client.getClientId());
 
         // Monitor DISCONNECT event
         broker.on('disconnect', (event) => {

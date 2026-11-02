@@ -34,7 +34,6 @@ Deno.test({ name: '@resend from MemoryStore', only: false }, async (context) => 
         });
 
         await client.connect();
-        broker.startRead(client.getClientId());
 
         // test
         broker.on('publish', (event) => {
@@ -112,7 +111,6 @@ Deno.test({ name: '@resend from MemoryStore', only: false }, async (context) => 
             logger('try to reconnect');
 
             await client.connect();
-            broker.startRead(client.getClientId());
 
             assertEquals((await pubResult1).result, Mqtt.ReasonCode.Success);
             assertEquals((await pubResult2).result, Mqtt.ReasonCode.Success);
@@ -160,7 +158,6 @@ Deno.test({ name: '@resend from MemoryStore', only: false }, async (context) => 
         });
 
         await client.connect();
-        broker.startRead(client.getClientId());
 
         // test
         broker.on('publish', (event) => {
@@ -210,7 +207,6 @@ Deno.test({ name: '@resend from MemoryStore', only: false }, async (context) => 
             logger('try to reconnect');
 
             await client.connect();
-            broker.startRead(client.getClientId());
 
             assertEquals((await pubResult1).result, Mqtt.ReasonCode.Success);
             assertEquals((await pubResult2).result, Mqtt.ReasonCode.Success);
@@ -257,7 +253,6 @@ Deno.test({ name: '@resend from MemoryStore', only: false }, async (context) => 
         });
 
         await client.connect();
-        broker.startRead(client.getClientId());
 
         // test
         broker.on('publish', (event) => {
@@ -335,7 +330,6 @@ Deno.test({ name: '@resend from MemoryStore', only: false }, async (context) => 
             logger('try to reconnect');
 
             await client.connect();
-            broker.startRead(client.getClientId());
 
             assertEquals((await pubResult1).result, Mqtt.ReasonCode.Success);
             assertEquals((await pubResult2).result, Mqtt.ReasonCode.Success);
@@ -383,7 +377,6 @@ Deno.test({ name: '@resend from MemoryStore', only: false }, async (context) => 
         });
 
         await client.connect();
-        broker.startRead(client.getClientId());
 
         // test
         broker.on('publish', (event) => {
@@ -433,7 +426,6 @@ Deno.test({ name: '@resend from MemoryStore', only: false }, async (context) => 
             logger('try to reconnect');
 
             await client.connect();
-            broker.startRead(client.getClientId());
 
             assertEquals((await pubResult1).result, Mqtt.ReasonCode.Success);
             assertEquals((await pubResult2).result, Mqtt.ReasonCode.Success);
@@ -481,7 +473,6 @@ Deno.test({ name: '@resend from MemoryStore', only: false }, async (context) => 
         });
 
         await client.connect();
-        broker.startRead(client.getClientId());
 
         // test
         broker.on('publish', (event) => {
@@ -566,7 +557,6 @@ Deno.test({ name: '@resend from MemoryStore', only: false }, async (context) => 
             logger('try to reconnect');
 
             await client.connect();
-            broker.startRead(client.getClientId());
 
             assertEquals((await pubResult1).result, Mqtt.ReasonCode.Success);
             assertEquals((await pubResult2).result, Mqtt.ReasonCode.Success);
@@ -615,7 +605,6 @@ Deno.test({ name: '@resend from MemoryStore', only: false }, async (context) => 
         });
 
         await client.connect();
-        broker.startRead(client.getClientId());
 
         // test
         broker.on('publish', (event) => {
@@ -670,7 +659,6 @@ Deno.test({ name: '@resend from MemoryStore', only: false }, async (context) => 
             logger('try to reconnect');
 
             await client.connect();
-            broker.startRead(client.getClientId());
 
             assertEquals((await pubResult1).result, Mqtt.ReasonCode.Success);
             assertEquals((await pubResult2).result, Mqtt.ReasonCode.Success);
@@ -717,7 +705,6 @@ Deno.test({ name: '@resend from MemoryStore', only: false }, async (context) => 
         });
 
         await client.connect();
-        broker.startRead(client.getClientId());
 
         // test
         broker.on('publish', (event) => {
@@ -837,7 +824,6 @@ Deno.test({ name: '@resend from MemoryStore', only: false }, async (context) => 
             logger('try to reconnect');
 
             await client.connect();
-            broker.startRead(client.getClientId());
 
             assertEquals((await pubResult1).result, Mqtt.ReasonCode.Success);
             assertEquals((await pubResult2).result, Mqtt.ReasonCode.Success);
@@ -890,7 +876,6 @@ Deno.test({ name: '@resend from MemoryStore', only: false }, async (context) => 
         });
 
         await client.connect();
-        broker.startRead(client.getClientId());
 
         // test
         broker.on('publish', async (event) => {
@@ -953,7 +938,6 @@ Deno.test({ name: '@resend from MemoryStore', only: false }, async (context) => 
             logger('try to reconnect');
 
             await client.connect();
-            broker.startRead(client.getClientId());
 
             assertEquals((await pubResult2).result, Mqtt.ReasonCode.Success);
             assertEquals((await pubResult3).result, Mqtt.ReasonCode.Success);

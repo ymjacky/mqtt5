@@ -70,8 +70,6 @@ Deno.test({ name: '@connack reaction', only: false }, async (context) => {
         const connack = await client.connect();
         assertEquals(connack.properties?.serverKeepAlive, 3);
 
-        broker.startRead(client.getClientId());
-
         const timerId = setTimeout(() => {
           reject();
         }, 10 * 1000);

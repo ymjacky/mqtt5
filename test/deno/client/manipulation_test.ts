@@ -31,7 +31,6 @@ Deno.test({ name: '@manipulation', only: false }, async (context) => {
         });
 
         await client.connect();
-        broker.startRead(client.getClientId());
 
         await client.connect().catch((err: Error) => {
           assert(err instanceof ClientErrors.StateIsNotOfflineError);
@@ -73,7 +72,6 @@ Deno.test({ name: '@manipulation', only: false }, async (context) => {
 
         await client.connect();
 
-        broker.startRead(client.getClientId());
         broker.on('disconnect', (event) => {
           const packet = event.detail;
           assertExists(packet);
@@ -125,8 +123,6 @@ Deno.test({ name: '@manipulation', only: false }, async (context) => {
 
         await client.connect();
 
-        broker.startRead(client.getClientId());
-
         let closedCount = 0;
         client.on('closed', () => {
           closedCount++;
@@ -172,8 +168,6 @@ Deno.test({ name: '@manipulation', only: false }, async (context) => {
 
         await client.connect();
 
-        broker.startRead(client.getClientId());
-
         let closedCount = 0;
         client.on('closed', () => {
           closedCount++;
@@ -218,7 +212,6 @@ Deno.test({ name: '@manipulation', only: false }, async (context) => {
         });
 
         await client.connect();
-        broker.startRead(client.getClientId());
 
         const bigData = new Uint8Array(268_435_456 + 1);
         bigData.fill(0xFF);
@@ -322,7 +315,6 @@ Deno.test({ name: '@manipulation', only: false }, async (context) => {
         });
 
         await client.connect();
-        broker.startRead(client.getClientId());
 
         broker.on('disconnect', () => {
           broker.closeConnectionFromBroker(client.getClientId());
@@ -371,7 +363,6 @@ Deno.test({ name: '@manipulation', only: false }, async (context) => {
           resolve();
         });
         broker.on('connect', () => {
-          broker.startRead(client.getClientId());
           broker.sendConnack(client.getClientId(), false, Mqtt.ProtocolVersion.MQTT_V5);
         });
 
@@ -407,7 +398,6 @@ Deno.test({ name: '@manipulation', only: false }, async (context) => {
         });
 
         broker.on('connect', () => {
-          broker.startRead(client.getClientId());
           broker.sendConnack(client.getClientId(), false, Mqtt.ProtocolVersion.MQTT_V5);
           resolve();
         });
@@ -459,7 +449,6 @@ Deno.test({ name: '@manipulation', only: false }, async (context) => {
 
         await client.connect();
 
-        broker.startRead(client.getClientId());
         broker.sendPuback(client.getClientId(), 999, Mqtt.ProtocolVersion.MQTT_V5);
 
         await promise;
@@ -503,7 +492,6 @@ Deno.test({ name: '@manipulation', only: false }, async (context) => {
 
         await client.connect();
 
-        broker.startRead(client.getClientId());
         broker.sendPubrec(client.getClientId(), 999, Mqtt.ProtocolVersion.MQTT_V5);
 
         await promise;
@@ -547,7 +535,6 @@ Deno.test({ name: '@manipulation', only: false }, async (context) => {
 
         await client.connect();
 
-        broker.startRead(client.getClientId());
         broker.sendPubrel(client.getClientId(), 999, Mqtt.ProtocolVersion.MQTT_V5);
 
         await promise;
@@ -588,7 +575,6 @@ Deno.test({ name: '@manipulation', only: false }, async (context) => {
 
         await client.connect();
 
-        broker.startRead(client.getClientId());
         broker.sendPubcomp(client.getClientId(), 999, Mqtt.ProtocolVersion.MQTT_V5);
 
         await promise;
@@ -629,7 +615,6 @@ Deno.test({ name: '@manipulation', only: false }, async (context) => {
 
         await client.connect();
 
-        broker.startRead(client.getClientId());
         broker.sendSuback(client.getClientId(), 999, Mqtt.ProtocolVersion.MQTT_V5);
 
         await promise;
@@ -670,7 +655,6 @@ Deno.test({ name: '@manipulation', only: false }, async (context) => {
 
         await client.connect();
 
-        broker.startRead(client.getClientId());
         broker.sendUnsuback(client.getClientId(), 999, Mqtt.ProtocolVersion.MQTT_V5);
 
         await promise;
@@ -707,7 +691,6 @@ Deno.test({ name: '@manipulation', only: false }, async (context) => {
         });
 
         await client.connect();
-        broker.startRead(client.getClientId());
 
         broker.on('pingreq', () => {
           fail('A pingreq event has occurred');

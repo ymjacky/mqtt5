@@ -47,8 +47,6 @@ Deno.test({ name: '@receive malformed packet (framing error)', only: false }, as
           },
         );
 
-        broker.startRead(client.getClientId());
-
         // v3.1.1 has no reason code on DISCONNECT, so the client closes the
         // connection directly instead of sending a (misleading) DISCONNECT.
         broker.on('disconnect', () => {
@@ -110,8 +108,6 @@ Deno.test({ name: '@receive malformed packet (framing error)', only: false }, as
             reasonCode: Mqtt.ReasonCode.Success,
           },
         );
-
-        broker.startRead(client.getClientId());
 
         broker.on('disconnect', (event) => {
           const packet = event.detail;

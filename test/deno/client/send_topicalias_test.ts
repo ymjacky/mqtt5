@@ -32,7 +32,6 @@ Deno.test({ name: '@send topic alias', only: false }, async (context) => {
         });
 
         await client.connect();
-        broker.startRead(client.getClientId());
 
         broker.on('publish', (event) => {
           const packet = event.detail;
@@ -90,7 +89,6 @@ Deno.test({ name: '@send topic alias', only: false }, async (context) => {
         });
 
         await client.connect();
-        broker.startRead(client.getClientId());
 
         broker.on('publish', (event) => {
           const packet = event.detail;

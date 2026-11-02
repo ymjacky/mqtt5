@@ -31,7 +31,6 @@ Deno.test({ name: '@receive disconnect', only: false }, async (context) => {
         });
 
         await client.connect();
-        broker.startRead(client.getClientId());
 
         const properties: MqttProperties.DisconnectProperties = {
           reasonString: 'trouble',

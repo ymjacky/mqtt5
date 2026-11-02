@@ -32,7 +32,6 @@ Deno.test({ name: '@publish_qos0', only: false }, async (context) => {
         });
 
         await client.connect();
-        broker.startRead(client.getClientId());
 
         // test
         broker.on('publish', (event) => {
@@ -82,7 +81,6 @@ Deno.test({ name: '@publish_qos0', only: false }, async (context) => {
         });
 
         await client.connect();
-        broker.startRead(client.getClientId());
 
         // test
         broker.on('publish', (event) => {
@@ -132,7 +130,6 @@ Deno.test({ name: '@publish_qos0', only: false }, async (context) => {
         });
 
         await client.connect();
-        broker.startRead(client.getClientId());
 
         // test
         broker.on('publish', (event) => {
@@ -182,7 +179,6 @@ Deno.test({ name: '@publish_qos0', only: false }, async (context) => {
         });
 
         await client.connect();
-        broker.startRead(client.getClientId());
 
         // test
         broker.on('publish', (event) => {
@@ -239,7 +235,6 @@ Deno.test({ name: '@publish_qos0', only: false }, async (context) => {
         });
 
         await client.connect();
-        broker.startRead(client.getClientId());
 
         // test
         const properties: MqttProperties.UserPublishProperties = {
@@ -327,7 +322,6 @@ Deno.test({ name: '@publish_qos1', only: false }, async (context) => {
         });
 
         await client.connect();
-        broker.startRead(client.getClientId());
 
         // test
         broker.on('publish', (event) => {
@@ -392,7 +386,6 @@ Deno.test({ name: '@publish_qos1', only: false }, async (context) => {
         });
 
         await client.connect();
-        broker.startRead(client.getClientId());
 
         // test
         broker.on('publish', (event) => {
@@ -455,7 +448,6 @@ Deno.test({ name: '@publish_qos1', only: false }, async (context) => {
         });
 
         await client.connect();
-        broker.startRead(client.getClientId());
 
         // test
         broker.on('publish', (event) => {
@@ -525,7 +517,6 @@ Deno.test({ name: '@publish_qos1', only: false }, async (context) => {
         });
 
         await client.connect();
-        broker.startRead(client.getClientId());
 
         // test
         const properties: MqttProperties.UserPublishProperties = {
@@ -623,7 +614,6 @@ Deno.test({ name: '@publish_qos2', only: false }, async (context) => {
         });
 
         await client.connect();
-        broker.startRead(client.getClientId());
 
         // test
         broker.on('publish', (event) => {
@@ -701,7 +691,6 @@ Deno.test({ name: '@publish_qos2', only: false }, async (context) => {
         });
 
         await client.connect();
-        broker.startRead(client.getClientId());
 
         // test
         broker.on('publish', (event) => {
@@ -778,7 +767,6 @@ Deno.test({ name: '@publish_qos2', only: false }, async (context) => {
         });
 
         await client.connect();
-        broker.startRead(client.getClientId());
 
         // test
         broker.on('publish', (event) => {
@@ -849,7 +837,6 @@ Deno.test({ name: '@publish_qos2', only: false }, async (context) => {
         });
 
         await client.connect();
-        broker.startRead(client.getClientId());
 
         // test
         const properties: MqttProperties.UserPublishProperties = {
@@ -968,8 +955,6 @@ Deno.test({ name: '@receive malformed puback', only: false }, async (context) =>
           },
         );
 
-        broker.startRead(client.getClientId());
-
         // Monitor DISCONNECT event
         broker.on('disconnect', (event) => {
           const packet = event.detail;
@@ -1053,8 +1038,6 @@ Deno.test({ name: '@receive malformed pubrec', only: false }, async (context) =>
           },
         );
 
-        broker.startRead(client.getClientId());
-
         // Monitor DISCONNECT event
         broker.on('disconnect', (event) => {
           const packet = event.detail;
@@ -1134,8 +1117,6 @@ Deno.test({ name: '@receive malformed pubcomp', only: false }, async (context) =
             reasonCode: Mqtt.ReasonCode.Success,
           },
         );
-
-        broker.startRead(client.getClientId());
 
         // Monitor DISCONNECT event
         broker.on('disconnect', (event) => {
