@@ -264,6 +264,112 @@ Deno.test({ name: '@closing', only: false }, async (context) => {
   );
 
   await context.step(
+    'disconnect called concurrently',
+    async () => {
+      const broker = new TestBroker();
+      let timer: ReturnType<typeof setTimeout> | undefined;
+
+      try {
+        broker.listen();
+
+        const client = new MqttClient({
+          clientId: 'cid',
+          logger: logger,
+          clean: true,
+          connectTimeoutMS: 10000,
+          keepAlive: 10,
+        });
+
+        broker.on('connect', (event) => {
+          const packet = event.detail;
+          broker.sendConnack(packet.clientId, false, packet.protocolVersion);
+        });
+
+        await client.connect();
+
+        let disconnectCount = 0;
+        broker.on('disconnect', () => {
+          disconnectCount++;
+          broker.closeConnectionFromBroker('cid');
+        });
+
+        const timeout = new Promise<string>((resolve) => {
+          timer = setTimeout(() => resolve('timeout'), 3000);
+        });
+        const result = await Promise.race([
+          Promise.all([client.disconnect(), client.disconnect()]).then(() => 'resolved'),
+          timeout,
+        ]);
+
+        // both calls resolve when the connection is closed, and DISCONNECT is sent only once
+        assertEquals(result, 'resolved');
+        assertEquals(disconnectCount, 1);
+      } catch (err) {
+        fail(`error occured: ${err}`);
+      } finally {
+        clearTimeout(timer);
+        await broker.destroy();
+      }
+    },
+  );
+
+  await context.step(
+    'disconnect force while a disconnect is in progress',
+    async () => {
+      const broker = new TestBroker();
+      let timer: ReturnType<typeof setTimeout> | undefined;
+
+      try {
+        broker.listen();
+
+        const client = new MqttClient({
+          clientId: 'cid',
+          logger: logger,
+          clean: true,
+          connectTimeoutMS: 10000,
+          disconnectTimeoutMS: 10000,
+          keepAlive: 10,
+        });
+
+        broker.on('connect', (event) => {
+          const packet = event.detail;
+          broker.sendConnack(packet.clientId, false, packet.protocolVersion);
+        });
+
+        await client.connect();
+
+        // the broker does not close the connection after DISCONNECT
+        let disconnectCount = 0;
+        const received = Promise.withResolvers<void>();
+        broker.on('disconnect', () => {
+          disconnectCount++;
+          received.resolve();
+        });
+
+        const first = client.disconnect();
+        await received.promise;
+
+        const timeout = new Promise<string>((resolve) => {
+          timer = setTimeout(() => resolve('timeout'), 3000);
+        });
+        const result = await Promise.race([
+          Promise.all([first, client.disconnect(true)]).then(() => 'resolved'),
+          timeout,
+        ]);
+
+        // force closes the connection without waiting for disconnectTimeoutMS
+        assertEquals(result, 'resolved');
+        assertEquals(disconnectCount, 1);
+      } catch (err) {
+        fail(`error occured: ${err}`);
+      } finally {
+        clearTimeout(timer);
+        await broker.destroy();
+      }
+    },
+  );
+
+  await context.step(
     'disconnect while connecting',
     async () => {
       const { promise, resolve, reject } = Promise.withResolvers<void>();
