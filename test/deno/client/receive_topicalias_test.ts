@@ -204,4 +204,70 @@ Deno.test({ name: '@receive topic alias', only: false }, async (context) => {
       }
     },
   );
+
+  await context.step(
+    'receive publish with unregistered topic alias',
+    async () => {
+      const { promise, resolve, reject } = Promise.withResolvers<void>();
+
+      const broker = new TestBroker();
+
+      try {
+        broker.listen();
+
+        const client = new MqttClient({
+          clientId: 'cid',
+          logger: logger,
+          clean: true,
+          connectTimeoutMS: 10000,
+          keepAlive: 10,
+          topicAliasMaximumAboutReceive: 3,
+        });
+
+        broker.on('connect', (event) => {
+          const packet = event.detail;
+          broker.sendConnack(packet.clientId, false, packet.protocolVersion);
+        });
+
+        await client.connect();
+
+        // The 1st publish uses an alias that was never registered, so it is dropped.
+        client.on('publish', (event) => {
+          const packet = event.detail;
+          const message = new TextDecoder().decode(packet.payload);
+          assertEquals(message, '2nd');
+          assertEquals(packet.topic, 'topicA');
+          resolve();
+        });
+
+        broker.sendPublish(
+          client.getClientId(),
+          0,
+          '',
+          Mqtt.ProtocolVersion.MQTT_V5,
+          new TextEncoder().encode('1st'),
+          Mqtt.QoS.AT_MOST_ONCE,
+          false,
+          false,
+          { topicAlias: 1 },
+        );
+
+        broker.sendPublish(
+          client.getClientId(),
+          0,
+          'topicA',
+          Mqtt.ProtocolVersion.MQTT_V5,
+          new TextEncoder().encode('2nd'),
+          Mqtt.QoS.AT_MOST_ONCE,
+        );
+
+        await promise;
+      } catch (err) {
+        reject();
+        fail(`error occured: ${err}`);
+      } finally {
+        await broker.destroy();
+      }
+    },
+  );
 }); // topic alias

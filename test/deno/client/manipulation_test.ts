@@ -548,6 +548,94 @@ Deno.test({ name: '@manipulation', only: false }, async (context) => {
   );
 
   await context.step(
+    'unkown packetId, pubrec mqtt v3.1.1',
+    async () => {
+      const { promise, resolve, reject } = Promise.withResolvers<void>();
+
+      const broker = new TestBroker();
+
+      try {
+        broker.listen();
+
+        const client = new MqttClient({
+          clientId: 'cid',
+          logger: logger,
+          clean: true,
+          connectTimeoutMS: 10000,
+          keepAlive: 2,
+          protocolVersion: Mqtt.ProtocolVersion.MQTT_V3_1_1,
+        });
+
+        broker.on('connect', (event) => {
+          const packet = event.detail;
+          broker.sendConnack(packet.clientId, false, packet.protocolVersion);
+        });
+        broker.on('pubrel', (event) => {
+          const packet = event.detail;
+          assertEquals(packet.packetId, 999);
+          assertEquals(packet.reasonCode, undefined);
+          resolve();
+        });
+
+        await client.connect();
+
+        broker.sendPubrec(client.getClientId(), 999, Mqtt.ProtocolVersion.MQTT_V3_1_1);
+
+        await promise;
+      } catch (err) {
+        reject();
+        fail(`error occured: ${err}`);
+      } finally {
+        await broker.destroy();
+      }
+    },
+  );
+
+  await context.step(
+    'unkown packetId, pubrel mqtt v3.1.1',
+    async () => {
+      const { promise, resolve, reject } = Promise.withResolvers<void>();
+
+      const broker = new TestBroker();
+
+      try {
+        broker.listen();
+
+        const client = new MqttClient({
+          clientId: 'cid',
+          logger: logger,
+          clean: true,
+          connectTimeoutMS: 10000,
+          keepAlive: 2,
+          protocolVersion: Mqtt.ProtocolVersion.MQTT_V3_1_1,
+        });
+
+        broker.on('connect', (event) => {
+          const packet = event.detail;
+          broker.sendConnack(packet.clientId, false, packet.protocolVersion);
+        });
+        broker.on('pubcomp', (event) => {
+          const packet = event.detail;
+          assertEquals(packet.packetId, 999);
+          assertEquals(packet.reasonCode, undefined);
+          resolve();
+        });
+
+        await client.connect();
+
+        broker.sendPubrel(client.getClientId(), 999, Mqtt.ProtocolVersion.MQTT_V3_1_1);
+
+        await promise;
+      } catch (err) {
+        reject();
+        fail(`error occured: ${err}`);
+      } finally {
+        await broker.destroy();
+      }
+    },
+  );
+
+  await context.step(
     'unkown packetId, pubcomp',
     async () => {
       const { promise, resolve, reject } = Promise.withResolvers<void>();
@@ -656,6 +744,62 @@ Deno.test({ name: '@manipulation', only: false }, async (context) => {
         await client.connect();
 
         broker.sendUnsuback(client.getClientId(), 999, Mqtt.ProtocolVersion.MQTT_V5);
+
+        await promise;
+      } catch (err) {
+        reject();
+        fail(`error occured: ${err}`);
+      } finally {
+        await broker.destroy();
+      }
+    },
+  );
+
+  await context.step(
+    'off removes an event listener',
+    async () => {
+      const { promise, resolve, reject } = Promise.withResolvers<void>();
+
+      const broker = new TestBroker();
+
+      try {
+        broker.listen();
+
+        const client = new MqttClient({
+          clientId: 'cid',
+          logger: logger,
+          clean: true,
+          connectTimeoutMS: 10000,
+          keepAlive: 10,
+        });
+
+        broker.on('connect', (event) => {
+          const packet = event.detail;
+          broker.sendConnack(packet.clientId, false, packet.protocolVersion);
+        });
+
+        await client.connect();
+
+        let removedCount = 0;
+        const removed = () => {
+          removedCount++;
+        };
+        client.on('publish', removed);
+        client.off('publish', removed);
+
+        client.on('publish', () => {
+          assertEquals(removedCount, 0);
+          resolve();
+        });
+
+        broker.sendPublish(
+          client.getClientId(),
+          0,
+          'topicA',
+          Mqtt.ProtocolVersion.MQTT_V5,
+          new TextEncoder().encode('payloadA'),
+          Mqtt.QoS.AT_MOST_ONCE,
+        );
 
         await promise;
       } catch (err) {

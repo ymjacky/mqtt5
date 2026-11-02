@@ -918,6 +918,80 @@ Deno.test({ name: '@publish_qos2', only: false }, async (context) => {
       }
     },
   );
+
+  await context.step(
+    'publish v5.0 pubcomp return error',
+    async () => {
+      const { promise, resolve } = Promise.withResolvers<void>();
+
+      const broker = new TestBroker();
+
+      try {
+        broker.listen();
+
+        const client = new MqttClient({
+          clientId: 'cid',
+          logger: logger,
+          clean: true,
+          connectTimeoutMS: 10000,
+          keepAlive: 10,
+        });
+
+        broker.on('connect', (event) => {
+          const packet = event.detail;
+          broker.sendConnack(packet.clientId, false, packet.protocolVersion);
+        });
+
+        await client.connect();
+
+        // test
+        broker.on('publish', (event) => {
+          const packet = event.detail;
+          assertEquals(packet.qos, Mqtt.QoS.EXACTLY_ONCE);
+          assertEquals(packet.packetId, 1);
+
+          broker.sendPubrec(
+            'cid',
+            packet.packetId!,
+            Mqtt.ProtocolVersion.MQTT_V5,
+          );
+        });
+
+        broker.on('pubrel', (event) => {
+          const packet = event.detail;
+          assertEquals(packet.packetId, 1);
+
+          const pubcompProperties: MqttProperties.PubcompProperties = {
+            reasonString: 'Packet identifier not found',
+          };
+          broker.sendPubcomp(
+            'cid',
+            packet.packetId!,
+            Mqtt.ProtocolVersion.MQTT_V5,
+            Mqtt.ReasonCode.PacketIdentifierNotFound,
+            pubcompProperties,
+          );
+          resolve();
+        });
+
+        const result = await client.publish(
+          'topicA',
+          new TextEncoder().encode('payloadA'),
+          { qos: Mqtt.QoS.EXACTLY_ONCE },
+        );
+        assertEquals(result.result, Mqtt.ReasonCode.PacketIdentifierNotFound);
+        assertEquals(result.reason, 'Packet identifier not found');
+
+        assertEquals(await client.publishInflightCount(), 0);
+
+        await promise;
+      } catch (err) {
+        fail(`error occured: ${err}`);
+      } finally {
+        await broker.destroy();
+      }
+    },
+  );
 }); // @publish_qos2
 
 Deno.test({ name: '@receive malformed puback', only: false }, async (context) => {
