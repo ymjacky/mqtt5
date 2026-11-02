@@ -61,22 +61,22 @@ await client.disconnect();
 
 All options are optional.
 
-| Option                          | Default                        | Description                                                                                       |
-| ------------------------------- | ------------------------------ | ------------------------------------------------------------------------------------------------- |
-| `url`                           | `mqtt://127.0.0.1:1883`        | Broker URL. `MqttClient`: `mqtt:` or `mqtts:`. `WebSocketMqttClient`: `ws:` or `wss:` (required). |
-| `clientId`                      | `''`                           | Client identifier. With an empty ID, an MQTT 5.0 broker assigns one.                              |
-| `username` / `password`         | -                              | Credentials sent in CONNECT.                                                                      |
-| `protocolVersion`               | `Mqtt.ProtocolVersion.MQTT_V5` | `MQTT_V5` or `MQTT_V3_1_1`.                                                                       |
-| `clean`                         | `true`                         | Clean Start (5.0) / Clean Session (3.1.1).                                                        |
-| `keepAlive`                     | `10`                           | Keep alive interval in **seconds**.                                                               |
-| `connectTimeoutMS`              | `10000`                        | Time to wait for CONNACK, in milliseconds.                                                        |
-| `disconnectTimeoutMS`           | `1000`                         | Time to wait for the connection to close after DISCONNECT, in milliseconds.                       |
-| `pingrespTimeoutMS`             | `2000`                         | Time to wait for PINGRESP, in milliseconds.                                                       |
-| `caCerts`                       | -                              | CA certificates (PEM) for `mqtts:` (`MqttClient` only).                                           |
-| `cert` / `privateKey`           | -                              | Client certificate and private key (PEM) for TLS client authentication (`MqttClient` only).       |
-| `topicAliasMaximumAboutSend`    | -                              | MQTT 5.0: topic alias maximum for outgoing PUBLISH packets. See [Topic aliases](#topic-aliases).  |
-| `topicAliasMaximumAboutReceive` | -                              | MQTT 5.0: topic alias maximum sent to the broker in CONNECT. See [Topic aliases](#topic-aliases). |
-| `logger`                        | -                              | `(msg: string, ...args: unknown[]) => void`, called with debug logs.                              |
+| Option                          | Default                        | Description                                                                                                                           |
+| ------------------------------- | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `url`                           | `mqtt://127.0.0.1:1883`        | Broker URL. `MqttClient`: `mqtt:` or `mqtts:`. `WebSocketMqttClient`: `ws:` or `wss:` (required).                                     |
+| `clientId`                      | `''`                           | Client identifier. With an empty ID, an MQTT 5.0 broker assigns one.                                                                  |
+| `username` / `password`         | -                              | Credentials sent in CONNECT.                                                                                                          |
+| `protocolVersion`               | `Mqtt.ProtocolVersion.MQTT_V5` | `MQTT_V5` or `MQTT_V3_1_1`.                                                                                                           |
+| `clean`                         | `true`                         | Clean Start (5.0) / Clean Session (3.1.1).                                                                                            |
+| `keepAlive`                     | `10`                           | Keep alive interval in **seconds**.                                                                                                   |
+| `connectTimeoutMS`              | `10000`                        | Time to wait for CONNACK, in milliseconds.                                                                                            |
+| `disconnectTimeoutMS`           | `1000`                         | Time to wait for the connection to close after DISCONNECT, in milliseconds.                                                           |
+| `pingrespTimeoutMS`             | `2000`                         | Time to wait for PINGRESP, in milliseconds.                                                                                           |
+| `caCerts`                       | -                              | CA certificates (PEM) to trust in addition to the default root certificates, for `mqtts:` (`MqttClient` only). See [TLS](#tls-mqtts). |
+| `cert` / `privateKey`           | -                              | Client certificate and private key (PEM) for TLS client authentication (`MqttClient` only).                                           |
+| `topicAliasMaximumAboutSend`    | -                              | MQTT 5.0: topic alias maximum for outgoing PUBLISH packets. See [Topic aliases](#topic-aliases).                                      |
+| `topicAliasMaximumAboutReceive` | -                              | MQTT 5.0: topic alias maximum sent to the broker in CONNECT. See [Topic aliases](#topic-aliases).                                     |
+| `logger`                        | -                              | `(msg: string, ...args: unknown[]) => void`, called with debug logs.                                                                  |
 
 ### MQTT 3.1.1
 
@@ -95,13 +95,17 @@ await client.connect();
 
 ### TLS (`mqtts://`)
 
+`caCerts` is optional. Without it, the broker certificate is verified against Deno's default root certificates (Mozilla's root store; set
+`DENO_TLS_CA_STORE=system` to use the OS certificate store). Specify `caCerts` when the broker certificate is signed by a CA that is not in them, such as your
+own private CA.
+
 ```ts
 import { MqttClient } from '@ymjacky/mqtt5';
 
-// A broker certificate trusted by the system
+// A broker certificate signed by a publicly trusted CA: caCerts is not needed
 const client = new MqttClient({ url: new URL('mqtts://broker.example.com:8883'), clientId: 'clientA' });
 
-// A broker certificate signed by your own CA
+// A broker certificate signed by your own CA: specify it with caCerts
 const clientWithCa = new MqttClient({
   url: new URL('mqtts://127.0.0.1:8883'),
   clientId: 'clientB',
@@ -121,6 +125,12 @@ const clientWithCert = new MqttClient({
 ### WebSocket (`ws://`, `wss://`)
 
 `WebSocketMqttClient` uses the `mqtt` WebSocket subprotocol and requires `url`.
+
+For `wss://`, a CA certificate **cannot** be specified in the client options (`caCerts`, `cert` and `privateKey` are ignored), because the WebSocket API does
+not accept them. The broker certificate is verified against the runtime's trust store:
+
+- Deno: the default root certificates. To trust your own CA, start Deno with `--cert ca.crt.pem` or set `DENO_CERT=ca.crt.pem`.
+- Browser: the browser's certificate store.
 
 ```ts
 import { Mqtt, WebSocketMqttClient } from '@ymjacky/mqtt5';
@@ -244,13 +254,31 @@ await client.disconnect(); // send DISCONNECT, then close
 
 ## Browser
 
-Import `WebSocketMqttClient` from the `@ymjacky/mqtt5/browser` entry point.
+### Why a separate build is needed
 
-The following command bundles the browser entry point into `browser/mqtt5.mjs`:
+The `@ymjacky/mqtt5` package cannot be loaded by a browser as is:
+
+- It is published as TypeScript, which browsers cannot run, and it is meant to be resolved by Deno (`jsr:` / `@ymjacky/mqtt5` specifiers).
+- `MqttClient` uses Deno's networking APIs (`Deno.connect` / `Deno.connectTls`), which do not exist in the browser.
+
+### Use `WebSocketMqttClient`
+
+A browser can connect to a broker only over WebSocket, so use `WebSocketMqttClient` with a `ws://` or `wss://` URL. The broker must have a WebSocket listener
+enabled. The browser entry point (`browser/mod.ts`, `@ymjacky/mqtt5/browser`) exports `WebSocketMqttClient` and the related types, without `MqttClient`.
+
+### Build `mqtt5.mjs`
+
+Convert the browser entry point into a single JavaScript module file. In a clone of this repository, run:
 
 ```sh
 deno task build_ems
 ```
+
+This creates `browser/mqtt5.mjs`. Copy it to the directory your web page is served from.
+
+### Import `mqtt5.mjs`
+
+Import it from a module script. Serve the page over HTTP(S); module scripts do not load from `file://` URLs.
 
 ```html
 <script type="module">
@@ -261,9 +289,18 @@ const client = new WebSocketMqttClient({
   clientId: 'browserClient',
   protocolVersion: Mqtt.ProtocolVersion.MQTT_V5,
 });
+
+client.on('publish', (event) => {
+  const packet = event.detail;
+  console.log(packet.topic, new TextDecoder().decode(packet.payload));
+});
+
 await client.connect();
+await client.subscribe('topicA', Mqtt.QoS.AT_LEAST_ONCE);
 </script>
 ```
+
+`browser/index.html` in this repository is a sample page that subscribes to a topic and lists received messages.
 
 ## Features
 
@@ -285,7 +322,32 @@ MQTT 5.0 only.
 
 ### Server redirection
 
-The client does not follow redirections. Check the `serverReference` property of CONNACK or DISCONNECT and reconnect yourself.
+MQTT 5.0 lets a broker redirect a client with the reason code `UseAnotherServer` (156) or `ServerMoved` (157) and a `serverReference` property in CONNACK or
+DISCONNECT. The format of `serverReference` is not defined by the MQTT specification and depends on the broker (for example `host:port`, or a list of servers).
+This library does not interpret it or reconnect automatically: it passes the string through as is. Parse it according to your broker and reconnect yourself.
+
+`connect()` resolves with the CONNACK packet even when the broker rejects the connection, so check its reason code:
+
+```ts
+import { Mqtt, MqttClient } from '@ymjacky/mqtt5';
+
+const isRedirect = (reasonCode?: number) => reasonCode === Mqtt.ReasonCode.UseAnotherServer || reasonCode === Mqtt.ReasonCode.ServerMoved;
+
+const client = new MqttClient({ url: new URL('mqtt://broker-a.example.com:1883'), clientId: 'clientA' });
+
+const connack = await client.connect();
+if (isRedirect(connack.reasonCode)) {
+  const serverReference = connack.properties?.serverReference; // broker specific format
+  // parse serverReference and connect to the referenced server
+}
+
+client.on('disconnect', (event) => {
+  if (isRedirect(event.detail.reasonCode)) {
+    const serverReference = event.detail.properties?.serverReference;
+    // parse serverReference and reconnect
+  }
+});
+```
 
 ### Request / response
 
