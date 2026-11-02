@@ -157,6 +157,18 @@ export abstract class BaseMqttClient {
     }
   }
 
+  /**
+   * Send a packet without waiting for completion, e.g. a response to a
+   * received packet. A send failure (e.g. the peer has closed the connection)
+   * is only logged by sendPacket(); the closed connection itself is detected
+   * by the receive side.
+   */
+  private sendPacketInBackground(packet: AnyPacket) {
+    this.sendPacket(packet).catch(() => {
+      // already logged in sendPacket()
+    });
+  }
+
   protected abstract open(): Promise<void>;
 
   /**
@@ -811,7 +823,7 @@ export abstract class BaseMqttClient {
 
       // resend publish and pubrel
       for await (const packet of this.session.resendTargets()) {
-        this.sendPacket(packet);
+        this.sendPacketInBackground(packet);
       }
     }
 
@@ -850,7 +862,7 @@ export abstract class BaseMqttClient {
         createCustomEvent('publish', { detail: packet }),
       );
     } else if (packet.qos === Mqtt.QoS.AT_LEAST_ONCE) {
-      this.sendPacket(
+      this.sendPacketInBackground(
         {
           type: 'puback',
           packetId: packet.packetId!,
@@ -867,7 +879,7 @@ export abstract class BaseMqttClient {
       if (emitMessage) {
         this.incomingStore.store(packet.packetId!);
 
-        this.sendPacket(
+        this.sendPacketInBackground(
           {
             type: 'pubrec',
             packetId: packet.packetId!,
@@ -924,7 +936,7 @@ export abstract class BaseMqttClient {
       };
 
       this.session.storePubrel(pubrel);
-      this.sendPacket(pubrel);
+      this.sendPacketInBackground(pubrel);
     } else {
       this.log(`Unknown packetId received. (packetId:${packet.packetId})`, 'pubrec');
       if (this.protocolVersion > Mqtt.ProtocolVersion.MQTT_V3_1_1) {
@@ -933,13 +945,13 @@ export abstract class BaseMqttClient {
           packetId: packet.packetId,
           reasonCode: Mqtt.ReasonCode.PacketIdentifierNotFound,
         };
-        this.sendPacket(pubrel);
+        this.sendPacketInBackground(pubrel);
       } else {
         const pubrel: PubrelPacket = {
           type: 'pubrel',
           packetId: packet.packetId,
         };
-        this.sendPacket(pubrel);
+        this.sendPacketInBackground(pubrel);
       }
     }
   }
@@ -948,7 +960,7 @@ export abstract class BaseMqttClient {
     if (await this.incomingStore.has(packet.packetId)) {
       await this.incomingStore.discard(packet.packetId);
 
-      this.sendPacket(
+      this.sendPacketInBackground(
         {
           type: 'pubcomp',
           packetId: packet.packetId,
@@ -962,13 +974,13 @@ export abstract class BaseMqttClient {
           packetId: packet.packetId,
           reasonCode: Mqtt.ReasonCode.PacketIdentifierNotFound,
         };
-        this.sendPacket(pubcomp);
+        this.sendPacketInBackground(pubcomp);
       } else {
         const pubcomp: PubcompPacket = {
           type: 'pubcomp',
           packetId: packet.packetId,
         };
-        this.sendPacket(pubcomp);
+        this.sendPacketInBackground(pubcomp);
       }
     }
   }
