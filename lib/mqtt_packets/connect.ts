@@ -79,7 +79,7 @@ export function toBytes(packet: ConnectPacket) {
   const payload = concatBytes(payloadChunks);
 
   const fixedHeader = [
-    (Mqtt.PacketType.CONNECT << 4) + Mqtt.fixexHeaderFlag.CONNECT,
+    (Mqtt.PacketType.CONNECT << 4) + Mqtt.fixedHeaderFlag.CONNECT,
     ...numToVariableByteInteger(variableHeader.length + payload.length),
   ];
 

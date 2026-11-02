@@ -129,7 +129,7 @@ Deno.test({ name: '@subscribe', only: false }, async (context) => {
 
           assertEquals(packet.packetId, 1);
           assertEquals(packet.subscriptions[0].topicFilter, 'topicA');
-          assertEquals(packet.subscriptions[0].qos, Mqtt.QoS.EXACTRY_ONCE);
+          assertEquals(packet.subscriptions[0].qos, Mqtt.QoS.EXACTLY_ONCE);
 
           broker.sendSuback(
             'cid',
@@ -138,7 +138,7 @@ Deno.test({ name: '@subscribe', only: false }, async (context) => {
             [Mqtt.ReasonCode.GrantedQoS2],
           );
         });
-        const result = await client.subscribe('topicA', Mqtt.QoS.EXACTRY_ONCE);
+        const result = await client.subscribe('topicA', Mqtt.QoS.EXACTLY_ONCE);
         assertEquals(result.reasons[0], Mqtt.ReasonCode.GrantedQoS2);
       } catch (err) {
         fail(`error occured: ${err}`);
@@ -273,7 +273,7 @@ Deno.test({ name: '@subscribe', only: false }, async (context) => {
 
           assertEquals(packet.packetId, 1);
           assertEquals(packet.subscriptions[0].topicFilter, 'topicA');
-          assertEquals(packet.subscriptions[0].qos, Mqtt.QoS.EXACTRY_ONCE);
+          assertEquals(packet.subscriptions[0].qos, Mqtt.QoS.EXACTLY_ONCE);
 
           broker.sendSuback(
             'cid',
@@ -282,7 +282,7 @@ Deno.test({ name: '@subscribe', only: false }, async (context) => {
             [Mqtt.ReasonCode.GrantedQoS2],
           );
         });
-        const result = await client.subscribe('topicA', Mqtt.QoS.EXACTRY_ONCE);
+        const result = await client.subscribe('topicA', Mqtt.QoS.EXACTLY_ONCE);
         assertEquals(result.reasons[0], Mqtt.ReasonCode.GrantedQoS2);
       } catch (err) {
         fail(`error occured: ${err}`);
@@ -326,10 +326,10 @@ Deno.test({ name: '@subscribe', only: false }, async (context) => {
           assertEquals(packet.subscriptions[1].qos, Mqtt.QoS.AT_LEAST_ONCE);
 
           assertEquals(packet.subscriptions[2].topicFilter, 'topicC');
-          assertEquals(packet.subscriptions[2].qos, Mqtt.QoS.EXACTRY_ONCE);
+          assertEquals(packet.subscriptions[2].qos, Mqtt.QoS.EXACTLY_ONCE);
 
           assertEquals(packet.subscriptions[3].topicFilter, 'unspecified');
-          assertEquals(packet.subscriptions[3].qos, Mqtt.QoS.EXACTRY_ONCE);
+          assertEquals(packet.subscriptions[3].qos, Mqtt.QoS.EXACTLY_ONCE);
 
           broker.sendSuback(
             'cid',
@@ -343,8 +343,8 @@ Deno.test({ name: '@subscribe', only: false }, async (context) => {
           [
             { topicFilter: 'topicA', qos: Mqtt.QoS.AT_MOST_ONCE },
             { topicFilter: 'topicB', qos: Mqtt.QoS.AT_LEAST_ONCE },
-            { topicFilter: 'topicC', qos: Mqtt.QoS.EXACTRY_ONCE },
-            { topicFilter: 'unspecified', qos: Mqtt.QoS.EXACTRY_ONCE },
+            { topicFilter: 'topicC', qos: Mqtt.QoS.EXACTLY_ONCE },
+            { topicFilter: 'unspecified', qos: Mqtt.QoS.EXACTLY_ONCE },
           ],
         );
 
@@ -395,10 +395,10 @@ Deno.test({ name: '@subscribe', only: false }, async (context) => {
           assertEquals(packet.subscriptions[1].qos, Mqtt.QoS.AT_LEAST_ONCE);
 
           assertEquals(packet.subscriptions[2].topicFilter, 'topicC');
-          assertEquals(packet.subscriptions[2].qos, Mqtt.QoS.EXACTRY_ONCE);
+          assertEquals(packet.subscriptions[2].qos, Mqtt.QoS.EXACTLY_ONCE);
 
           assertEquals(packet.subscriptions[3].topicFilter, 'unspecified');
-          assertEquals(packet.subscriptions[3].qos, Mqtt.QoS.EXACTRY_ONCE);
+          assertEquals(packet.subscriptions[3].qos, Mqtt.QoS.EXACTLY_ONCE);
 
           broker.sendSuback(
             'cid',
@@ -417,8 +417,8 @@ Deno.test({ name: '@subscribe', only: false }, async (context) => {
           [
             { topicFilter: 'topicA', qos: Mqtt.QoS.AT_MOST_ONCE },
             { topicFilter: 'topicB', qos: Mqtt.QoS.AT_LEAST_ONCE },
-            { topicFilter: 'topicC', qos: Mqtt.QoS.EXACTRY_ONCE },
-            { topicFilter: 'unspecified', qos: Mqtt.QoS.EXACTRY_ONCE },
+            { topicFilter: 'topicC', qos: Mqtt.QoS.EXACTLY_ONCE },
+            { topicFilter: 'unspecified', qos: Mqtt.QoS.EXACTLY_ONCE },
           ],
         );
 
@@ -527,7 +527,7 @@ Deno.test({ name: '@subscribe', only: false }, async (context) => {
           assertEquals(packet.subscriptions[1].noLocal, false);
 
           assertEquals(packet.subscriptions[2].topicFilter, 'topicC');
-          assertEquals(packet.subscriptions[2].qos, Mqtt.QoS.EXACTRY_ONCE);
+          assertEquals(packet.subscriptions[2].qos, Mqtt.QoS.EXACTLY_ONCE);
           assertEquals(packet.subscriptions[2].retainHandling, Mqtt.RetainHandling.DoNotSend);
           assertEquals(packet.subscriptions[2].retainAsPublished, false);
           assertEquals(packet.subscriptions[2].noLocal, true);
@@ -555,7 +555,7 @@ Deno.test({ name: '@subscribe', only: false }, async (context) => {
               retainAsPublished: false,
               noLocal: false,
             },
-            { topicFilter: 'topicC', qos: Mqtt.QoS.EXACTRY_ONCE, retainHandling: Mqtt.RetainHandling.DoNotSend, retainAsPublished: false, noLocal: true },
+            { topicFilter: 'topicC', qos: Mqtt.QoS.EXACTLY_ONCE, retainHandling: Mqtt.RetainHandling.DoNotSend, retainAsPublished: false, noLocal: true },
           ],
         );
 

@@ -265,7 +265,7 @@ Deno.test({ name: '@resend from MemoryStore', only: false }, async (context) => 
         broker.on('publish', (event) => {
           const packet = event.detail;
           if (sessionExists) {
-            assertEquals(packet.qos, Mqtt.QoS.EXACTRY_ONCE);
+            assertEquals(packet.qos, Mqtt.QoS.EXACTLY_ONCE);
             assertEquals(packet.dup, true);
             assertEquals(packet.retain, false);
             assertEquals(packet.packetId, expectedPacketId++);
@@ -318,9 +318,9 @@ Deno.test({ name: '@resend from MemoryStore', only: false }, async (context) => 
           contentType: 'application/json',
         };
 
-        const pubResult1 = client.publish('topicA', new TextEncoder().encode('payloadA'), { qos: Mqtt.QoS.EXACTRY_ONCE }, properties);
-        const pubResult2 = client.publish('topicA', new TextEncoder().encode('payloadA'), { qos: Mqtt.QoS.EXACTRY_ONCE }, properties);
-        const pubResult3 = client.publish('topicA', new TextEncoder().encode('payloadA'), { qos: Mqtt.QoS.EXACTRY_ONCE }, properties);
+        const pubResult1 = client.publish('topicA', new TextEncoder().encode('payloadA'), { qos: Mqtt.QoS.EXACTLY_ONCE }, properties);
+        const pubResult2 = client.publish('topicA', new TextEncoder().encode('payloadA'), { qos: Mqtt.QoS.EXACTLY_ONCE }, properties);
+        const pubResult3 = client.publish('topicA', new TextEncoder().encode('payloadA'), { qos: Mqtt.QoS.EXACTLY_ONCE }, properties);
 
         broker.on('disconnect', (event) => {
           const packet = event.detail;
@@ -393,7 +393,7 @@ Deno.test({ name: '@resend from MemoryStore', only: false }, async (context) => 
         broker.on('publish', (event) => {
           const packet = event.detail;
           if (sessionExists) {
-            assertEquals(packet.qos, Mqtt.QoS.EXACTRY_ONCE);
+            assertEquals(packet.qos, Mqtt.QoS.EXACTLY_ONCE);
             assertEquals(packet.dup, true);
             assertEquals(packet.retain, false);
             assertEquals(packet.packetId, expectedPacketId++);
@@ -416,9 +416,9 @@ Deno.test({ name: '@resend from MemoryStore', only: false }, async (context) => 
           }
         });
 
-        const pubResult1 = client.publish('topicA', new TextEncoder().encode('payloadA'), { qos: Mqtt.QoS.EXACTRY_ONCE });
-        const pubResult2 = client.publish('topicA', new TextEncoder().encode('payloadA'), { qos: Mqtt.QoS.EXACTRY_ONCE });
-        const pubResult3 = client.publish('topicA', new TextEncoder().encode('payloadA'), { qos: Mqtt.QoS.EXACTRY_ONCE });
+        const pubResult1 = client.publish('topicA', new TextEncoder().encode('payloadA'), { qos: Mqtt.QoS.EXACTLY_ONCE });
+        const pubResult2 = client.publish('topicA', new TextEncoder().encode('payloadA'), { qos: Mqtt.QoS.EXACTLY_ONCE });
+        const pubResult3 = client.publish('topicA', new TextEncoder().encode('payloadA'), { qos: Mqtt.QoS.EXACTLY_ONCE });
 
         broker.on('disconnect', (event) => {
           const packet = event.detail;
@@ -490,7 +490,7 @@ Deno.test({ name: '@resend from MemoryStore', only: false }, async (context) => 
         // test
         broker.on('publish', (event) => {
           const packet = event.detail;
-          assertEquals(packet.qos, Mqtt.QoS.EXACTRY_ONCE);
+          assertEquals(packet.qos, Mqtt.QoS.EXACTLY_ONCE);
           assertEquals(packet.dup, false);
           assertEquals(packet.retain, false);
           assertEquals(packet.packetId, expectedPublishPacketId++);
@@ -551,9 +551,9 @@ Deno.test({ name: '@resend from MemoryStore', only: false }, async (context) => 
           contentType: 'application/json',
         };
 
-        const pubResult1 = client.publish('topicA', new TextEncoder().encode('payloadA'), { qos: Mqtt.QoS.EXACTRY_ONCE }, properties);
-        const pubResult2 = client.publish('topicA', new TextEncoder().encode('payloadA'), { qos: Mqtt.QoS.EXACTRY_ONCE }, properties);
-        const pubResult3 = client.publish('topicA', new TextEncoder().encode('payloadA'), { qos: Mqtt.QoS.EXACTRY_ONCE }, properties);
+        const pubResult1 = client.publish('topicA', new TextEncoder().encode('payloadA'), { qos: Mqtt.QoS.EXACTLY_ONCE }, properties);
+        const pubResult2 = client.publish('topicA', new TextEncoder().encode('payloadA'), { qos: Mqtt.QoS.EXACTLY_ONCE }, properties);
+        const pubResult3 = client.publish('topicA', new TextEncoder().encode('payloadA'), { qos: Mqtt.QoS.EXACTLY_ONCE }, properties);
 
         broker.on('disconnect', (event) => {
           const packet = event.detail;
@@ -626,7 +626,7 @@ Deno.test({ name: '@resend from MemoryStore', only: false }, async (context) => 
         // test
         broker.on('publish', (event) => {
           const packet = event.detail;
-          assertEquals(packet.qos, Mqtt.QoS.EXACTRY_ONCE);
+          assertEquals(packet.qos, Mqtt.QoS.EXACTLY_ONCE);
           assertEquals(packet.dup, false);
           assertEquals(packet.retain, false);
           assertEquals(packet.packetId, expectedPublishPacketId++);
@@ -655,9 +655,9 @@ Deno.test({ name: '@resend from MemoryStore', only: false }, async (context) => 
           }
         });
 
-        const pubResult1 = client.publish('topicA', new TextEncoder().encode('payloadA'), { qos: Mqtt.QoS.EXACTRY_ONCE });
-        const pubResult2 = client.publish('topicA', new TextEncoder().encode('payloadA'), { qos: Mqtt.QoS.EXACTRY_ONCE });
-        const pubResult3 = client.publish('topicA', new TextEncoder().encode('payloadA'), { qos: Mqtt.QoS.EXACTRY_ONCE });
+        const pubResult1 = client.publish('topicA', new TextEncoder().encode('payloadA'), { qos: Mqtt.QoS.EXACTLY_ONCE });
+        const pubResult2 = client.publish('topicA', new TextEncoder().encode('payloadA'), { qos: Mqtt.QoS.EXACTLY_ONCE });
+        const pubResult3 = client.publish('topicA', new TextEncoder().encode('payloadA'), { qos: Mqtt.QoS.EXACTLY_ONCE });
 
         broker.on('disconnect', (event) => {
           const packet = event.detail;

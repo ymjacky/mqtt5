@@ -180,7 +180,7 @@ await client.connect();
 await client.publish('topicA', 'payload', { qos: Mqtt.QoS.AT_MOST_ONCE });
 await client.publish('topicA', new Uint8Array([1, 2, 3]), { qos: Mqtt.QoS.AT_LEAST_ONCE, retain: true });
 
-const result = await client.publish('topicA', 'payload', { qos: Mqtt.QoS.EXACTRY_ONCE }, {
+const result = await client.publish('topicA', 'payload', { qos: Mqtt.QoS.EXACTLY_ONCE }, {
   contentType: 'application/json',
   messageExpiryInterval: 60,
   userProperties: [{ key: 'userProp1', val: 'userData1' }],

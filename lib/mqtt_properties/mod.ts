@@ -19,12 +19,17 @@ import {
 } from '../mqtt_utils/mod.ts';
 
 /** The property identifier is not supported. */
-export class UnsuportedPropertyError extends Error {
+export class UnsupportedPropertyError extends Error {
   /** Creates the error for the given property identifier. */
   constructor(propertyId: number) {
-    super(`unsuported property. propertyId: ${propertyId}`);
+    super(`unsupported property. propertyId: ${propertyId}`);
   }
 }
+
+/** @deprecated Use {@link UnsupportedPropertyError} instead. */
+export const UnsuportedPropertyError: typeof UnsupportedPropertyError = UnsupportedPropertyError;
+/** @deprecated Use {@link UnsupportedPropertyError} instead. */
+export type UnsuportedPropertyError = UnsupportedPropertyError;
 
 /** A key-value pair of a user property. */
 export type StringPair = { key: string; val: string };
@@ -190,7 +195,7 @@ export type WillProperties = {
   userProperties?: UserProperties;
 };
 
-type AcknolagePacketProperties = {
+type AcknowledgementPacketProperties = {
   /** Human readable reason for diagnostics. (id: 0x1F) */
   reasonString?: string;
   /** Application-defined key-value pairs. (id: 0x26) */
@@ -198,17 +203,17 @@ type AcknolagePacketProperties = {
 };
 
 /** Properties of PUBACK. */
-export type PubackProperties = AcknolagePacketProperties;
+export type PubackProperties = AcknowledgementPacketProperties;
 /** Properties of PUBREC. */
-export type PubrecProperties = AcknolagePacketProperties;
+export type PubrecProperties = AcknowledgementPacketProperties;
 /** Properties of PUBREL. */
-export type PubrelProperties = AcknolagePacketProperties;
+export type PubrelProperties = AcknowledgementPacketProperties;
 /** Properties of PUBCOMP. */
-export type PubcompProperties = AcknolagePacketProperties;
+export type PubcompProperties = AcknowledgementPacketProperties;
 /** Properties of SUBACK. */
-export type SubackProperties = AcknolagePacketProperties;
+export type SubackProperties = AcknowledgementPacketProperties;
 /** Properties of UNSUBACK. */
-export type UnsubackProperties = AcknolagePacketProperties;
+export type UnsubackProperties = AcknowledgementPacketProperties;
 
 /** All MQTT 5.0 properties: the properties of every packet combined into one type. */
 export type Properties =
@@ -369,7 +374,7 @@ export function propertiesToBytes(properties?: Properties): Uint8Array {
  * @param offset the position of the first property in the buffer.
  * @param propertyLength the length of the properties in bytes.
  * @returns the decoded properties.
- * @throws {UnsuportedPropertyError} if a property identifier is not supported.
+ * @throws {UnsupportedPropertyError} if a property identifier is not supported.
  */
 export function parseMqttProperties(
   buffer: Uint8Array,
@@ -530,7 +535,7 @@ export function parseMqttProperties(
         properties.sharedSubscriptionAvailable = buffer[pos++] === 1 ? true : false;
         break;
       default:
-        throw new UnsuportedPropertyError(propertyId);
+        throw new UnsupportedPropertyError(propertyId);
     }
   }
 

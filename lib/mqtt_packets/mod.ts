@@ -124,7 +124,7 @@ export function packetToBytes(
         bytes = authToBytes(packet, protocolVersion);
         break;
       default:
-        throw new MqttPacketsError.UnsuportedPacketError('unknown');
+        throw new MqttPacketsError.UnsupportedPacketError('unknown');
     }
 
     return bytes;
@@ -251,7 +251,7 @@ function parsePacket(
       packet = authParse(variableHeaderAndPayload, remainingLength, protocolVersion);
       break;
     default:
-      throw new MqttPacketsError.UnsuportedPacketError('unknown');
+      throw new MqttPacketsError.UnsupportedPacketError('unknown');
   }
 
   return packet as AnyPacket;

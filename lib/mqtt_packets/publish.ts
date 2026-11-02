@@ -26,7 +26,7 @@ export function toBytes(
 
   const variableHeaderChunks: (Uint8Array | number[])[] = [stringToUtfEncodedString(packet.topic)]; // topic
 
-  if (qos === Mqtt.QoS.AT_LEAST_ONCE || qos === Mqtt.QoS.EXACTRY_ONCE) {
+  if (qos === Mqtt.QoS.AT_LEAST_ONCE || qos === Mqtt.QoS.EXACTLY_ONCE) {
     variableHeaderChunks.push(numToTwoByteInteger(packet.packetId!));
   }
 
@@ -70,7 +70,7 @@ export function parse(
   pos += topicInfo.length;
 
   const packetId = (() => {
-    if (qos === Mqtt.QoS.AT_LEAST_ONCE || qos == Mqtt.QoS.EXACTRY_ONCE) {
+    if (qos === Mqtt.QoS.AT_LEAST_ONCE || qos == Mqtt.QoS.EXACTLY_ONCE) {
       const id = twoByteIntegerToNum(buffer, pos);
       pos += 2; // 2 = two byte Integer
       return id;

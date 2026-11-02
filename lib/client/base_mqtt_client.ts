@@ -341,8 +341,8 @@ export abstract class BaseMqttClient {
    *
    * await client.publish('topicA', 'payload', { qos: Mqtt.QoS.AT_MOST_ONCE });
    * await client.publish('topicA', 'payload', { qos: Mqtt.QoS.AT_LEAST_ONCE });
-   * await client.publish('topicA', 'payload', { qos: Mqtt.QoS.EXACTRY_ONCE });
-   * await client.publish('topicA', new TextEncoder().encode('payloadA'), { qos: Mqtt.QoS.EXACTRY_ONCE });
+   * await client.publish('topicA', 'payload', { qos: Mqtt.QoS.EXACTLY_ONCE });
+   * await client.publish('topicA', new TextEncoder().encode('payloadA'), { qos: Mqtt.QoS.EXACTLY_ONCE });
    * await client.publish('topicA', 'payloadA', { qos: Mqtt.QoS.AT_LEAST_ONCE, dup: true, retain: true });
    *
    * const pubProperties: MqttProperties.UserPublishProperties = {
@@ -512,8 +512,8 @@ export abstract class BaseMqttClient {
    *   [
    *     { topicFilter: 'topicA', qos: Mqtt.QoS.AT_MOST_ONCE },
    *     { topicFilter: 'topicB', qos: Mqtt.QoS.AT_LEAST_ONCE },
-   *     { topicFilter: 'topicC', qos: Mqtt.QoS.EXACTRY_ONCE },
-   *     { topicFilter: 'topicD', qos: Mqtt.QoS.EXACTRY_ONCE, retainHandling: Mqtt.RetainHandling.DoNotSend, retainAsPublished: true, noLocal: true }
+   *     { topicFilter: 'topicC', qos: Mqtt.QoS.EXACTLY_ONCE },
+   *     { topicFilter: 'topicD', qos: Mqtt.QoS.EXACTLY_ONCE, retainHandling: Mqtt.RetainHandling.DoNotSend, retainAsPublished: true, noLocal: true }
    *   ],
    * );
    * ```
@@ -876,7 +876,7 @@ export abstract class BaseMqttClient {
         handle = () => this.handleAuth(packet);
         break;
       default:
-        throw new MqttPackets.MqttPacketsError.UnsuportedPacketError('unknown');
+        throw new MqttPackets.MqttPacketsError.UnsupportedPacketError('unknown');
     }
 
     this.packetHandling = this.packetHandling
@@ -985,7 +985,7 @@ export abstract class BaseMqttClient {
       this.eventTarget.dispatchEvent(
         createCustomEvent('publish', { detail: packet }),
       );
-    } else if (packet.qos === Mqtt.QoS.EXACTRY_ONCE) {
+    } else if (packet.qos === Mqtt.QoS.EXACTLY_ONCE) {
       const emitMessage = !packet.dup ||
         !(await this.incomingStore.has(packet.packetId!));
 

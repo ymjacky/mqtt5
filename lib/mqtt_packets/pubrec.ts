@@ -25,7 +25,7 @@ export function toBytes(
   const variableHeader = concatBytes(variableHeaderChunks);
 
   const fixedHeader = [
-    (Mqtt.PacketType.PUBREC << 4) + Mqtt.fixexHeaderFlag.PUBREC,
+    (Mqtt.PacketType.PUBREC << 4) + Mqtt.fixedHeaderFlag.PUBREC,
     ...numToVariableByteInteger(variableHeader.length),
   ];
 

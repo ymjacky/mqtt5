@@ -7,6 +7,8 @@
 export const QoS = {
   AT_MOST_ONCE: 0,
   AT_LEAST_ONCE: 1,
+  EXACTLY_ONCE: 2,
+  /** @deprecated Use {@link QoS.EXACTLY_ONCE} instead. */
   EXACTRY_ONCE: 2,
 } as const;
 /** A value of {@link QoS}. */
@@ -113,7 +115,7 @@ export const PacketType = {
 };
 
 /** Fixed header flags of each packet type, the lower 4 bits of the fixed header. */
-export const fixexHeaderFlag = {
+export const fixedHeaderFlag = {
   CONNECT: 0b0000,
   CONNACK: 0b0000,
   PUBACK: 0b0000,
@@ -129,6 +131,9 @@ export const fixexHeaderFlag = {
   DISCONNECT: 0b0000,
   AUTH: 0b0000,
 };
+
+/** @deprecated Use {@link fixedHeaderFlag} instead. */
+export const fixexHeaderFlag: typeof fixedHeaderFlag = fixedHeaderFlag;
 
 /** Retain Handling subscription option: whether retained messages are sent when subscribing. */
 export const RetainHandling = {

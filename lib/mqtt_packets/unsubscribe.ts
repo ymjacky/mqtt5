@@ -33,7 +33,7 @@ export function toBytes(
   const payload = concatBytes(payloadChunks);
 
   const fixedHeader = [
-    (Mqtt.PacketType.UNSUBSCRIBE << 4) + Mqtt.fixexHeaderFlag.UNSUBSCRIBE,
+    (Mqtt.PacketType.UNSUBSCRIBE << 4) + Mqtt.fixedHeaderFlag.UNSUBSCRIBE,
     ...numToVariableByteInteger(variableHeader.length + payload.length),
   ];
 

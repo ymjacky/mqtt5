@@ -17,13 +17,18 @@ export class MqttPacketSerializeError extends Error {
 }
 
 /** The packet type is not supported. */
-export class UnsuportedPacketError extends Error {
-  readonly #className = 'UnsuportedPacketError';
+export class UnsupportedPacketError extends Error {
+  readonly #className = 'UnsupportedPacketError';
   /** Creates the error for the given packet type. */
   constructor(packetType: string) {
-    super(`unsuported packet.  ${packetType}`);
+    super(`unsupported packet: ${packetType}`);
   }
 }
+
+/** @deprecated Use {@link UnsupportedPacketError} instead. */
+export const UnsuportedPacketError: typeof UnsupportedPacketError = UnsupportedPacketError;
+/** @deprecated Use {@link UnsupportedPacketError} instead. */
+export type UnsuportedPacketError = UnsupportedPacketError;
 
 /** The protocol version is not supported. */
 export class InvalidProtocolVersionError extends Error {

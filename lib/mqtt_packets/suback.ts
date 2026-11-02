@@ -18,7 +18,7 @@ export function toBytes(
   const payload: number[] = (protocolVersion > Mqtt.ProtocolVersion.MQTT_V3_1_1) ? packet.reasonCodes! : packet.returnCodes!;
 
   const fixedHeader = [
-    (Mqtt.PacketType.SUBACK << 4) + Mqtt.fixexHeaderFlag.SUBACK,
+    (Mqtt.PacketType.SUBACK << 4) + Mqtt.fixedHeaderFlag.SUBACK,
     ...numToVariableByteInteger(variableHeader.length + payload.length),
   ];
 

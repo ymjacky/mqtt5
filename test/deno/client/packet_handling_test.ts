@@ -95,7 +95,7 @@ Deno.test({ name: '@packet handling', only: false }, async (context) => {
           'topicA',
           Mqtt.ProtocolVersion.MQTT_V5,
           new TextEncoder().encode('payload A'),
-          Mqtt.QoS.EXACTRY_ONCE,
+          Mqtt.QoS.EXACTLY_ONCE,
         );
         await broker.sendPubrel(client.getClientId(), 1, Mqtt.ProtocolVersion.MQTT_V5);
 

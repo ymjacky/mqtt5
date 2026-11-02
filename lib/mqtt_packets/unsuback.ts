@@ -19,14 +19,14 @@ export function toBytes(
     const payload = packet.reasonCodes!;
 
     const fixedHeader = [
-      (Mqtt.PacketType.UNSUBACK << 4) + Mqtt.fixexHeaderFlag.UNSUBACK,
+      (Mqtt.PacketType.UNSUBACK << 4) + Mqtt.fixedHeaderFlag.UNSUBACK,
       ...numToVariableByteInteger(variableHeader.length + payload.length),
     ];
 
     return concatBytes([fixedHeader, variableHeader, payload]);
   } else {
     const fixedHeader = [
-      (Mqtt.PacketType.UNSUBACK << 4) + Mqtt.fixexHeaderFlag.UNSUBACK,
+      (Mqtt.PacketType.UNSUBACK << 4) + Mqtt.fixedHeaderFlag.UNSUBACK,
       ...numToVariableByteInteger(variableHeader.length),
     ];
 
