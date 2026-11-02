@@ -82,6 +82,7 @@ export type ClientOptions = {
   /**
    * MQTT 5.0 only. When set, topic aliases are assigned to outgoing PUBLISH packets automatically,
    * up to the smaller of this value and the broker's Topic Alias Maximum.
+   * If the broker's CONNACK has no Topic Alias Maximum (or it is 0), no topic aliases are sent.
    */
   topicAliasMaximumAboutSend?: number;
   /**

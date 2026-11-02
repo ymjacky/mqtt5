@@ -317,8 +317,8 @@ esm.sh is a third-party service. To serve everything from your own server, use `
 - Download `mqtt5.mjs` from the assets of a [GitHub Release](https://github.com/ymjacky/mqtt5/releases) (0.0.25 and later).
 - Build it in a clone of this repository with `deno task build_ems` (uses `deno bundle`, Deno 2.4 or later). This creates `browser/mqtt5.mjs`.
 
-Copy it to the directory your web page is served from and import it from a module script. Serve the page over HTTP(S); module scripts do not load from
-`file://` URLs.
+Copy it to the directory your web page is served from and import it from a module script. Serve the page over HTTP(S); module scripts do not load from `file://`
+URLs.
 
 ```html
 <script type="module">
@@ -356,7 +356,7 @@ await client.subscribe('topicA', Mqtt.QoS.AT_LEAST_ONCE);
 MQTT 5.0 only.
 
 - `topicAliasMaximumAboutSend`: when set, topic aliases are assigned to outgoing PUBLISH packets automatically, up to the smaller of this value and the broker's
-  Topic Alias Maximum.
+  Topic Alias Maximum. If the broker's CONNACK has no Topic Alias Maximum (or it is 0), no topic aliases are sent.
 - `topicAliasMaximumAboutReceive`: when set, it is sent to the broker as the Topic Alias Maximum property of CONNECT, and topic aliases in incoming PUBLISH
   packets are resolved automatically.
 
