@@ -53,6 +53,8 @@ export abstract class BaseMqttClient {
   private session: Session;
   private unresolvedConnect?: Deferred<ConnackPacket>;
   private incomingStore: IncomingStore;
+  // Tail of the chain that runs received packet handlers one at a time.
+  private packetHandling: Promise<void> = Promise.resolve();
   private timers: { [key: string]: ReturnType<typeof setTimeout> };
   protected log: (msg: string, ...args: unknown[]) => void;
   /**
@@ -738,44 +740,59 @@ export abstract class BaseMqttClient {
     );
   }
 
+  /**
+   * Dispatch a received packet to its handler.
+   *
+   * Handlers run one at a time in the order packets were received, so a
+   * handler awaiting e.g. a store never lets a later packet overtake it. A
+   * failure inside a handler is logged instead of becoming an unhandled
+   * rejection. An unsupported packet type is thrown synchronously.
+   */
   protected packetReceived(packet: AnyPacket) {
+    let handle: () => void | Promise<void>;
     switch (packet.type) {
       case 'connack':
-        this.handleConnack(packet);
+        handle = () => this.handleConnack(packet);
         break;
       case 'publish':
-        this.handlePublish(packet);
+        handle = () => this.handlePublish(packet);
         break;
       case 'puback':
-        this.handlePuback(packet);
+        handle = () => this.handlePuback(packet);
         break;
       case 'pubrec':
-        this.handlePubrec(packet);
+        handle = () => this.handlePubrec(packet);
         break;
       case 'pubrel':
-        this.handlePubrel(packet);
+        handle = () => this.handlePubrel(packet);
         break;
       case 'pubcomp':
-        this.handlePubcomp(packet);
+        handle = () => this.handlePubcomp(packet);
         break;
       case 'suback':
-        this.handleSuback(packet);
+        handle = () => this.handleSuback(packet);
         break;
       case 'unsuback':
-        this.handleUnsuback(packet);
+        handle = () => this.handleUnsuback(packet);
         break;
       case 'pingresp':
-        this.handlePingresp(packet);
+        handle = () => this.handlePingresp(packet);
         break;
       case 'disconnect':
-        this.handleDisconnect(packet);
+        handle = () => this.handleDisconnect(packet);
         break;
       case 'auth':
-        this.handleAuth(packet);
+        handle = () => this.handleAuth(packet);
         break;
       default:
         throw new MqttPackets.MqttPacketsError.UnsuportedPacketError('unknown');
     }
+
+    this.packetHandling = this.packetHandling
+      .then(handle)
+      .catch((err) => {
+        this.log(`Error while handling ${packet.type} packet:`, err);
+      });
   }
 
   private async handleConnack(packet: ConnackPacket) {
@@ -877,7 +894,7 @@ export abstract class BaseMqttClient {
         !(await this.incomingStore.has(packet.packetId!));
 
       if (emitMessage) {
-        this.incomingStore.store(packet.packetId!);
+        await this.incomingStore.store(packet.packetId!);
 
         this.sendPacketInBackground(
           {
