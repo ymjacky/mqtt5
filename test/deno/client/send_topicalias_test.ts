@@ -28,7 +28,7 @@ Deno.test({ name: '@send topic alias', only: false }, async (context) => {
 
         broker.on('connect', (event) => {
           const packet = event.detail;
-          broker.sendConnack(packet.clientId, false, packet.protocolVersion);
+          broker.sendConnack(packet.clientId, false, packet.protocolVersion, 0, { topicAliasMaximum: 3 });
         });
 
         await client.connect();
@@ -65,7 +65,7 @@ Deno.test({ name: '@send topic alias', only: false }, async (context) => {
   );
 
   await context.step(
-    'send publish using topic alias, reach maximum',
+    'send publish using topic alias, reach maximum (CONNACK Topic Alias Maximum is higher)',
     async () => {
       const { promise, resolve, reject } = Promise.withResolvers<void>();
 
@@ -85,7 +85,7 @@ Deno.test({ name: '@send topic alias', only: false }, async (context) => {
 
         broker.on('connect', (event) => {
           const packet = event.detail;
-          broker.sendConnack(packet.clientId, false, packet.protocolVersion);
+          broker.sendConnack(packet.clientId, false, packet.protocolVersion, 0, { topicAliasMaximum: 10 }); // higher than topicAliasMaximumAboutSend
         });
 
         await client.connect();
@@ -131,6 +131,119 @@ Deno.test({ name: '@send topic alias', only: false }, async (context) => {
         await client.publish('topicD', new TextEncoder().encode('6th')); // topic alias 1
         await client.publish('topicA', new TextEncoder().encode('7th')); // topic alias 2
         await client.publish('topicB', new TextEncoder().encode('8th')); // topic alias 2
+
+        await promise;
+      } catch (err) {
+        reject();
+        fail(`error occured: ${err}`);
+      } finally {
+        await broker.destroy();
+      }
+    },
+  );
+
+  for (
+    const [name, connackProperties] of [
+      ['CONNACK has no Topic Alias Maximum', undefined],
+      ['CONNACK Topic Alias Maximum is 0', { topicAliasMaximum: 0 }],
+    ] as const
+  ) {
+    await context.step(
+      `send publish without topic alias, ${name}`,
+      async () => {
+        const { promise, resolve, reject } = Promise.withResolvers<void>();
+
+        const broker = new TestBroker();
+
+        try {
+          broker.listen();
+
+          const client = new MqttClient({
+            clientId: 'cid',
+            logger: logger,
+            clean: true,
+            connectTimeoutMS: 10000,
+            keepAlive: 10,
+            topicAliasMaximumAboutSend: 3,
+          });
+
+          broker.on('connect', (event) => {
+            const packet = event.detail;
+            broker.sendConnack(packet.clientId, false, packet.protocolVersion, 0, connackProperties);
+          });
+
+          await client.connect();
+
+          broker.on('publish', (event) => {
+            const packet = event.detail;
+            const message = new TextDecoder().decode(packet.payload);
+            assertEquals(packet.topic, 'topicA');
+            assertEquals(packet.properties?.topicAlias, undefined);
+            if (message === '2nd') {
+              resolve();
+            }
+          });
+
+          await client.publish('topicA', new TextEncoder().encode('1st'));
+          await client.publish('topicA', new TextEncoder().encode('2nd'));
+
+          await promise;
+        } catch (err) {
+          reject();
+          fail(`error occured: ${err}`);
+        } finally {
+          await broker.destroy();
+        }
+      },
+    );
+  }
+
+  await context.step(
+    'send publish using topic alias, reach maximum (CONNACK Topic Alias Maximum is lower)',
+    async () => {
+      const { promise, resolve, reject } = Promise.withResolvers<void>();
+
+      const broker = new TestBroker();
+
+      try {
+        broker.listen();
+
+        const client = new MqttClient({
+          clientId: 'cid',
+          logger: logger,
+          clean: true,
+          connectTimeoutMS: 10000,
+          keepAlive: 10,
+          topicAliasMaximumAboutSend: 3,
+        });
+
+        broker.on('connect', (event) => {
+          const packet = event.detail;
+          broker.sendConnack(packet.clientId, false, packet.protocolVersion, 0, { topicAliasMaximum: 2 });
+        });
+
+        await client.connect();
+
+        broker.on('publish', (event) => {
+          const packet = event.detail;
+          const message = new TextDecoder().decode(packet.payload);
+          if (message === '1st') {
+            assertEquals(packet.topic, 'topicA');
+            assertEquals(packet.properties?.topicAlias, 1);
+          } else if (message === '2nd') {
+            assertEquals(packet.topic, 'topicB');
+            assertEquals(packet.properties?.topicAlias, 2);
+          } else {
+            assertEquals(message, '3rd');
+            assertEquals(packet.topic, 'topicC');
+            assertEquals(packet.properties?.topicAlias, 1);
+            resolve();
+          }
+        });
+
+        await client.publish('topicA', new TextEncoder().encode('1st')); // topic alias 1
+        await client.publish('topicB', new TextEncoder().encode('2nd')); // topic alias 2
+        await client.publish('topicC', new TextEncoder().encode('3rd')); // topic alias 1
 
         await promise;
       } catch (err) {

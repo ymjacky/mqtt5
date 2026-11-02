@@ -701,7 +701,7 @@ Deno.test({ name: '@resend from MemoryStore', only: false }, async (context) => 
         broker.on('connect', (event) => {
           const packet = event.detail;
           assertFalse(packet.clean);
-          broker.sendConnack(packet.clientId, sessionExists, packet.protocolVersion);
+          broker.sendConnack(packet.clientId, sessionExists, packet.protocolVersion, 0, { topicAliasMaximum: 3 });
         });
 
         await client.connect();

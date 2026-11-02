@@ -101,6 +101,7 @@ export abstract class BaseMqttClient {
   /** Dispatches the client events registered with `on()`. */
   protected eventTarget: EventTarget;
   private pingrespTimeoutMs: number;
+  private topicAliasMaximumAboutSend?: number;
   private topicAliasManagerAboutSend?: TopicAliasManager;
   private topicAliasMaximumAboutReceive?: number;
   private topicAliasMapAboutReceive: Map<number, string>;
@@ -148,7 +149,7 @@ export abstract class BaseMqttClient {
     this.timers = {};
 
     if (this.protocolVersion == Mqtt.ProtocolVersion.MQTT_V5 && options?.topicAliasMaximumAboutSend) {
-      this.topicAliasManagerAboutSend = new TopicAliasManager(options.topicAliasMaximumAboutSend);
+      this.topicAliasMaximumAboutSend = options.topicAliasMaximumAboutSend;
     }
 
     if (this.protocolVersion == Mqtt.ProtocolVersion.MQTT_V5 && options?.topicAliasMaximumAboutReceive) {
@@ -925,13 +926,11 @@ export abstract class BaseMqttClient {
             this.keepAlive = packet.properties.serverKeepAlive;
           }
         }
-
-        if (packet.properties.topicAliasMaximum) {
-          if (this.topicAliasManagerAboutSend && this.topicAliasManagerAboutSend.capacity() > packet.properties.topicAliasMaximum) {
-            this.topicAliasManagerAboutSend = new TopicAliasManager(packet.properties.topicAliasMaximum);
-          }
-        }
       }
+
+      // Topic aliases are valid per connection, and an absent Topic Alias Maximum means 0 (no aliases allowed).
+      const topicAliasMaximum = Math.min(this.topicAliasMaximumAboutSend ?? 0, packet.properties?.topicAliasMaximum ?? 0);
+      this.topicAliasManagerAboutSend = topicAliasMaximum > 0 ? new TopicAliasManager(topicAliasMaximum) : undefined;
 
       // resend publish and pubrel
       for await (const packet of this.session.resendTargets()) {
