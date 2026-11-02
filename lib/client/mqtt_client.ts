@@ -1,4 +1,3 @@
-import { MqttPackets } from '../mod.ts';
 import { BaseMqttClient } from './base_mqtt_client.ts';
 import type { ClientOptions, WriterFactory, WriterFunction } from './client_types.ts';
 import * as MqttStream from '../mqtt_stream_utils/mod.ts';
@@ -93,26 +92,7 @@ export class MqttClient extends BaseMqttClient {
             this.detectClosed();
             break;
           }
-          this.log('receive bytes', receiveBytes);
-
-          // Wrap packet decoding to handle malformed packets
-          try {
-            const packet = MqttPackets.decode(receiveBytes, this.protocolVersion);
-            this.log('receive packet', packet);
-            this.packetReceived(packet);
-          } catch (decodeError) {
-            if (!(decodeError instanceof MqttPackets.MqttPacketsError.MqttPacketParseError)) {
-              // Not caused by malformed data from the peer; treat as a fatal/unexpected error.
-              throw decodeError;
-            }
-
-            // Handle malformed packet
-            this.log(`Malformed packet received: ${decodeError.message}`);
-            this.log(`Raw bytes (first 20): ${receiveBytes.slice(0, 20)}`);
-
-            // Send appropriate response based on protocol version and packet type
-            await this.handleMalformedPacket(decodeError);
-          }
+          await this.handleReceivedBytes(receiveBytes);
         } catch (e) {
           this.detectClosed();
           if (e instanceof ConnectionClosed) {

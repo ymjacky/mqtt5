@@ -658,6 +658,38 @@ export abstract class BaseMqttClient {
     }
   }
 
+  /**
+   * Decode the bytes of a single complete MQTT packet and dispatch it.
+   * Called by subclasses once a packet has been framed off the transport.
+   *
+   * Decoding and dispatching are performed synchronously, so packets are
+   * processed in the order this method is called. A malformed packet is
+   * handled per protocol version and the returned promise settles when that
+   * handling completes; any other error is thrown synchronously.
+   */
+  protected handleReceivedBytes(receiveBytes: Uint8Array): Promise<void> {
+    this.log('receive bytes', receiveBytes);
+
+    try {
+      const packet = MqttPackets.decode(receiveBytes, this.protocolVersion);
+      this.log('receive packet', packet);
+      this.packetReceived(packet);
+    } catch (decodeError) {
+      if (!(decodeError instanceof MqttPackets.MqttPacketsError.MqttPacketParseError)) {
+        // Not caused by malformed data from the peer; treat as a fatal/unexpected error.
+        throw decodeError;
+      }
+
+      this.log(`Malformed packet received: ${decodeError.message}`);
+      this.log(`Raw bytes (first 20): ${receiveBytes.slice(0, 20)}`);
+
+      // Send appropriate response based on protocol version
+      return this.handleMalformedPacket(decodeError);
+    }
+
+    return Promise.resolve();
+  }
+
   protected detectClosed() {
     this.log('connection closed.');
     this.connectionState = 'offline';
