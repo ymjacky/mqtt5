@@ -9,7 +9,7 @@
  * In the browser, import `WebSocketMqttClient` from `@ymjacky/mqtt5/browser` instead.
  *
  * See the {@link https://github.com/ymjacky/mqtt5#readme | readme} for connection options, TLS,
- * publishing, subscribing, events and the browser bundle.
+ * publishing, subscribing, events and browser usage.
  *
  * @example Quick start
  * ```ts

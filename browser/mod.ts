@@ -4,8 +4,8 @@
  * It exports {@link WebSocketMqttClient}, which connects over WebSocket (`ws://`) or WebSocket Secure (`wss://`),
  * and the related types, without the Deno-only `MqttClient`. It also works in Deno.
  *
- * Browsers cannot load this TypeScript package as is; see the
- * {@link https://github.com/ymjacky/mqtt5#browser | readme} for how to build it into a JavaScript module.
+ * Browsers cannot load this TypeScript package with a `jsr:` specifier; see the
+ * {@link https://github.com/ymjacky/mqtt5#browser | readme} for using it with a bundler, from a CDN or as a prebuilt file.
  *
  * @example Quick start
  * ```ts
