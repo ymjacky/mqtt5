@@ -481,6 +481,25 @@ export class TestBroker extends EventTarget {
     }
   }
 
+  async sendPingresp(
+    clientId: string,
+    protocolVersion: Mqtt.ProtocolVersion,
+  ) {
+    const client = this.clients.get(clientId);
+    if (client) { // found
+      const packet: MqttPackets.PingrespPacket = {
+        type: 'pingresp',
+      };
+
+      log(`sending packet`, packet);
+      const bytes = MqttPackets.packetToBytes(packet, protocolVersion);
+      log(`sending bytes`, bytes);
+
+      await client.writer.ready;
+      await client.writer.write(bytes);
+    }
+  }
+
   async sendDisconnect(
     clientId: string,
     reasonCode: Mqtt.ReasonCode,
