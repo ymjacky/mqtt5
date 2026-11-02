@@ -21,20 +21,24 @@ export class TopicAliasManager {
   }
 
   public async getTopicId(topic: string): Promise<[boolean, number]> {
-    if (this.deferred) {
+    while (this.deferred) {
       await this.deferred.promise;
-    } else {
-      this.deferred = new Deferred<void>();
     }
 
-    let topicId = this.topicAliasMap.get(topic);
-    let generated = false;
-    if (!topicId) {
-      topicId = await this.registerTopic(topic);
-      generated = true;
+    const gate = new Deferred<void>();
+    this.deferred = gate;
+    try {
+      let topicId = this.topicAliasMap.get(topic);
+      let generated = false;
+      if (!topicId) {
+        topicId = await this.registerTopic(topic);
+        generated = true;
+      }
+      return [generated, topicId];
+    } finally {
+      this.deferred = undefined;
+      gate.resolve();
     }
-    this.deferred.resolve();
-    return [generated, topicId];
   }
 
   private async registerTopic(topic: string) {
