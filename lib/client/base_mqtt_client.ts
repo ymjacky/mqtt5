@@ -40,7 +40,7 @@ function positiveOrDefault(value: number | undefined, defaultValue: number): num
 }
 
 /**
- * Creates the Deferred whose promise publish(), subscribe() and unsubscribe() return.
+ * Creates the Deferred whose promise publish(), subscribe(), unsubscribe() and auth() return.
  * A rejection reaches callers that await the promise, but never becomes an unhandled rejection
  * (which terminates the process in Deno) when a caller ignores the promise.
  */
@@ -807,19 +807,24 @@ export abstract class BaseMqttClient {
 
   /**
    * Sends AUTH (MQTT 5.0 enhanced authentication). Receive AUTH from the broker with the `auth` event.
+   * The returned promise resolves when AUTH is sent.
+   * A rejection of an ignored promise does not terminate the process; await the promise to handle failures.
    * @param reasonCode e.g. `Mqtt.ReasonCode.ContinueAuthentication` or `Mqtt.ReasonCode.ReAuthenticate`.
    * @param properties AUTH properties, such as `authenticationMethod` and `authenticationData`.
+   * @throws {SendPacketError} if the client is not connected.
    */
-  public async auth(
+  public auth(
     reasonCode?: Mqtt.ReasonCode,
     properties?: MqttProperties.AuthProperties,
   ): Promise<void> {
+    const deferred = createRequestDeferred<void>();
     const packet: AuthPacket = {
       type: 'auth',
       reasonCode,
       properties,
     };
-    await this.sendPacket(packet);
+    this.sendPacket(packet).then(() => deferred.resolve(), (err) => deferred.reject(err));
+    return deferred.promise;
   }
 
   /** Writes bytes to the transport. Set by subclasses when the connection is opened. */

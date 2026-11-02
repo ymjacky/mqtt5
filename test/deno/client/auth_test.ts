@@ -1,6 +1,6 @@
-import { Mqtt, MqttClient, MqttProperties } from '../../../deno/mod.ts';
+import { ClientErrors, Mqtt, MqttClient, MqttProperties } from '../../../deno/mod.ts';
 import { TestBroker } from '../broker/test_broker.ts';
-import { assertEquals, fail } from 'std/assert/mod.ts';
+import { assertEquals, assertRejects, fail } from 'std/assert/mod.ts';
 
 function logger(msg: string, ...args: unknown[]): void {
   console.log('[Test Client]', msg, ...args);
@@ -74,6 +74,21 @@ Deno.test({ name: '@auth', only: false }, async (context) => {
       } finally {
         await broker.destroy();
       }
+    },
+  );
+
+  await context.step(
+    'auth while not connected',
+    async () => {
+      const client = new MqttClient({
+        clientId: 'cid',
+        logger: logger,
+      });
+
+      // ignored on purpose: the rejection must not terminate the process
+      client.auth(Mqtt.ReasonCode.ContinueAuthentication);
+
+      await assertRejects(() => client.auth(Mqtt.ReasonCode.ContinueAuthentication), ClientErrors.SendPacketError);
     },
   );
 }); // auth
