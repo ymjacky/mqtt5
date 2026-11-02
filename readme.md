@@ -13,6 +13,7 @@ API reference: [jsr.io/@ymjacky/mqtt5/doc](https://jsr.io/@ymjacky/mqtt5/doc)
 
 - Deno 2.3.1 or later
 - For the browser: a browser that supports ES modules and WebSocket
+- To build `mqtt5.mjs` yourself (`deno task build_ems`): Deno 2.4 or later
 
 ## Installation
 
@@ -254,31 +255,70 @@ await client.disconnect(); // send DISCONNECT, then close
 
 ## Browser
 
-### Why a separate build is needed
-
-The `@ymjacky/mqtt5` package cannot be loaded by a browser as is:
-
-- It is published as TypeScript, which browsers cannot run, and it is meant to be resolved by Deno (`jsr:` / `@ymjacky/mqtt5` specifiers).
-- `MqttClient` uses Deno's networking APIs (`Deno.connect` / `Deno.connectTls`), which do not exist in the browser.
-
 ### Use `WebSocketMqttClient`
 
 A browser can connect to a broker only over WebSocket, so use `WebSocketMqttClient` with a `ws://` or `wss://` URL. The broker must have a WebSocket listener
-enabled. The browser entry point (`browser/mod.ts`, `@ymjacky/mqtt5/browser`) exports `WebSocketMqttClient` and the related types, without `MqttClient`.
+enabled. The browser entry point `@ymjacky/mqtt5/browser` exports `WebSocketMqttClient` and the related types, without `MqttClient`, which uses Deno's
+networking APIs (`Deno.connect` / `Deno.connectTls`).
 
-### Build `mqtt5.mjs`
+The package is published to JSR as TypeScript, so a browser cannot load it with a `jsr:` specifier. Use one of the following.
 
-Convert the browser entry point into a single JavaScript module file. In a clone of this repository, run:
+### With a bundler (Vite, esbuild, webpack, ...)
+
+Install the package with the [JSR npm compatibility layer](https://jsr.io/docs/npm-compatibility), which provides it as JavaScript:
 
 ```sh
-deno task build_ems
+npx jsr add @ymjacky/mqtt5
 ```
 
-This creates `browser/mqtt5.mjs`. Copy it to the directory your web page is served from.
+Then import from `@ymjacky/mqtt5/browser`:
 
-### Import `mqtt5.mjs`
+```ts
+import { Mqtt, WebSocketMqttClient } from '@ymjacky/mqtt5/browser';
 
-Import it from a module script. Serve the page over HTTP(S); module scripts do not load from `file://` URLs.
+const client = new WebSocketMqttClient({
+  url: new URL('wss://broker.example.com:8081'),
+  clientId: 'browserClient',
+  protocolVersion: Mqtt.ProtocolVersion.MQTT_V5,
+});
+
+client.on('publish', (event) => {
+  const packet = event.detail;
+  console.log(packet.topic, new TextDecoder().decode(packet.payload));
+});
+
+await client.connect();
+await client.subscribe('topicA', Mqtt.QoS.AT_LEAST_ONCE);
+```
+
+### From a CDN (no build step)
+
+[esm.sh](https://esm.sh) serves JSR packages as JavaScript modules. Specify the version:
+
+```html
+<script type="module">
+import { Mqtt, WebSocketMqttClient } from 'https://esm.sh/jsr/@ymjacky/mqtt5@0.0.25/browser';
+
+const client = new WebSocketMqttClient({
+  url: new URL('wss://broker.example.com:8081'),
+  clientId: 'browserClient',
+  protocolVersion: Mqtt.ProtocolVersion.MQTT_V5,
+});
+await client.connect();
+</script>
+```
+
+esm.sh is a third-party service. To serve everything from your own server, use `mqtt5.mjs` below.
+
+### Self-hosted `mqtt5.mjs`
+
+`mqtt5.mjs` is the browser entry point bundled into a single JavaScript module file. Get it in either way:
+
+- Download `mqtt5.mjs` from the assets of a [GitHub Release](https://github.com/ymjacky/mqtt5/releases) (0.0.25 and later).
+- Build it in a clone of this repository with `deno task build_ems` (uses `deno bundle`, Deno 2.4 or later). This creates `browser/mqtt5.mjs`.
+
+Copy it to the directory your web page is served from and import it from a module script. Serve the page over HTTP(S); module scripts do not load from
+`file://` URLs.
 
 ```html
 <script type="module">
