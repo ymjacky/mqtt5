@@ -22,7 +22,8 @@ const writerFactory: WriterFactory = (
  */
 export class MqttClient extends BaseMqttClient {
   protected conn?: Deno.Conn;
-  private reader?: ReadableStreamBYOBReader;
+  private reader?: ReadableStreamDefaultReader<Uint8Array>;
+  private frameBuffer = new MqttStream.MqttFrameBuffer();
 
   constructor(options?: ClientOptions) {
     super(options);
@@ -61,7 +62,9 @@ export class MqttClient extends BaseMqttClient {
 
     this.conn = await openSocket();
     this.write = writerFactory(this.conn, this.log);
-    this.reader = this.conn.readable.getReader({ mode: 'byob' });
+    this.reader = this.conn.readable.getReader();
+    // Discard any partial packet left over from a previous connection.
+    this.frameBuffer = new MqttStream.MqttFrameBuffer();
 
     (async () => {
       while (true) {
@@ -70,22 +73,30 @@ export class MqttClient extends BaseMqttClient {
             break;
           }
 
-          let receiveBytes: Uint8Array;
-          try {
-            receiveBytes = await MqttStream.readMqttBytes(this.reader);
-          } catch (streamError) {
-            // Rethrows non-framing errors (e.g. ConnectionClosed).
-            await this.handleFramingError(streamError);
+          this.frameBuffer.append(await MqttStream.readChunk(this.reader));
 
-            // We can no longer safely read further packets on this
-            // connection, so tear it down ourselves; the disconnect timer
-            // started by handleMalformedPacket() won't help here because
-            // nothing else awaits `this.reader` once we stop this loop.
-            await this.close();
-            this.detectClosed();
-            break;
+          while (true) {
+            let receiveBytes: Uint8Array | undefined;
+            try {
+              receiveBytes = this.frameBuffer.takePacket();
+            } catch (streamError) {
+              // Rethrows non-framing errors.
+              await this.handleFramingError(streamError);
+
+              // We can no longer safely read further packets on this
+              // connection, so tear it down ourselves; the disconnect timer
+              // started by handleMalformedPacket() won't help here because
+              // nothing else awaits `this.reader` once we stop this loop.
+              await this.close();
+              this.detectClosed();
+              return; // stop the receive loop
+            }
+            if (!receiveBytes) {
+              break; // wait for the next chunk
+            }
+
+            await this.handleReceivedBytes(receiveBytes);
           }
-          await this.handleReceivedBytes(receiveBytes);
         } catch (e) {
           this.detectClosed();
           if (e instanceof ConnectionClosed) {

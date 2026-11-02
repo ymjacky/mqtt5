@@ -21,9 +21,18 @@ function publishBytes(payloadSize: number): Uint8Array {
   );
 }
 
+function takeAll(frameBuffer: MqttStream.MqttFrameBuffer): Uint8Array[] {
+  const packets: Uint8Array[] = [];
+  let packet: Uint8Array | undefined;
+  while ((packet = frameBuffer.takePacket())) {
+    packets.push(packet);
+  }
+  return packets;
+}
+
 function appendAndTake(frameBuffer: MqttStream.MqttFrameBuffer, data: Uint8Array): Uint8Array[] {
   frameBuffer.append(data);
-  return frameBuffer.takePackets();
+  return takeAll(frameBuffer);
 }
 
 Deno.test('decodeRemainingLength', function () {
@@ -65,7 +74,7 @@ Deno.test('mqttFrameBufferWithPacketSplitAcrossChunks', function () {
 });
 
 // Regression test for receiving a payload beyond the argument-spread limit
-// (see readMqttBytesWithLargePublishPacket).
+// (see readChunkWithLargePublishPacketSplitAcrossChunks).
 Deno.test('mqttFrameBufferWithLargePublishPacket', function () {
   const publish = publishBytes(300_000);
   const frameBuffer = new MqttStream.MqttFrameBuffer();
@@ -80,8 +89,9 @@ Deno.test('mqttFrameBufferWithMultipleAppendsBeforeTake', function () {
   frameBuffer.append(pingresp);
   frameBuffer.append(pingresp);
 
-  assertEquals(frameBuffer.takePackets(), [pingresp, pingresp]);
-  assertEquals(frameBuffer.takePackets(), []);
+  assertEquals(frameBuffer.takePacket(), pingresp);
+  assertEquals(frameBuffer.takePacket(), pingresp);
+  assertEquals(frameBuffer.takePacket(), undefined);
 });
 
 Deno.test('mqttFrameBufferThrowsMalformedPacketErrorForInvalidRemainingLength', function () {
@@ -89,7 +99,22 @@ Deno.test('mqttFrameBufferThrowsMalformedPacketErrorForInvalidRemainingLength', 
 
   frameBuffer.append(new Uint8Array([0x30, 0xFF, 0xFF, 0xFF, 0xFF]));
   assertThrows(
-    () => frameBuffer.takePackets(),
+    () => frameBuffer.takePacket(),
+    MalformedPacketError,
+  );
+});
+
+// Packets preceding a malformed one in the same chunk must still be returned,
+// so the client processes them before handling the framing error.
+Deno.test('mqttFrameBufferReturnsPacketsBeforeMalformedOne', function () {
+  const frameBuffer = new MqttStream.MqttFrameBuffer();
+
+  frameBuffer.append(new Uint8Array([...pingresp, ...pingresp, 0x30, 0xFF, 0xFF, 0xFF, 0xFF]));
+
+  assertEquals(frameBuffer.takePacket(), pingresp);
+  assertEquals(frameBuffer.takePacket(), pingresp);
+  assertThrows(
+    () => frameBuffer.takePacket(),
     MalformedPacketError,
   );
 });
