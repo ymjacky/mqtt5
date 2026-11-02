@@ -1,6 +1,9 @@
 import { MqttPackets } from '../mod.ts';
 
-/** Keeps the packet IDs of received QoS 2 PUBLISH packets until PUBREL is received. */
+/**
+ * Keeps the packet IDs of received QoS 2 PUBLISH packets until PUBREL is received.
+ * Used internally by the client. Custom implementations are not supported.
+ */
 export interface IncomingStore {
   /** Stores a packet ID. */
   store(packetId: number): Promise<void>;
@@ -10,7 +13,7 @@ export interface IncomingStore {
   discard(packetId: number): Promise<void>;
 }
 
-/** An {@link IncomingStore} that keeps packet IDs in memory. */
+/** The default {@link IncomingStore} used internally by the client. */
 export class IncomingMemoryStore implements IncomingStore {
   /** The stored packet IDs. */
   packets: Set<number> = new Set<number>();
@@ -33,7 +36,10 @@ export class IncomingMemoryStore implements IncomingStore {
   }
 }
 
-/** Keeps sent PUBLISH (QoS 1 and 2) and PUBREL packets until they are acknowledged, to resend them on reconnection. */
+/**
+ * Keeps sent PUBLISH (QoS 1 and 2) and PUBREL packets until they are acknowledged, to resend them on reconnection.
+ * Used internally by the client. Custom implementations are not supported.
+ */
 export interface OutgoingStore {
   /** Stores a packet by its packet ID. */
   store(
@@ -56,7 +62,7 @@ export interface OutgoingStore {
   clear(): Promise<void>;
 }
 
-/** An {@link OutgoingStore} that keeps packets in memory. */
+/** The default {@link OutgoingStore} used internally by the client. */
 export class MemoryStore implements OutgoingStore {
   /** The stored packets by packet ID. */
   packets: Map<number, MqttPackets.PublishPacket | MqttPackets.PubrelPacket> = new Map<
