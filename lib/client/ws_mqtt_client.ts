@@ -39,23 +39,26 @@ export class WebSocketMqttClient extends BaseMqttClient {
     this.conn.onmessage = (e: MessageEvent<unknown>) => {
       this.frameBuffer.append(new Uint8Array(e.data as ArrayBuffer));
 
-      let array: Array<Uint8Array>;
-      try {
-        array = this.frameBuffer.takePackets();
-      } catch (streamError) {
-        // Rethrows non-framing errors.
-        this.handleFramingError(streamError);
+      while (true) {
+        let receiveBytes: Uint8Array | undefined;
+        try {
+          receiveBytes = this.frameBuffer.takePacket();
+        } catch (streamError) {
+          // Rethrows non-framing errors.
+          this.handleFramingError(streamError);
 
-        // We can no longer safely interpret further bytes on this
-        // connection. `this.conn.onclose` will call detectClosed() once the
-        // connection actually closes (either from handleMalformedPacket()'s
-        // close()/DISCONNECT-then-timer, or from the broker).
-        return;
-      }
+          // We can no longer safely interpret further bytes on this
+          // connection. `this.conn.onclose` will call detectClosed() once the
+          // connection actually closes (either from handleMalformedPacket()'s
+          // close()/DISCONNECT-then-timer, or from the broker).
+          return;
+        }
+        if (!receiveBytes) {
+          return; // wait for the next message
+        }
 
-      array.forEach((receiveBytes) => {
         this.handleReceivedBytes(receiveBytes);
-      });
+      }
     };
 
     this.conn.onerror = (e: Event) => {

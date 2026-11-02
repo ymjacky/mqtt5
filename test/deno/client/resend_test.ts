@@ -70,10 +70,6 @@ Deno.test({ name: '@resend from MemoryStore', only: false }, async (context) => 
               packet.packetId!,
               Mqtt.ProtocolVersion.MQTT_V5,
             );
-
-            if (expectedPacketId > 3) {
-              resolve();
-            }
           } else {
             assertEquals(packet.packetId, expectedPacketId++);
             if (expectedPacketId > 3) {
@@ -110,6 +106,7 @@ Deno.test({ name: '@resend from MemoryStore', only: false }, async (context) => 
         client.on('closed', async () => {
           if (sessionExists) {
             assertEquals(await client.publishInflightCount(), 0);
+            resolve();
           } else {
             sessionExists = true;
             assertEquals(await client.publishInflightCount(), 3);
@@ -185,10 +182,6 @@ Deno.test({ name: '@resend from MemoryStore', only: false }, async (context) => 
               packet.packetId!,
               Mqtt.ProtocolVersion.MQTT_V3_1_1,
             );
-
-            if (expectedPacketId > 3) {
-              resolve();
-            }
           } else {
             assertEquals(packet.packetId, expectedPacketId++);
             if (expectedPacketId > 3) {
@@ -211,6 +204,7 @@ Deno.test({ name: '@resend from MemoryStore', only: false }, async (context) => 
         client.on('closed', async () => {
           if (sessionExists) {
             assertEquals(await client.publishInflightCount(), 0);
+            resolve();
           } else {
             sessionExists = true;
             assertEquals(await client.publishInflightCount(), 3);
@@ -301,10 +295,6 @@ Deno.test({ name: '@resend from MemoryStore', only: false }, async (context) => 
               packet.packetId!,
               Mqtt.ProtocolVersion.MQTT_V5,
             );
-
-            if (expectedPacketId > 3) {
-              resolve();
-            }
           } else {
             assertEquals(packet.packetId, expectedPacketId++);
             if (expectedPacketId > 3) {
@@ -341,6 +331,7 @@ Deno.test({ name: '@resend from MemoryStore', only: false }, async (context) => 
         client.on('closed', async () => {
           if (sessionExists) {
             assertEquals(await client.publishInflightCount(), 0);
+            resolve();
           } else {
             sessionExists = true;
             assertEquals(await client.publishInflightCount(), 3);
@@ -416,10 +407,6 @@ Deno.test({ name: '@resend from MemoryStore', only: false }, async (context) => 
               packet.packetId!,
               Mqtt.ProtocolVersion.MQTT_V3_1_1,
             );
-
-            if (expectedPacketId > 3) {
-              resolve();
-            }
           } else {
             assertEquals(packet.packetId, expectedPacketId++);
             if (expectedPacketId > 3) {
@@ -442,6 +429,7 @@ Deno.test({ name: '@resend from MemoryStore', only: false }, async (context) => 
         client.on('closed', async () => {
           if (sessionExists) {
             assertEquals(await client.publishInflightCount(), 0);
+            resolve();
           } else {
             sessionExists = true;
             assertEquals(await client.publishInflightCount(), 3);
@@ -544,9 +532,6 @@ Deno.test({ name: '@resend from MemoryStore', only: false }, async (context) => 
               packet.packetId!,
               Mqtt.ProtocolVersion.MQTT_V5,
             );
-            if (expectedPubrelPacketId > 3) {
-              resolve();
-            }
           } else {
             broker.closeConnectionFromBroker(client.getClientId());
           }
@@ -579,6 +564,7 @@ Deno.test({ name: '@resend from MemoryStore', only: false }, async (context) => 
         client.on('closed', async () => {
           if (sessionExists) {
             assertEquals(await client.publishInflightCount(), 0);
+            resolve();
           } else {
             sessionExists = true;
             assertEquals(await client.publishInflightCount(), 3);
@@ -664,9 +650,6 @@ Deno.test({ name: '@resend from MemoryStore', only: false }, async (context) => 
               packet.packetId!,
               Mqtt.ProtocolVersion.MQTT_V5,
             );
-            if (expectedPubrelPacketId > 3) {
-              resolve();
-            }
           } else {
             broker.closeConnectionFromBroker(client.getClientId());
           }
@@ -685,6 +668,7 @@ Deno.test({ name: '@resend from MemoryStore', only: false }, async (context) => 
         client.on('closed', async () => {
           if (sessionExists) {
             assertEquals(await client.publishInflightCount(), 0);
+            resolve();
           } else {
             sessionExists = true;
             assertEquals(await client.publishInflightCount(), 3);
@@ -780,9 +764,6 @@ Deno.test({ name: '@resend from MemoryStore', only: false }, async (context) => 
             );
 
             expectedPacketId++;
-            if (expectedPacketId > 3) {
-              resolve();
-            }
           } else {
             assertEquals(packet.qos, Mqtt.QoS.AT_LEAST_ONCE);
             assertEquals(packet.dup, false);
@@ -857,6 +838,7 @@ Deno.test({ name: '@resend from MemoryStore', only: false }, async (context) => 
         client.on('closed', async () => {
           if (sessionExists) {
             assertEquals(await client.publishInflightCount(), 0);
+            resolve();
           } else {
             sessionExists = true;
             assertEquals(await client.publishInflightCount(), 2);

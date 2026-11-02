@@ -35,21 +35,37 @@ function log(msg: string, ...args: unknown[]): void {
   console.log(`[Test Broker] ${msg}`, ...args);
 }
 
+// Read the bytes of the next complete MQTT packet.
+async function readPacketBytes(
+  reader: ReadableStreamDefaultReader<Uint8Array>,
+  frameBuffer: MqttStream.MqttFrameBuffer,
+): Promise<Uint8Array> {
+  let receiveBytes: Uint8Array | undefined;
+  while (!(receiveBytes = frameBuffer.takePacket())) {
+    frameBuffer.append(await MqttStream.readChunk(reader));
+  }
+  return receiveBytes;
+}
+
 class Client {
   public clientId;
   public protocolVersion: Mqtt.ProtocolVersion;
   public conn;
   public reader;
+  public frameBuffer;
   public writer;
   constructor(
     clientId: string,
     protocolVersion: Mqtt.ProtocolVersion,
     conn: Deno.Conn,
+    reader: ReadableStreamDefaultReader<Uint8Array>,
+    frameBuffer: MqttStream.MqttFrameBuffer,
   ) {
     this.clientId = clientId;
     this.protocolVersion = protocolVersion;
     this.conn = conn;
-    this.reader = conn.readable.getReader({ mode: 'byob' });
+    this.reader = reader;
+    this.frameBuffer = frameBuffer;
     this.writer = conn.writable.getWriter();
   }
 
@@ -81,21 +97,19 @@ export class TestBroker extends EventTarget {
   }
 
   private async register(conn: Deno.Conn<Deno.Addr>) {
-    const reader: ReadableStreamBYOBReader = conn.readable.getReader({
-      mode: 'byob',
-    });
+    const reader = conn.readable.getReader();
+    const frameBuffer = new MqttStream.MqttFrameBuffer();
 
-    const receiveBytes = await MqttStream.readMqttBytes(reader);
+    const receiveBytes = await readPacketBytes(reader, frameBuffer);
     log('receiveBytes', receiveBytes);
     const packet = MqttPackets.decode(receiveBytes);
     log('receivePacket', packet);
 
     if (packet.type === 'connect') {
-      reader.releaseLock();
-
+      // Hand over the reader and any bytes already buffered after CONNECT.
       this.clients.set(
         packet.clientId,
-        new Client(packet.clientId, packet.protocolVersion, conn),
+        new Client(packet.clientId, packet.protocolVersion, conn, reader, frameBuffer),
       );
 
       this.dispatchEvent(
@@ -173,7 +187,7 @@ export class TestBroker extends EventTarget {
 
     try {
       do {
-        const receiveBytes = await MqttStream.readMqttBytes(client.reader);
+        const receiveBytes = await readPacketBytes(client.reader, client.frameBuffer);
         log('receiveBytes', receiveBytes);
         const packet = MqttPackets.decode(receiveBytes, client.protocolVersion);
         log('receivePacket', packet);

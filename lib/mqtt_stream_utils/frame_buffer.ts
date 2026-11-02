@@ -2,8 +2,8 @@ import * as MqttUtils from '../mqtt_utils/mod.ts';
 import { decodeRemainingLength } from './remaining_length.ts';
 
 /**
- * Splits a byte stream received in arbitrary chunks (e.g. WebSocket messages)
- * into complete MQTT packets.
+ * Splits a byte stream received in arbitrary chunks (e.g. TCP reads or
+ * WebSocket messages) into complete MQTT packets.
  */
 export class MqttFrameBuffer {
   private buffer: Uint8Array = new Uint8Array(0);
@@ -16,30 +16,26 @@ export class MqttFrameBuffer {
   }
 
   /**
-   * Remove and return every complete packet currently in the buffer.
-   * Bytes of an incomplete trailing packet are kept until more data arrives.
-   * Throws `MalformedPacketError` when the Remaining Length is malformed.
+   * Remove and return the first complete packet in the buffer, or `undefined`
+   * when the buffer does not hold a complete packet yet.
+   * Throws `MalformedPacketError` when the Remaining Length of the first
+   * packet is malformed; packets before it have already been returned by
+   * earlier calls.
    */
-  takePackets(): Uint8Array[] {
-    const packets: Uint8Array[] = [];
-    let offset = 0;
-    while (offset < this.buffer.length) {
-      // buffer[offset] is the fixed header byte, followed by the Remaining Length.
-      const remainingLength = decodeRemainingLength(this.buffer, offset + 1);
-      if (!remainingLength) {
-        break;
-      }
-
-      const packetSize = 1 + remainingLength.size + remainingLength.number;
-      if (offset + packetSize > this.buffer.length) {
-        break;
-      }
-
-      packets.push(this.buffer.slice(offset, offset + packetSize));
-      offset += packetSize;
+  takePacket(): Uint8Array | undefined {
+    // buffer[0] is the fixed header byte, followed by the Remaining Length.
+    const remainingLength = decodeRemainingLength(this.buffer, 1);
+    if (!remainingLength) {
+      return undefined;
     }
 
-    this.buffer = this.buffer.slice(offset);
-    return packets;
+    const packetSize = 1 + remainingLength.size + remainingLength.number;
+    if (packetSize > this.buffer.length) {
+      return undefined;
+    }
+
+    const packet = this.buffer.slice(0, packetSize);
+    this.buffer = this.buffer.subarray(packetSize);
+    return packet;
   }
 }
