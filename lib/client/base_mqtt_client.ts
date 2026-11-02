@@ -40,6 +40,17 @@ function positiveOrDefault(value: number | undefined, defaultValue: number): num
 }
 
 /**
+ * Creates the Deferred whose promise publish(), subscribe() and unsubscribe() return.
+ * A rejection reaches callers that await the promise, but never becomes an unhandled rejection
+ * (which terminates the process in Deno) when a caller ignores the promise.
+ */
+function createRequestDeferred<T>(): Deferred<T> {
+  const deferred = new Deferred<T>();
+  deferred.promise.catch(() => {});
+  return deferred;
+}
+
+/**
  * The API shared by {@link MqttClient} and {@link WebSocketMqttClient}: connecting, publishing, subscribing and events.
  *
  * It is exported as a type only, e.g. to write a function that accepts either client.
@@ -329,6 +340,7 @@ export abstract class BaseMqttClient {
    * The returned promise resolves when the flow for the QoS level completes: right after sending for QoS 0,
    * on PUBACK for QoS 1, and on PUBCOMP for QoS 2. A failure reported by the broker resolves with its reason code
    * in {@link PublishResult.result} instead of rejecting.
+   * A rejection of an ignored promise does not terminate the process; await the promise to handle failures.
    *
    * @param topic topic name
    * @param payload payload. A string is encoded as UTF-8.
@@ -336,6 +348,7 @@ export abstract class BaseMqttClient {
    * @param properties MQTT 5.0 PUBLISH properties.
    * @returns the result of the publish flow.
    * @throws {StateIsNotOnlineError} if the client is not connected.
+   * @throws {SessionLostError} QoS 1 and 2: if the broker did not keep the session when reconnecting before the flow completed.
    * @example
    * ```ts
    * import { Mqtt, MqttClient, MqttProperties } from '@ymjacky/mqtt5';
@@ -364,12 +377,25 @@ export abstract class BaseMqttClient {
    * await client.publish('topicA', 'payload', { qos: Mqtt.QoS.AT_MOST_ONCE }, pubProperties);
    * ```
    */
-  public async publish(
+  public publish(
     topic: string,
     payload: string | Uint8Array,
     options?: PublishOptions,
     properties?: MqttProperties.UserPublishProperties,
   ): Promise<PublishResult> {
+    const deferred = createRequestDeferred<PublishResult>();
+    this.sendPublish(topic, payload, options, properties, deferred).catch((err) => deferred.reject(err));
+    return deferred.promise;
+  }
+
+  /** Sends PUBLISH for publish(). The flow settles `deferred` (right away for QoS 0). */
+  private async sendPublish(
+    topic: string,
+    payload: string | Uint8Array,
+    options: PublishOptions | undefined,
+    properties: MqttProperties.UserPublishProperties | undefined,
+    deferred: Deferred<PublishResult>,
+  ) {
     if (this.connectionState !== 'online') {
       throw new StateIsNotOnlineError('publish');
     }
@@ -377,8 +403,6 @@ export abstract class BaseMqttClient {
     const dup = (options && options.dup) || false;
     const qos = (options && options.qos) || 0;
     const retain = (options && options.retain) || false;
-
-    const deferred = new Deferred<PublishResult>();
 
     const buffer: Uint8Array = (typeof payload === 'string') ? new TextEncoder().encode(payload) : payload;
 
@@ -427,16 +451,17 @@ export abstract class BaseMqttClient {
       await this.session.storePublish(packet, deferred, omittedTopic);
       await this.sendPacket(packet);
     }
-
-    return deferred.promise;
   }
 
   /**
    * Subscribes to a topic filter and waits for SUBACK.
+   * A rejection of an ignored promise does not terminate the process; await the promise to handle failures.
    * @param topicFilter topic name or topic filter
    * @param qos QoS level. Defaults to `Mqtt.QoS.AT_MOST_ONCE`.
    * @param properties MQTT 5.0 SUBSCRIBE properties.
    * @returns the reason codes of SUBACK.
+   * @throws {StateIsNotOnlineError} if the client is not connected.
+   * @throws {ConnectionClosed} if the connection is closed before SUBACK is received.
    * @example
    * ```ts
    * import { Mqtt, MqttClient } from '@ymjacky/mqtt5';
@@ -446,7 +471,7 @@ export abstract class BaseMqttClient {
    * await client.subscribe('topicA', Mqtt.QoS.AT_MOST_ONCE);
    * ```
    */
-  public async subscribe(
+  public subscribe(
     topicFilter: string,
     qos?: Mqtt.QoS,
     properties?: MqttProperties.SubscribeProperties,
@@ -454,10 +479,13 @@ export abstract class BaseMqttClient {
 
   /**
    * Subscribes to multiple topic filters with one SUBSCRIBE packet and waits for SUBACK.
+   * A rejection of an ignored promise does not terminate the process; await the promise to handle failures.
    * @param topicFilters topic names or topic filters
    * @param qos QoS level. Defaults to `Mqtt.QoS.AT_MOST_ONCE`.
    * @param properties MQTT 5.0 SUBSCRIBE properties.
    * @returns the reason codes of SUBACK.
+   * @throws {StateIsNotOnlineError} if the client is not connected.
+   * @throws {ConnectionClosed} if the connection is closed before SUBACK is received.
    * @example
    * ```ts
    * import { Mqtt, MqttClient } from '@ymjacky/mqtt5';
@@ -467,7 +495,7 @@ export abstract class BaseMqttClient {
    * await client.subscribe(['topicA', 'topicB'], Mqtt.QoS.AT_MOST_ONCE);
    * ```
    */
-  public async subscribe(
+  public subscribe(
     topicFilters: string[],
     qos?: Mqtt.QoS,
     properties?: MqttProperties.SubscribeProperties,
@@ -475,10 +503,13 @@ export abstract class BaseMqttClient {
 
   /**
    * Subscribes to a topic filter with MQTT 5.0 subscription options and waits for SUBACK.
+   * A rejection of an ignored promise does not terminate the process; await the promise to handle failures.
    * @param subscription topic filter and subscription options. Its `qos` takes precedence over the `qos` argument.
    * @param qos QoS level. Defaults to `Mqtt.QoS.AT_MOST_ONCE`.
    * @param properties MQTT 5.0 SUBSCRIBE properties.
    * @returns the reason codes of SUBACK.
+   * @throws {StateIsNotOnlineError} if the client is not connected.
+   * @throws {ConnectionClosed} if the connection is closed before SUBACK is received.
    * @example
    * ```ts
    * import { Mqtt, MqttClient } from '@ymjacky/mqtt5';
@@ -488,7 +519,7 @@ export abstract class BaseMqttClient {
    * await client.subscribe({ topicFilter: 'topicA', qos: Mqtt.QoS.AT_MOST_ONCE, retainHandling: Mqtt.RetainHandling.DoNotSend, retainAsPublished: true, noLocal: true });
    * ```
    */
-  public async subscribe(
+  public subscribe(
     subscription: SubscriptionOption,
     qos?: Mqtt.QoS,
     properties?: MqttProperties.SubscribeProperties,
@@ -496,10 +527,13 @@ export abstract class BaseMqttClient {
 
   /**
    * Subscribes to multiple topic filters with subscription options with one SUBSCRIBE packet and waits for SUBACK.
+   * A rejection of an ignored promise does not terminate the process; await the promise to handle failures.
    * @param subscriptions topic filters and subscription options. Their `qos` takes precedence over the `qos` argument.
    * @param qos QoS level. Defaults to `Mqtt.QoS.AT_MOST_ONCE`.
    * @param properties MQTT 5.0 SUBSCRIBE properties.
    * @returns the reason codes of SUBACK.
+   * @throws {StateIsNotOnlineError} if the client is not connected.
+   * @throws {ConnectionClosed} if the connection is closed before SUBACK is received.
    * @example
    * ```ts
    * import { Mqtt, MqttClient } from '@ymjacky/mqtt5';
@@ -516,7 +550,7 @@ export abstract class BaseMqttClient {
    * );
    * ```
    */
-  public async subscribe(
+  public subscribe(
     subscriptions: SubscriptionOption[],
     qos?: Mqtt.QoS,
     properties?: MqttProperties.SubscribeProperties,
@@ -525,11 +559,27 @@ export abstract class BaseMqttClient {
   /**
    * Subscribes to one or more topic filters and waits for SUBACK.
    */
-  public async subscribe(
+  public subscribe(
     input: SubscriptionOption | string | (SubscriptionOption | string)[],
     qos?: Mqtt.QoS,
     properties?: MqttProperties.SubscribeProperties,
   ): Promise<SubscribeResults> {
+    const deferred = createRequestDeferred<SubscribeResults>();
+    this.sendSubscribe(input, qos, properties, deferred).catch((err) => deferred.reject(err));
+    return deferred.promise;
+  }
+
+  /** Sends SUBSCRIBE for subscribe(). SUBACK settles `deferred`. */
+  private async sendSubscribe(
+    input: SubscriptionOption | string | (SubscriptionOption | string)[],
+    qos: Mqtt.QoS | undefined,
+    properties: MqttProperties.SubscribeProperties | undefined,
+    deferred: Deferred<SubscribeResults>,
+  ) {
+    if (this.connectionState !== 'online') {
+      throw new StateIsNotOnlineError('subscribe');
+    }
+
     const arr = Array.isArray(input) ? input : [input];
     const subs = arr.map<SubscriptionOption>((sub) => {
       return (typeof sub === 'object')
@@ -543,7 +593,6 @@ export abstract class BaseMqttClient {
         : { topicFilter: sub, qos: qos || Mqtt.QoS.AT_MOST_ONCE };
     });
 
-    const deferred = new Deferred<SubscribeResults>();
     const packet: SubscribePacket = {
       type: 'subscribe',
       packetId: await this.session.acquirePacketId(),
@@ -551,16 +600,22 @@ export abstract class BaseMqttClient {
       properties: properties,
     };
     await this.session.storeSubscribe(packet, deferred);
-    await this.sendPacket(packet);
-
-    return deferred.promise;
+    try {
+      await this.sendPacket(packet);
+    } catch (err) {
+      this.session.discardSubscribeRequest(packet.packetId);
+      throw err;
+    }
   }
 
   /**
    * Unsubscribes from a topic filter and waits for UNSUBACK.
+   * A rejection of an ignored promise does not terminate the process; await the promise to handle failures.
    * @param topicFilter topic name or topic filter
    * @param properties MQTT 5.0 UNSUBSCRIBE properties.
    * @returns the reason codes of UNSUBACK.
+   * @throws {StateIsNotOnlineError} if the client is not connected.
+   * @throws {ConnectionClosed} if the connection is closed before UNSUBACK is received.
    * @example
    * ```ts
    * import { MqttClient, MqttProperties } from '@ymjacky/mqtt5';
@@ -579,13 +634,16 @@ export abstract class BaseMqttClient {
    * await client.unsubscribe('topicB', properties);
    * ```
    */
-  public async unsubscribe(topicFilter: string, properties?: MqttProperties.UnsubscribeProperties): Promise<UnsubscribeResults>;
+  public unsubscribe(topicFilter: string, properties?: MqttProperties.UnsubscribeProperties): Promise<UnsubscribeResults>;
 
   /**
    * Unsubscribes from multiple topic filters with one UNSUBSCRIBE packet and waits for UNSUBACK.
+   * A rejection of an ignored promise does not terminate the process; await the promise to handle failures.
    * @param topicFilters topic names or topic filters
    * @param properties MQTT 5.0 UNSUBSCRIBE properties.
    * @returns the reason codes of UNSUBACK.
+   * @throws {StateIsNotOnlineError} if the client is not connected.
+   * @throws {ConnectionClosed} if the connection is closed before UNSUBACK is received.
    * @example
    * ```ts
    * import { MqttClient } from '@ymjacky/mqtt5';
@@ -601,18 +659,32 @@ export abstract class BaseMqttClient {
    * );
    * ```
    */
-  public async unsubscribe(topicFilters: string[], properties?: MqttProperties.UnsubscribeProperties): Promise<UnsubscribeResults>;
+  public unsubscribe(topicFilters: string[], properties?: MqttProperties.UnsubscribeProperties): Promise<UnsubscribeResults>;
 
   /**
    * Unsubscribes from one or more topic filters and waits for UNSUBACK.
    */
-  public async unsubscribe(
+  public unsubscribe(
     input: string | string[],
     properties?: MqttProperties.UnsubscribeProperties,
   ): Promise<UnsubscribeResults> {
+    const deferred = createRequestDeferred<UnsubscribeResults>();
+    this.sendUnsubscribe(input, properties, deferred).catch((err) => deferred.reject(err));
+    return deferred.promise;
+  }
+
+  /** Sends UNSUBSCRIBE for unsubscribe(). UNSUBACK settles `deferred`. */
+  private async sendUnsubscribe(
+    input: string | string[],
+    properties: MqttProperties.UnsubscribeProperties | undefined,
+    deferred: Deferred<UnsubscribeResults>,
+  ) {
+    if (this.connectionState !== 'online') {
+      throw new StateIsNotOnlineError('unsubscribe');
+    }
+
     const unsubs = Array.isArray(input) ? input : [input];
 
-    const deferred = new Deferred<UnsubscribeResults>();
     const packet: UnsubscribePacket = {
       type: 'unsubscribe',
       packetId: await this.session.acquirePacketId(),
@@ -621,9 +693,12 @@ export abstract class BaseMqttClient {
     };
 
     await this.session.storeUnsubscribe(packet, deferred);
-    await this.sendPacket(packet);
-
-    return deferred.promise;
+    try {
+      await this.sendPacket(packet);
+    } catch (err) {
+      this.session.discardSubscribeRequest(packet.packetId);
+      throw err;
+    }
   }
 
   /**
@@ -840,6 +915,9 @@ export abstract class BaseMqttClient {
     this.stopKeepAliveTimer();
     this.stopPingrespTimer();
 
+    // SUBACK and UNSUBACK will not arrive: SUBSCRIBE and UNSUBSCRIBE are not resent after reconnecting.
+    this.session.abortSubscribeRequests();
+
     if (this.waitForClose) {
       this.waitForClose.resolve();
       this.waitForClose = undefined;
@@ -935,7 +1013,7 @@ export abstract class BaseMqttClient {
         this.clientId = packet.properties.assignedClientIdentifier;
       }
       if (!packet.sessionPresent) {
-        this.session.clearAllStores(this.clientId);
+        await this.session.clearAllStores(this.clientId);
       }
 
       // The Server Keep Alive replaces the Keep Alive sent in CONNECT for this connection, even when it is higher or 0.
@@ -959,7 +1037,8 @@ export abstract class BaseMqttClient {
       createCustomEvent('connack', { detail: packet }),
     );
 
-    if (connectionSuceeded) {
+    // The connection may have been closed while awaiting above.
+    if (connectionSuceeded && this.connectionState === 'online') {
       this.startKeepAliveTimer();
     }
   }

@@ -1,6 +1,7 @@
 import { IdProvider, MqttPackets } from '../mod.ts';
 import { MemoryStore, OutgoingStore } from '../mqtt_store/mod.ts';
 import { Deferred } from './promise.ts';
+import { ConnectionClosed, SessionLostError } from './error.ts';
 import { PublishResult, SubscribeResults, UnsubscribeResults } from './client_types.ts';
 
 export class Session {
@@ -36,10 +37,35 @@ export class Session {
     }
 
     await this.outgoingStore.clear();
+
+    // The PUBLISH flows waiting for an acknowledgment will never complete without the session.
+    for (const deferred of this.inflightPublish.values()) {
+      deferred.reject(new SessionLostError());
+    }
     this.inflightPublish.clear();
     this.inflightSubscribe.clear();
     this.inflightUnsubscribe.clear();
     this.packetIdProvider.clear();
+  }
+
+  /**
+   * Rejects the SUBSCRIBE and UNSUBSCRIBE requests waiting for an acknowledgment and releases their packet IDs.
+   * Called when the connection is closed: unlike PUBLISH and PUBREL, they are not resent after reconnecting.
+   */
+  public abortSubscribeRequests() {
+    for (const [packetId, deferred] of [...this.inflightSubscribe, ...this.inflightUnsubscribe]) {
+      deferred.reject(new ConnectionClosed());
+      this.packetIdProvider.release(packetId);
+    }
+    this.inflightSubscribe.clear();
+    this.inflightUnsubscribe.clear();
+  }
+
+  /** Removes a SUBSCRIBE or UNSUBSCRIBE that could not be sent, and releases its packet ID. */
+  public discardSubscribeRequest(packetId: number) {
+    this.inflightSubscribe.delete(packetId);
+    this.inflightUnsubscribe.delete(packetId);
+    this.packetIdProvider.release(packetId);
   }
 
   public async packetIdInUse(packetId: number) {

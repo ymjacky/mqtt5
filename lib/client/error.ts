@@ -3,7 +3,10 @@
  * @module
  */
 
-/** The connection was closed by the peer. */
+/**
+ * The connection was closed. Also rejected by `subscribe()` and `unsubscribe()` when the connection is closed before
+ * SUBACK / UNSUBACK is received; the broker may or may not have processed the request.
+ */
 export class ConnectionClosed extends Error {
   readonly #className = 'ConnectionClosed';
   constructor() {
@@ -46,12 +49,24 @@ export class StateIsNotOfflineError extends Error {
   }
 }
 
-/** `publish()` was called while the client is not connected. */
+/** `publish()`, `subscribe()` or `unsubscribe()` was called while the client is not connected. */
 export class StateIsNotOnlineError extends Error {
   readonly #className = 'StateIsNotOnlineError';
   /** Creates the error with the given details. */
   constructor(message: string) {
     super(`State is not online: ${message}`);
+  }
+}
+
+/**
+ * The broker did not keep the session (CONNACK Session Present is 0), so a request sent on a previous connection
+ * will not complete. Rejected by `publish()` (QoS 1 and 2) waiting for PUBACK / PUBREC / PUBCOMP.
+ * The message may or may not have reached the broker.
+ */
+export class SessionLostError extends Error {
+  readonly #className = 'SessionLostError';
+  constructor() {
+    super('session lost: the broker did not keep the session');
   }
 }
 
