@@ -163,15 +163,19 @@ export class TestWsBroker extends EventTarget {
       conn.close();
     };
 
+    // Packets after CONNECT are decoded with the protocol version the client connected with.
+    let protocolVersion: Mqtt.ProtocolVersion = Mqtt.ProtocolVersion.MQTT_V5;
+
     conn.onmessage = (e: MessageEvent<unknown>) => {
       const receiveBytes = new Uint8Array(e.data as ArrayBuffer);
       log('receive bytes', receiveBytes);
-      const packet = MqttPackets.decode(receiveBytes);
+      const packet = MqttPackets.decode(receiveBytes, protocolVersion);
       log('receive packet', packet);
 
       switch (packet.type) {
         case 'connect':
           log('receive connect packet');
+          protocolVersion = packet.protocolVersion;
 
           this.clients.set(
             packet.clientId,
