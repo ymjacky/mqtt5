@@ -906,7 +906,7 @@ export abstract class BaseMqttClient {
       if (packet.returnCode === Mqtt.V3_1_1_ConnectReturnCode.ConnectionAccepted) {
         connectionSuceeded = true;
       } else {
-        this.log(`connection failed. reasonCode:${packet.reasonCode}`);
+        this.log(`connection failed. returnCode:${packet.returnCode}`);
       }
     }
 
@@ -961,7 +961,7 @@ export abstract class BaseMqttClient {
           if (storedTopic) {
             packet.topic = storedTopic;
           } else {
-            this.log('Unregistered topic alias receiv');
+            this.log('Unregistered topic alias received');
             return;
           }
         } else {

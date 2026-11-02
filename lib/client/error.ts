@@ -65,9 +65,9 @@ export class SendPacketError extends Error {
 
 /** The URL protocol is not supported by the client (`MqttClient` accepts `mqtt:` and `mqtts:`). */
 export class UnexpectedUrlProtocol extends Error {
-  readonly #className = 'UnexpectedUrlProtocolextends';
+  readonly #className = 'UnexpectedUrlProtocol';
   /** Creates the error with the given details. */
   constructor(message: string) {
-    super(`unexpected URL protcol: ${message}`);
+    super(`unexpected URL protocol: ${message}`);
   }
 }
