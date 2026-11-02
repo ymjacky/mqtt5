@@ -393,7 +393,7 @@ Deno.test({ name: '@receive publish_qos2', only: false }, async (context) => {
         client.on('publish', (event) => {
           const packet = event.detail;
           assertEquals(packet.packetId, 1);
-          assertEquals(packet.qos, Mqtt.QoS.EXACTRY_ONCE);
+          assertEquals(packet.qos, Mqtt.QoS.EXACTLY_ONCE);
           assertEquals(packet.topic, 'topicA');
           assertEquals(packet.payload, new TextEncoder().encode('payload A'));
           assertEquals(packet.dup, false);
@@ -422,7 +422,7 @@ Deno.test({ name: '@receive publish_qos2', only: false }, async (context) => {
           'topicA',
           Mqtt.ProtocolVersion.MQTT_V3_1_1,
           new Uint8Array(new TextEncoder().encode('payload A')),
-          Mqtt.QoS.EXACTRY_ONCE,
+          Mqtt.QoS.EXACTLY_ONCE,
           false,
           false,
         );
@@ -475,7 +475,7 @@ Deno.test({ name: '@receive publish_qos2', only: false }, async (context) => {
         client.on('publish', (event) => {
           const packet = event.detail;
           assertEquals(packet.packetId, 1);
-          assertEquals(packet.qos, Mqtt.QoS.EXACTRY_ONCE);
+          assertEquals(packet.qos, Mqtt.QoS.EXACTLY_ONCE);
           assertEquals(packet.topic, 'topicA');
           assertEquals(packet.payload, new TextEncoder().encode('payload A'));
           assertEquals(packet.dup, false);
@@ -541,7 +541,7 @@ Deno.test({ name: '@receive publish_qos2', only: false }, async (context) => {
           'topicA',
           Mqtt.ProtocolVersion.MQTT_V5,
           new Uint8Array(new TextEncoder().encode('payload A')),
-          Mqtt.QoS.EXACTRY_ONCE,
+          Mqtt.QoS.EXACTLY_ONCE,
           false,
           false,
           properties,

@@ -1,12 +1,7 @@
 import * as Mqtt from '../mqtt/mod.ts';
 import * as MqttProperties from '../mqtt_properties/mod.ts';
 import { concatBytes, numToVariableByteInteger, variableByteIntegerToNum } from '../mqtt_utils/mod.ts';
-
-export type AuthPacket = {
-  type: 'auth';
-  reasonCode?: number;
-  properties?: MqttProperties.AuthProperties;
-};
+import type { AuthPacket } from './packet_types.ts';
 
 export function toBytes(
   packet: AuthPacket,
@@ -27,7 +22,7 @@ export function toBytes(
   const variableHeader = concatBytes(variableHeaderChunks);
 
   const fixedHeader = [
-    (Mqtt.PacketType.AUTH << 4) + Mqtt.fixexHeaderFlag.AUTH,
+    (Mqtt.PacketType.AUTH << 4) + Mqtt.fixedHeaderFlag.AUTH,
     ...numToVariableByteInteger(variableHeader.length),
   ];
 

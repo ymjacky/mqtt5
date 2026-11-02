@@ -51,11 +51,13 @@ const defaultPingrespTimeout = 2 * 1000;
  * ```
  */
 export abstract class BaseMqttClient {
+  /** The URL of the broker to connect to. */
   protected url: URL;
   private userName?: string;
   private password?: string;
   private clientId: string;
   private keepAlive: number;
+  /** The MQTT protocol version used for the connection. */
   protected protocolVersion: Mqtt.ProtocolVersion;
   private clean: boolean;
   private connectTimeout: number;
@@ -67,6 +69,7 @@ export abstract class BaseMqttClient {
   // Tail of the chain that runs received packet handlers one at a time.
   private packetHandling: Promise<void> = Promise.resolve();
   private timers: { [key: string]: ReturnType<typeof setTimeout> };
+  /** Logger given by the `logger` option; does nothing by default. */
   protected log: (msg: string, ...args: unknown[]) => void;
   /**
    * ca certificate.
@@ -95,6 +98,7 @@ export abstract class BaseMqttClient {
 
   private connectProperties?: MqttProperties.ConnectProperties;
 
+  /** Dispatches the client events registered with `on()`. */
   protected eventTarget: EventTarget;
   private pingrespTimeoutMs: number;
   private topicAliasManagerAboutSend?: TopicAliasManager;
@@ -102,7 +106,7 @@ export abstract class BaseMqttClient {
   private topicAliasMapAboutReceive: Map<number, string>;
   private waitForClose?: Deferred<void>;
 
-  // constructor
+  /** Creates a client. Use {@link MqttClient} or {@link WebSocketMqttClient}. */
   constructor(options?: ClientOptions) {
     this.url = options?.url || new URL('mqtt://127.0.0.1:1883');
     this.log = options?.logger || (() => {});
@@ -153,6 +157,7 @@ export abstract class BaseMqttClient {
     this.topicAliasMapAboutReceive = new Map<number, string>();
   }
 
+  /** Encodes and sends a packet, and restarts the keep alive timer. */
   private async sendPacket(packet: AnyPacket) {
     try {
       if (this.connectionState === 'offline') {
@@ -182,6 +187,7 @@ export abstract class BaseMqttClient {
     });
   }
 
+  /** Opens the transport connection to the broker. */
   protected abstract open(): Promise<void>;
 
   /**
@@ -335,8 +341,8 @@ export abstract class BaseMqttClient {
    *
    * await client.publish('topicA', 'payload', { qos: Mqtt.QoS.AT_MOST_ONCE });
    * await client.publish('topicA', 'payload', { qos: Mqtt.QoS.AT_LEAST_ONCE });
-   * await client.publish('topicA', 'payload', { qos: Mqtt.QoS.EXACTRY_ONCE });
-   * await client.publish('topicA', new TextEncoder().encode('payloadA'), { qos: Mqtt.QoS.EXACTRY_ONCE });
+   * await client.publish('topicA', 'payload', { qos: Mqtt.QoS.EXACTLY_ONCE });
+   * await client.publish('topicA', new TextEncoder().encode('payloadA'), { qos: Mqtt.QoS.EXACTLY_ONCE });
    * await client.publish('topicA', 'payloadA', { qos: Mqtt.QoS.AT_LEAST_ONCE, dup: true, retain: true });
    *
    * const pubProperties: MqttProperties.UserPublishProperties = {
@@ -506,8 +512,8 @@ export abstract class BaseMqttClient {
    *   [
    *     { topicFilter: 'topicA', qos: Mqtt.QoS.AT_MOST_ONCE },
    *     { topicFilter: 'topicB', qos: Mqtt.QoS.AT_LEAST_ONCE },
-   *     { topicFilter: 'topicC', qos: Mqtt.QoS.EXACTRY_ONCE },
-   *     { topicFilter: 'topicD', qos: Mqtt.QoS.EXACTRY_ONCE, retainHandling: Mqtt.RetainHandling.DoNotSend, retainAsPublished: true, noLocal: true }
+   *     { topicFilter: 'topicC', qos: Mqtt.QoS.EXACTLY_ONCE },
+   *     { topicFilter: 'topicD', qos: Mqtt.QoS.EXACTLY_ONCE, retainHandling: Mqtt.RetainHandling.DoNotSend, retainAsPublished: true, noLocal: true }
    *   ],
    * );
    * ```
@@ -685,6 +691,7 @@ export abstract class BaseMqttClient {
     return deferred.promise;
   }
 
+  /** Closes the connection when `force` is true, otherwise sends DISCONNECT and waits for the broker to close it. */
   protected async doDisconnect(
     force: boolean = false,
     reasonCode?: Mqtt.ReasonCode,
@@ -722,10 +729,16 @@ export abstract class BaseMqttClient {
     await this.sendPacket(packet);
   }
 
+  /** Writes bytes to the transport. Set by subclasses when the connection is opened. */
   protected write: (byte: Uint8Array) => void = (_byte: Uint8Array) => {};
 
+  /** Closes the transport connection. */
   protected abstract close(): Promise<void>;
 
+  /**
+   * Handles a malformed packet per protocol version: closes the connection (MQTT 3.1.1)
+   * or sends DISCONNECT with the MalformedPacket reason code (MQTT 5.0).
+   */
   protected async handleMalformedPacket(error: Error): Promise<void> {
     try {
       this.log('handling malformed packet', error);
@@ -800,6 +813,7 @@ export abstract class BaseMqttClient {
     return this.handleMalformedPacket(streamError);
   }
 
+  /** Called by subclasses when the connection is closed: stops the timers and emits the `closed` event. */
   protected detectClosed() {
     this.log('connection closed.');
     this.connectionState = 'offline';
@@ -862,7 +876,7 @@ export abstract class BaseMqttClient {
         handle = () => this.handleAuth(packet);
         break;
       default:
-        throw new MqttPackets.MqttPacketsError.UnsuportedPacketError('unknown');
+        throw new MqttPackets.MqttPacketsError.UnsupportedPacketError('unknown');
     }
 
     this.packetHandling = this.packetHandling
@@ -872,6 +886,10 @@ export abstract class BaseMqttClient {
       });
   }
 
+  /**
+   * Handles CONNACK: updates the session and settings from the broker, resends unacknowledged packets
+   * and resolves `connect()`.
+   */
   private async handleConnack(packet: ConnackPacket) {
     this.connectionState = 'online';
 
@@ -888,7 +906,7 @@ export abstract class BaseMqttClient {
       if (packet.returnCode === Mqtt.V3_1_1_ConnectReturnCode.ConnectionAccepted) {
         connectionSuceeded = true;
       } else {
-        this.log(`connection failed. reasonCode:${packet.reasonCode}`);
+        this.log(`connection failed. returnCode:${packet.returnCode}`);
       }
     }
 
@@ -934,6 +952,7 @@ export abstract class BaseMqttClient {
     }
   }
 
+  /** Handles PUBLISH: resolves the topic alias, sends PUBACK / PUBREC per QoS and emits the `publish` event. */
   private async handlePublish(packet: PublishPacket) {
     { // resolve topic alias
       if (packet.properties?.topicAlias) {
@@ -942,7 +961,7 @@ export abstract class BaseMqttClient {
           if (storedTopic) {
             packet.topic = storedTopic;
           } else {
-            this.log('Unregistered topic alias receiv');
+            this.log('Unregistered topic alias received');
             return;
           }
         } else {
@@ -966,7 +985,7 @@ export abstract class BaseMqttClient {
       this.eventTarget.dispatchEvent(
         createCustomEvent('publish', { detail: packet }),
       );
-    } else if (packet.qos === Mqtt.QoS.EXACTRY_ONCE) {
+    } else if (packet.qos === Mqtt.QoS.EXACTLY_ONCE) {
       const emitMessage = !packet.dup ||
         !(await this.incomingStore.has(packet.packetId!));
 
@@ -989,6 +1008,7 @@ export abstract class BaseMqttClient {
     }
   }
 
+  /** Handles PUBACK: completes a QoS 1 publish. */
   private async handlePuback(packet: PubackPacket) {
     if (await this.session.packetIdInUse(packet.packetId)) {
       await this.session.discard(packet);
@@ -1006,6 +1026,7 @@ export abstract class BaseMqttClient {
     }
   }
 
+  /** Handles PUBREC: sends PUBREL for a QoS 2 publish. */
   private async handlePubrec(packet: PubrecPacket) {
     if (await this.session.packetIdInUse(packet.packetId)) {
       // MUST send a PUBREL packet when it receives a PUBREC packet from the receiver with a Reason Code value less than 0x80.
@@ -1050,6 +1071,7 @@ export abstract class BaseMqttClient {
     }
   }
 
+  /** Handles PUBREL: sends PUBCOMP for a received QoS 2 publish. */
   private async handlePubrel(packet: PubrelPacket) {
     if (await this.incomingStore.has(packet.packetId)) {
       await this.incomingStore.discard(packet.packetId);
@@ -1079,6 +1101,7 @@ export abstract class BaseMqttClient {
     }
   }
 
+  /** Handles PUBCOMP: completes a QoS 2 publish. */
   private async handlePubcomp(packet: PubcompPacket) {
     if (await this.session.packetIdInUse(packet.packetId)) {
       await this.session.discard(packet);
@@ -1097,6 +1120,7 @@ export abstract class BaseMqttClient {
     }
   }
 
+  /** Handles SUBACK: resolves `subscribe()`. */
   private async handleSuback(packet: SubackPacket) {
     if (await this.session.packetIdInUse(packet.packetId)) {
       const rvList = packet.reasonCodes ? packet.reasonCodes : packet.returnCodes;
@@ -1113,6 +1137,7 @@ export abstract class BaseMqttClient {
     }
   }
 
+  /** Handles UNSUBACK: resolves `unsubscribe()`. */
   private async handleUnsuback(packet: UnsubackPacket) {
     if (await this.session.packetIdInUse(packet.packetId)) {
       await this.session.discard(packet);
@@ -1130,10 +1155,12 @@ export abstract class BaseMqttClient {
     }
   }
 
+  /** Handles PINGRESP: stops the PINGRESP timeout. */
   private handlePingresp(_packet: PingrespPacket) {
     this.stopPingrespTimer();
   }
 
+  /** Handles DISCONNECT from the broker: closes the connection and emits the `disconnect` event. */
   private async handleDisconnect(packet: DisconnectPacket) {
     await this.close();
     this.eventTarget.dispatchEvent(
@@ -1141,12 +1168,14 @@ export abstract class BaseMqttClient {
     );
   }
 
+  /** Handles AUTH: emits the `auth` event. */
   private handleAuth(packet: AuthPacket) {
     this.eventTarget.dispatchEvent(
       createCustomEvent('auth', { detail: packet }),
     );
   }
 
+  /** Closes the connection if the broker does not close it within `disconnectTimeoutMS` after DISCONNECT. */
   private startDisconnectTimer() {
     this.startTimer(
       'disconnect',
@@ -1156,12 +1185,14 @@ export abstract class BaseMqttClient {
       this.disconnectTimeout,
     );
   }
+  /** Stops the timer started by startDisconnectTimer(). */
   private stopDisconnectTimer() {
     if (this.timerExists('disconnect')) {
       this.stopTimer('disconnect');
     }
   }
 
+  /** Rejects `connect()` with ConnectTimeout if CONNACK is not received within `connectTimeoutMS`. */
   private startConnectTimer() {
     this.startTimer(
       'connect',
@@ -1174,12 +1205,14 @@ export abstract class BaseMqttClient {
       this.connectTimeout,
     );
   }
+  /** Stops the timer started by startConnectTimer(). */
   private stopConnectTimer() {
     if (this.timerExists('connect')) {
       this.stopTimer('connect');
     }
   }
 
+  /** Sends PINGREQ when nothing is sent within the keep alive interval. */
   private startKeepAliveTimer() {
     if (!this.keepAlive) {
       return;
@@ -1194,23 +1227,27 @@ export abstract class BaseMqttClient {
       this.keepAlive * 1000,
     );
   }
+  /** Stops the timer started by startKeepAliveTimer(). */
   private stopKeepAliveTimer() {
     if (this.timerExists('keepAlive')) {
       this.stopTimer('keepAlive');
     }
   }
 
+  /** Disconnects if PINGRESP is not received within `pingrespTimeoutMS`. */
   private startPingrespTimer() {
     this.startTimer('pingrespTimeout', async () => {
       await this.disconnect(true);
     }, this.pingrespTimeoutMs);
   }
+  /** Stops the timer started by startPingrespTimer(). */
   private stopPingrespTimer() {
     if (this.timerExists('pingrespTimeout')) {
       this.stopTimer('pingrespTimeout');
     }
   }
 
+  /** Starts the named timer, replacing the running one with the same name. */
   private startTimer(
     name: string,
     cb: (...args: unknown[]) => void,
@@ -1226,6 +1263,7 @@ export abstract class BaseMqttClient {
     }, delay);
   }
 
+  /** Stops the named timer. */
   private stopTimer(name: string) {
     if (!this.timerExists(name)) {
       return;
@@ -1240,7 +1278,8 @@ export abstract class BaseMqttClient {
     }
   }
 
-  private timerExists(name: string) {
+  /** Whether the named timer is running. */
+  private timerExists(name: string): boolean {
     return !!this.timers[name];
   }
 

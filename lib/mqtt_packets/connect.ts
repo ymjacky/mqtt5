@@ -11,25 +11,7 @@ import {
 import * as Mqtt from '../mqtt/mod.ts';
 import * as MqttProperties from '../mqtt_properties/mod.ts';
 import { InvalidProtocolVersionError } from './error.ts';
-
-export type ConnectPacket = {
-  type: 'connect';
-  clientId: string;
-  protocolVersion: Mqtt.ProtocolVersion;
-  protocolName?: string;
-  username?: string;
-  password?: string;
-  clean?: boolean;
-  keepAlive?: number;
-  properties?: MqttProperties.ConnectProperties;
-  will?: {
-    retain?: boolean;
-    qos?: Mqtt.QoS;
-    topic: string;
-    payload?: Uint8Array;
-    properties?: MqttProperties.WillProperties;
-  };
-};
+import type { ConnectPacket } from './packet_types.ts';
 
 export function toBytes(packet: ConnectPacket) {
   const protocolName = stringToUtfEncodedString('MQTT');
@@ -97,7 +79,7 @@ export function toBytes(packet: ConnectPacket) {
   const payload = concatBytes(payloadChunks);
 
   const fixedHeader = [
-    (Mqtt.PacketType.CONNECT << 4) + Mqtt.fixexHeaderFlag.CONNECT,
+    (Mqtt.PacketType.CONNECT << 4) + Mqtt.fixedHeaderFlag.CONNECT,
     ...numToVariableByteInteger(variableHeader.length + payload.length),
   ];
 

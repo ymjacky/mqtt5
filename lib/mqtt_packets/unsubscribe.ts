@@ -8,13 +8,7 @@ import {
   variableByteIntegerToNum,
 } from '../mqtt_utils/mod.ts';
 import * as MqttProperties from '../mqtt_properties/mod.ts';
-
-export type UnsubscribePacket = {
-  type: 'unsubscribe';
-  packetId: number;
-  topicFilters: string[];
-  properties?: MqttProperties.UnsubscribeProperties;
-};
+import type { UnsubscribePacket } from './packet_types.ts';
 
 export function toBytes(
   packet: UnsubscribePacket,
@@ -39,7 +33,7 @@ export function toBytes(
   const payload = concatBytes(payloadChunks);
 
   const fixedHeader = [
-    (Mqtt.PacketType.UNSUBSCRIBE << 4) + Mqtt.fixexHeaderFlag.UNSUBSCRIBE,
+    (Mqtt.PacketType.UNSUBSCRIBE << 4) + Mqtt.fixedHeaderFlag.UNSUBSCRIBE,
     ...numToVariableByteInteger(variableHeader.length + payload.length),
   ];
 

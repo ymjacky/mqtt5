@@ -9,21 +9,7 @@ import {
   variableByteIntegerToNum,
 } from '../mqtt_utils/mod.ts';
 import * as MqttProperties from '../mqtt_properties/mod.ts';
-
-export type SubscribePacket = {
-  type: 'subscribe';
-  packetId: number;
-  subscriptions: Subscription[];
-  properties?: MqttProperties.SubscribeProperties;
-};
-
-export type Subscription = {
-  topicFilter: string;
-  qos: Mqtt.QoS;
-  retainHandling?: Mqtt.RetainHandling;
-  retainAsPublished?: boolean;
-  noLocal?: boolean;
-};
+import type { SubscribePacket, Subscription } from './packet_types.ts';
 
 export function toBytes(
   packet: SubscribePacket,
@@ -49,7 +35,7 @@ export function toBytes(
         (sub.retainHandling === Mqtt.RetainHandling.AtSubscribeOnlyIfTheSubscriptionDoesNotCurrentlyExist ? 0b00010000 : 0) | // 4bit for retainHandling
         (sub.retainAsPublished ? 0b00001000 : 0) | // 3bit for retainAsPublished
         (sub.noLocal ? 0b00000100 : 0) | // 2bit for noLocal
-        (sub.qos === Mqtt.QoS.EXACTRY_ONCE ? 0b00000010 : 0) | // 1bit for qos
+        (sub.qos === Mqtt.QoS.EXACTLY_ONCE ? 0b00000010 : 0) | // 1bit for qos
         (sub.qos === Mqtt.QoS.AT_LEAST_ONCE ? 0b00000001 : 0); // 0bit for qos
 
       payloadChunks.push(stringToUtfEncodedString(sub.topicFilter), [subscriptionOptions]);
@@ -61,7 +47,7 @@ export function toBytes(
   const payload = concatBytes(payloadChunks);
 
   const fixedHeader = [
-    (Mqtt.PacketType.SUBSCRIBE << 4) + Mqtt.fixexHeaderFlag.SUBSCRIBE,
+    (Mqtt.PacketType.SUBSCRIBE << 4) + Mqtt.fixedHeaderFlag.SUBSCRIBE,
     ...numToVariableByteInteger(variableHeader.length + payload.length),
   ];
 

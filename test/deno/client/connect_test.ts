@@ -98,6 +98,44 @@ Deno.test({ name: '@connect', only: false }, async (context) => {
   );
 
   await context.step(
+    'connect v3.1.1 refused',
+    async () => {
+      const broker = new TestBroker();
+
+      try {
+        broker.listen();
+
+        const client = new MqttClient({
+          clientId: 'cid',
+          logger: logger,
+          protocolVersion: 4,
+        });
+
+        broker.on('connect', async (event) => {
+          const packet = event.detail;
+          assertEquals(packet.protocolVersion, Mqtt.ProtocolVersion.MQTT_V3_1_1);
+
+          await broker.sendConnack(packet.clientId, false, packet.protocolVersion, Mqtt.V3_1_1_ConnectReturnCode.NotAuthorized);
+          broker.closeConnectionFromBroker(client.getClientId());
+        });
+
+        const connack = await client.connect();
+
+        assertEquals(
+          connack, // actual
+          {
+            type: 'connack',
+            sessionPresent: false,
+            returnCode: Mqtt.V3_1_1_ConnectReturnCode.NotAuthorized,
+          },
+        );
+      } finally {
+        await broker.destroy();
+      }
+    },
+  );
+
+  await context.step(
     'connect v5.0',
     async () => {
       const broker = new TestBroker();

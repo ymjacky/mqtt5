@@ -1,5 +1,5 @@
 import { assertEquals } from 'std/assert/mod.ts';
-import type { SubscribePacket } from '../../../lib/mqtt_packets/subscribe.ts';
+import type { SubscribePacket } from '../../../lib/mqtt_packets/packet_types.ts';
 import { parse, toBytes } from '../../../lib/mqtt_packets/subscribe.ts';
 import * as Mqtt from '../../../lib/mqtt/mod.ts';
 
@@ -51,7 +51,7 @@ Deno.test('encodeSubscribePacketMQTT5WithOptions', function () {
         subscriptions: [
           {
             topicFilter: 'sensors/#',
-            qos: Mqtt.QoS.EXACTRY_ONCE,
+            qos: Mqtt.QoS.EXACTLY_ONCE,
             noLocal: true,
             retainAsPublished: true,
             retainHandling: Mqtt.RetainHandling.AtSubscribeOnlyIfTheSubscriptionDoesNotCurrentlyExist,
@@ -302,7 +302,7 @@ Deno.test('decodeSubscribePacketMQTT5WithOptions', function () {
       subscriptions: [
         {
           topicFilter: 'sensors/#',
-          qos: Mqtt.QoS.EXACTRY_ONCE,
+          qos: Mqtt.QoS.EXACTLY_ONCE,
           noLocal: true,
           retainAsPublished: true,
           retainHandling: Mqtt.RetainHandling.AtSubscribeOnlyIfTheSubscriptionDoesNotCurrentlyExist,

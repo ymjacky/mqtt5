@@ -11,17 +11,7 @@ import {
   variableByteIntegerToNum,
 } from '../mqtt_utils/mod.ts';
 import * as MqttProperties from '../mqtt_properties/mod.ts';
-
-export type PublishPacket = {
-  type: 'publish';
-  topic: string;
-  payload: Uint8Array;
-  dup: boolean;
-  retain: boolean;
-  qos: Mqtt.QoS;
-  packetId?: number;
-  properties?: MqttProperties.PublishProperties;
-};
+import type { PublishPacket } from './packet_types.ts';
 
 export function toBytes(
   packet: PublishPacket,
@@ -36,7 +26,7 @@ export function toBytes(
 
   const variableHeaderChunks: (Uint8Array | number[])[] = [stringToUtfEncodedString(packet.topic)]; // topic
 
-  if (qos === Mqtt.QoS.AT_LEAST_ONCE || qos === Mqtt.QoS.EXACTRY_ONCE) {
+  if (qos === Mqtt.QoS.AT_LEAST_ONCE || qos === Mqtt.QoS.EXACTLY_ONCE) {
     variableHeaderChunks.push(numToTwoByteInteger(packet.packetId!));
   }
 
@@ -80,7 +70,7 @@ export function parse(
   pos += topicInfo.length;
 
   const packetId = (() => {
-    if (qos === Mqtt.QoS.AT_LEAST_ONCE || qos == Mqtt.QoS.EXACTRY_ONCE) {
+    if (qos === Mqtt.QoS.AT_LEAST_ONCE || qos == Mqtt.QoS.EXACTLY_ONCE) {
       const id = twoByteIntegerToNum(buffer, pos);
       pos += 2; // 2 = two byte Integer
       return id;

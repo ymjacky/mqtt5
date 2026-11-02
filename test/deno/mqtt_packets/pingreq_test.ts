@@ -1,5 +1,5 @@
 import { assertEquals } from 'std/assert/mod.ts';
-import type { PingreqPacket } from '../../../lib/mqtt_packets/pingreq.ts';
+import type { PingreqPacket } from '../../../lib/mqtt_packets/packet_types.ts';
 import { parse, toBytes } from '../../../lib/mqtt_packets/pingreq.ts';
 
 // Test PINGREQ packet encoding

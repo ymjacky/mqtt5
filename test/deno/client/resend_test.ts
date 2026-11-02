@@ -62,7 +62,6 @@ Deno.test({ name: '@resend from MemoryStore', only: false }, async (context) => 
                 { key: 'userProp2', val: 'userData3' },
               ],
             );
-            assertEquals(packet.properties?.subscriptionIdentifier, 3);
             assertEquals(packet.properties?.contentType, 'application/json');
 
             broker.sendPuback(
@@ -89,7 +88,6 @@ Deno.test({ name: '@resend from MemoryStore', only: false }, async (context) => 
             { key: 'userProp2', val: 'userData2' },
             { key: 'userProp2', val: 'userData3' },
           ],
-          subscriptionIdentifier: 3,
           contentType: 'application/json',
         };
 
@@ -265,7 +263,7 @@ Deno.test({ name: '@resend from MemoryStore', only: false }, async (context) => 
         broker.on('publish', (event) => {
           const packet = event.detail;
           if (sessionExists) {
-            assertEquals(packet.qos, Mqtt.QoS.EXACTRY_ONCE);
+            assertEquals(packet.qos, Mqtt.QoS.EXACTLY_ONCE);
             assertEquals(packet.dup, true);
             assertEquals(packet.retain, false);
             assertEquals(packet.packetId, expectedPacketId++);
@@ -287,7 +285,6 @@ Deno.test({ name: '@resend from MemoryStore', only: false }, async (context) => 
                 { key: 'userProp2', val: 'userData3' },
               ],
             );
-            assertEquals(packet.properties?.subscriptionIdentifier, 3);
             assertEquals(packet.properties?.contentType, 'application/json');
 
             broker.sendPuback(
@@ -314,13 +311,12 @@ Deno.test({ name: '@resend from MemoryStore', only: false }, async (context) => 
             { key: 'userProp2', val: 'userData2' },
             { key: 'userProp2', val: 'userData3' },
           ],
-          subscriptionIdentifier: 3,
           contentType: 'application/json',
         };
 
-        const pubResult1 = client.publish('topicA', new TextEncoder().encode('payloadA'), { qos: Mqtt.QoS.EXACTRY_ONCE }, properties);
-        const pubResult2 = client.publish('topicA', new TextEncoder().encode('payloadA'), { qos: Mqtt.QoS.EXACTRY_ONCE }, properties);
-        const pubResult3 = client.publish('topicA', new TextEncoder().encode('payloadA'), { qos: Mqtt.QoS.EXACTRY_ONCE }, properties);
+        const pubResult1 = client.publish('topicA', new TextEncoder().encode('payloadA'), { qos: Mqtt.QoS.EXACTLY_ONCE }, properties);
+        const pubResult2 = client.publish('topicA', new TextEncoder().encode('payloadA'), { qos: Mqtt.QoS.EXACTLY_ONCE }, properties);
+        const pubResult3 = client.publish('topicA', new TextEncoder().encode('payloadA'), { qos: Mqtt.QoS.EXACTLY_ONCE }, properties);
 
         broker.on('disconnect', (event) => {
           const packet = event.detail;
@@ -393,7 +389,7 @@ Deno.test({ name: '@resend from MemoryStore', only: false }, async (context) => 
         broker.on('publish', (event) => {
           const packet = event.detail;
           if (sessionExists) {
-            assertEquals(packet.qos, Mqtt.QoS.EXACTRY_ONCE);
+            assertEquals(packet.qos, Mqtt.QoS.EXACTLY_ONCE);
             assertEquals(packet.dup, true);
             assertEquals(packet.retain, false);
             assertEquals(packet.packetId, expectedPacketId++);
@@ -416,9 +412,9 @@ Deno.test({ name: '@resend from MemoryStore', only: false }, async (context) => 
           }
         });
 
-        const pubResult1 = client.publish('topicA', new TextEncoder().encode('payloadA'), { qos: Mqtt.QoS.EXACTRY_ONCE });
-        const pubResult2 = client.publish('topicA', new TextEncoder().encode('payloadA'), { qos: Mqtt.QoS.EXACTRY_ONCE });
-        const pubResult3 = client.publish('topicA', new TextEncoder().encode('payloadA'), { qos: Mqtt.QoS.EXACTRY_ONCE });
+        const pubResult1 = client.publish('topicA', new TextEncoder().encode('payloadA'), { qos: Mqtt.QoS.EXACTLY_ONCE });
+        const pubResult2 = client.publish('topicA', new TextEncoder().encode('payloadA'), { qos: Mqtt.QoS.EXACTLY_ONCE });
+        const pubResult3 = client.publish('topicA', new TextEncoder().encode('payloadA'), { qos: Mqtt.QoS.EXACTLY_ONCE });
 
         broker.on('disconnect', (event) => {
           const packet = event.detail;
@@ -490,7 +486,7 @@ Deno.test({ name: '@resend from MemoryStore', only: false }, async (context) => 
         // test
         broker.on('publish', (event) => {
           const packet = event.detail;
-          assertEquals(packet.qos, Mqtt.QoS.EXACTRY_ONCE);
+          assertEquals(packet.qos, Mqtt.QoS.EXACTLY_ONCE);
           assertEquals(packet.dup, false);
           assertEquals(packet.retain, false);
           assertEquals(packet.packetId, expectedPublishPacketId++);
@@ -512,7 +508,6 @@ Deno.test({ name: '@resend from MemoryStore', only: false }, async (context) => 
               { key: 'userProp2', val: 'userData3' },
             ],
           );
-          assertEquals(packet.properties?.subscriptionIdentifier, 3);
           assertEquals(packet.properties?.contentType, 'application/json');
 
           broker.sendPubrec(
@@ -547,13 +542,12 @@ Deno.test({ name: '@resend from MemoryStore', only: false }, async (context) => 
             { key: 'userProp2', val: 'userData2' },
             { key: 'userProp2', val: 'userData3' },
           ],
-          subscriptionIdentifier: 3,
           contentType: 'application/json',
         };
 
-        const pubResult1 = client.publish('topicA', new TextEncoder().encode('payloadA'), { qos: Mqtt.QoS.EXACTRY_ONCE }, properties);
-        const pubResult2 = client.publish('topicA', new TextEncoder().encode('payloadA'), { qos: Mqtt.QoS.EXACTRY_ONCE }, properties);
-        const pubResult3 = client.publish('topicA', new TextEncoder().encode('payloadA'), { qos: Mqtt.QoS.EXACTRY_ONCE }, properties);
+        const pubResult1 = client.publish('topicA', new TextEncoder().encode('payloadA'), { qos: Mqtt.QoS.EXACTLY_ONCE }, properties);
+        const pubResult2 = client.publish('topicA', new TextEncoder().encode('payloadA'), { qos: Mqtt.QoS.EXACTLY_ONCE }, properties);
+        const pubResult3 = client.publish('topicA', new TextEncoder().encode('payloadA'), { qos: Mqtt.QoS.EXACTLY_ONCE }, properties);
 
         broker.on('disconnect', (event) => {
           const packet = event.detail;
@@ -626,7 +620,7 @@ Deno.test({ name: '@resend from MemoryStore', only: false }, async (context) => 
         // test
         broker.on('publish', (event) => {
           const packet = event.detail;
-          assertEquals(packet.qos, Mqtt.QoS.EXACTRY_ONCE);
+          assertEquals(packet.qos, Mqtt.QoS.EXACTLY_ONCE);
           assertEquals(packet.dup, false);
           assertEquals(packet.retain, false);
           assertEquals(packet.packetId, expectedPublishPacketId++);
@@ -655,9 +649,9 @@ Deno.test({ name: '@resend from MemoryStore', only: false }, async (context) => 
           }
         });
 
-        const pubResult1 = client.publish('topicA', new TextEncoder().encode('payloadA'), { qos: Mqtt.QoS.EXACTRY_ONCE });
-        const pubResult2 = client.publish('topicA', new TextEncoder().encode('payloadA'), { qos: Mqtt.QoS.EXACTRY_ONCE });
-        const pubResult3 = client.publish('topicA', new TextEncoder().encode('payloadA'), { qos: Mqtt.QoS.EXACTRY_ONCE });
+        const pubResult1 = client.publish('topicA', new TextEncoder().encode('payloadA'), { qos: Mqtt.QoS.EXACTLY_ONCE });
+        const pubResult2 = client.publish('topicA', new TextEncoder().encode('payloadA'), { qos: Mqtt.QoS.EXACTLY_ONCE });
+        const pubResult3 = client.publish('topicA', new TextEncoder().encode('payloadA'), { qos: Mqtt.QoS.EXACTLY_ONCE });
 
         broker.on('disconnect', (event) => {
           const packet = event.detail;
@@ -751,7 +745,6 @@ Deno.test({ name: '@resend from MemoryStore', only: false }, async (context) => 
                 { key: 'userProp2', val: 'userData3' },
               ],
             );
-            assertEquals(packet.properties?.subscriptionIdentifier, 3);
             assertEquals(packet.properties?.contentType, 'application/json');
 
             assertEquals(packet.topic, 'topicA');
@@ -786,7 +779,6 @@ Deno.test({ name: '@resend from MemoryStore', only: false }, async (context) => 
                 { key: 'userProp2', val: 'userData3' },
               ],
             );
-            assertEquals(packet.properties?.subscriptionIdentifier, 3);
             assertEquals(packet.properties?.contentType, 'application/json');
 
             assertEquals(packet.properties?.topicAlias, 1);
@@ -821,7 +813,6 @@ Deno.test({ name: '@resend from MemoryStore', only: false }, async (context) => 
             { key: 'userProp2', val: 'userData2' },
             { key: 'userProp2', val: 'userData3' },
           ],
-          subscriptionIdentifier: 3,
           contentType: 'application/json',
         };
 

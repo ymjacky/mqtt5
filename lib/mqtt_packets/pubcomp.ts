@@ -2,13 +2,7 @@ import * as Mqtt from '../mqtt/mod.ts';
 import * as MqttProperties from '../mqtt_properties/mod.ts';
 import { MqttUtilsError } from '../mqtt_utils/mod.ts';
 import { concatBytes, numToTwoByteInteger, numToVariableByteInteger, twoByteIntegerToNum, variableByteIntegerToNum } from '../mqtt_utils/mod.ts';
-
-export type PubcompPacket = {
-  type: 'pubcomp';
-  packetId: number;
-  reasonCode?: number;
-  properties?: MqttProperties.PubcompProperties;
-};
+import type { PubcompPacket } from './packet_types.ts';
 
 export function toBytes(
   packet: PubcompPacket,
@@ -31,7 +25,7 @@ export function toBytes(
   const variableHeader = concatBytes(variableHeaderChunks);
 
   const fixedHeader = [
-    (Mqtt.PacketType.PUBCOMP << 4) + Mqtt.fixexHeaderFlag.PUBCOMP,
+    (Mqtt.PacketType.PUBCOMP << 4) + Mqtt.fixedHeaderFlag.PUBCOMP,
     ...numToVariableByteInteger(variableHeader.length),
   ];
 

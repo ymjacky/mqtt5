@@ -1,12 +1,7 @@
 import * as Mqtt from '../mqtt/mod.ts';
 import * as MqttProperties from '../mqtt_properties/mod.ts';
 import { concatBytes, numToVariableByteInteger, variableByteIntegerToNum } from '../mqtt_utils/mod.ts';
-
-export type DisconnectPacket = {
-  type: 'disconnect';
-  reasonCode?: number;
-  properties?: MqttProperties.DisconnectProperties;
-};
+import type { DisconnectPacket } from './packet_types.ts';
 
 export function toBytes(
   packet: DisconnectPacket,
@@ -32,7 +27,7 @@ export function toBytes(
   const variableHeader = concatBytes(variableHeaderChunks);
 
   const fixedHeader = [
-    (Mqtt.PacketType.DISCONNECT << 4) + Mqtt.fixexHeaderFlag.DISCONNECT,
+    (Mqtt.PacketType.DISCONNECT << 4) + Mqtt.fixedHeaderFlag.DISCONNECT,
     ...numToVariableByteInteger(variableHeader.length),
   ];
 

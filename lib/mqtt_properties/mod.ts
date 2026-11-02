@@ -18,175 +18,208 @@ import {
   variableByteIntegerToNum,
 } from '../mqtt_utils/mod.ts';
 
-export class UnsuportedPropertyError extends Error {
+/** The property identifier is not supported. */
+export class UnsupportedPropertyError extends Error {
+  /** Creates the error for the given property identifier. */
   constructor(propertyId: number) {
-    super(`unsuported property. propertyId: ${propertyId}`);
+    super(`unsupported property. propertyId: ${propertyId}`);
   }
-} // // id: 0x01
+}
 
+/** @deprecated Use {@link UnsupportedPropertyError} instead. */
+export const UnsuportedPropertyError: typeof UnsupportedPropertyError = UnsupportedPropertyError;
+/** @deprecated Use {@link UnsupportedPropertyError} instead. */
+export type UnsuportedPropertyError = UnsupportedPropertyError;
+
+/** A key-value pair of a user property. */
 export type StringPair = { key: string; val: string };
+/** User properties (id: 0x26). The same key can appear more than once. */
 export type UserProperties = StringPair[];
 
+/** Properties of CONNECT. */
 export type ConnectProperties = {
-  // id: 0x11
+  /**
+   * Seconds to keep the session after the connection is closed. (id: 0x11)
+   *
+   * 0 or omitted: the session ends when the connection closes. 0xFFFFFFFF: the session never expires.
+   */
   sessionExpiryInterval?: number;
-  // id: 0x15
+  /** Name of the authentication method for enhanced authentication. (id: 0x15) */
   authenticationMethod?: string;
-  // id: 0x16
+  /** Authentication data. Its contents are defined by the authentication method. (id: 0x16) */
   authenticationData?: Uint8Array;
-  // id: 0x17
+  /** Whether the broker may send a reason string or user properties when a failure occurs. (id: 0x17) */
   requestProblemInformation?: boolean;
-  // id: 0x19
+  /** Whether the broker should return response information in CONNACK. (id: 0x19) */
   requestResponseInformation?: boolean;
-  // id: 0x21
+  /** Maximum number of QoS 1 and 2 PUBLISH packets the client is willing to process at once. (id: 0x21) */
   receiveMaximum?: number;
-  // id: 0x22
+  /** Highest topic alias value the client accepts. 0 or omitted: topic aliases are not accepted. (id: 0x22) */
   topicAliasMaximum?: number;
-  // id: 0x26
+  /** Application-defined key-value pairs. (id: 0x26) */
   userProperties?: UserProperties;
-  // id: 0x27
+  /** Maximum packet size in bytes the client accepts. (id: 0x27) */
   maximumPacketSize?: number;
 };
 
+/** Properties of CONNACK. */
 export type ConnackProperties = {
-  // id: 0x11
+  /** Session expiry interval in seconds set by the broker, used instead of the one the client sent. (id: 0x11) */
   sessionExpiryInterval?: number;
-  // id: 0x12
+  /** Client identifier assigned by the broker when the client connected with an empty client identifier. (id: 0x12) */
   assignedClientIdentifier?: string;
-  // id: 0x13
+  /** Keep alive in seconds the client must use instead of the one it sent. (id: 0x13) */
   serverKeepAlive?: number;
-  // id: 0x15
+  /** Name of the authentication method for enhanced authentication. (id: 0x15) */
   authenticationMethod?: string;
-  // id: 0x16
+  /** Authentication data. Its contents are defined by the authentication method. (id: 0x16) */
   authenticationData?: Uint8Array;
-  // id: 0x1A
+  /** Basis for creating a response topic. (id: 0x1A) */
   responseInformation?: string;
-  // id: 0x1C
+  /** Another server the client can use. (id: 0x1C) */
   serverReference?: string;
-  // id: 0x1F
+  /** Human readable reason for diagnostics. (id: 0x1F) */
   reasonString?: string;
-  // id: 0x21
+  /** Maximum number of QoS 1 and 2 PUBLISH packets the broker is willing to process at once. (id: 0x21) */
   receiveMaximum?: number;
-  // id: 0x22
+  /** Highest topic alias value the broker accepts. 0 or omitted: topic aliases are not accepted. (id: 0x22) */
   topicAliasMaximum?: number;
-  // id: 0x24
+  /** Maximum QoS the broker supports. All QoS levels are supported if omitted. (id: 0x24) */
   maximumQoS?: Mqtt.QoS;
-  // id: 0x25
+  /** Whether the broker supports retained messages. Supported if omitted. (id: 0x25) */
   retainAvailable?: boolean;
-  // id: 0x26
+  /** Application-defined key-value pairs. (id: 0x26) */
   userProperties?: UserProperties;
-  // id: 0x27
+  /** Maximum packet size in bytes the broker accepts. (id: 0x27) */
   maximumPacketSize?: number;
-  // id: 0x28
+  /** Whether the broker supports wildcard subscriptions. Supported if omitted. (id: 0x28) */
   wildcardSubscriptionAvailable?: boolean;
-  // id: 0x29
+  /** Whether the broker supports subscription identifiers. Supported if omitted. (id: 0x29) */
   subscriptionIdentifiersAvailable?: boolean;
-  // id: 0x2A
+  /** Whether the broker supports shared subscriptions. Supported if omitted. (id: 0x2A) */
   sharedSubscriptionAvailable?: boolean;
 };
 
+/** Properties of PUBLISH. */
 export type PublishProperties = {
-  // id: 0x01
+  /** 0: unspecified bytes, 1: UTF-8 encoded character data. (id: 0x01) */
   payloadFormatIndicator?: number;
-  // id: 0x02
+  /** Lifetime of the message in seconds. The message never expires if omitted. (id: 0x02) */
   messageExpiryInterval?: number;
-  // id: 0x03
+  /** Content type of the payload, e.g. a MIME type. (id: 0x03) */
   contentType?: string;
-  // id: 0x08
+  /** Topic name for a response message (request / response). (id: 0x08) */
   responseTopic?: string;
-  // id: 0x09
+  /** Data that relates a response message to its request. (id: 0x09) */
   correlationData?: Uint8Array;
-  // id: 0x0B
+  /** Identifier of the subscription that matched, set by the broker. (id: 0x0B) */
   subscriptionIdentifier?: number;
-  // id: 0x23
+  /** A number used in place of the topic name to reduce the packet size. (id: 0x23) */
   topicAlias?: number;
-  // id: 0x26
+  /** Application-defined key-value pairs. (id: 0x26) */
   userProperties?: UserProperties;
 };
 
+/** Properties of PUBLISH that users can set with `publish()`. Topic aliases are managed by the client. */
 export type UserPublishProperties = {
-  // id: 0x01
+  /** 0: unspecified bytes, 1: UTF-8 encoded character data. (id: 0x01) */
   payloadFormatIndicator?: number;
-  // id: 0x02
+  /** Lifetime of the message in seconds. The message never expires if omitted. (id: 0x02) */
   messageExpiryInterval?: number;
-  // id: 0x03
+  /** Content type of the payload, e.g. a MIME type. (id: 0x03) */
   contentType?: string;
-  // id: 0x08
+  /** Topic name for a response message (request / response). (id: 0x08) */
   responseTopic?: string;
-  // id: 0x09
+  /** Data that relates a response message to its request. (id: 0x09) */
   correlationData?: Uint8Array;
-  // id: 0x0B
+  /**
+   * Identifier of the subscription. (id: 0x0B)
+   *
+   * @deprecated A client must not send it in PUBLISH (MQTT 5.0 [MQTT-3.3.4-6]); only the broker sets it.
+   */
   subscriptionIdentifier?: number;
   // // id: 0x23
   // topicAlias?: number;
-  // id: 0x26
+  /** Application-defined key-value pairs. (id: 0x26) */
   userProperties?: UserProperties;
 };
 
+/** Properties of SUBSCRIBE. */
 export type SubscribeProperties = {
-  // id: 0x0B
+  /** Identifier of the subscription, from 1 to 268,435,455. (id: 0x0B) */
   subscriptionIdentifier?: number;
-  // id: 0x26
+  /** Application-defined key-value pairs. (id: 0x26) */
   userProperties?: UserProperties;
 };
 
+/** Properties of UNSUBSCRIBE. */
 export type UnsubscribeProperties = {
-  // id: 0x26
+  /** Application-defined key-value pairs. (id: 0x26) */
   userProperties?: UserProperties;
 };
 
+/** Properties of DISCONNECT. */
 export type DisconnectProperties = {
-  // id: 0x11
+  /** New session expiry interval in seconds. Cannot be set when it was 0 in CONNECT. (id: 0x11) */
   sessionExpiryInterval?: number;
-  // id: 0x1C
+  /** Another server the client can use. (id: 0x1C) */
   serverReference?: string;
-  // id: 0x1F
+  /** Human readable reason for diagnostics. (id: 0x1F) */
   reasonString?: string;
-  // id: 0x26
+  /** Application-defined key-value pairs. (id: 0x26) */
   userProperties?: UserProperties;
 };
 
+/** Properties of AUTH. */
 export type AuthProperties = {
-  // id: 0x15
+  /** Name of the authentication method for enhanced authentication. (id: 0x15) */
   authenticationMethod?: string;
-  // id: 0x16
+  /** Authentication data. Its contents are defined by the authentication method. (id: 0x16) */
   authenticationData?: Uint8Array;
-  // id: 0x1F
+  /** Human readable reason for diagnostics. (id: 0x1F) */
   reasonString?: string;
-  // id: 0x26
+  /** Application-defined key-value pairs. (id: 0x26) */
   userProperties?: UserProperties;
 };
+/** Properties of the will message in CONNECT. */
 export type WillProperties = {
-  // id: 0x01
+  /** 0: unspecified bytes, 1: UTF-8 encoded character data. (id: 0x01) */
   payloadFormatIndicator?: number;
-  // id: 0x02
+  /** Lifetime of the will message in seconds. The message never expires if omitted. (id: 0x02) */
   messageExpiryInterval?: number;
-  // id: 0x03
+  /** Content type of the payload, e.g. a MIME type. (id: 0x03) */
   contentType?: string;
-  // id: 0x08
+  /** Topic name for a response message (request / response). (id: 0x08) */
   responseTopic?: string;
-  // id: 0x09
+  /** Data that relates a response message to its request. (id: 0x09) */
   correlationData?: Uint8Array;
-  // id: 0x18
+  /** Seconds to wait before publishing the will message after the connection is lost. (id: 0x18) */
   willDelayInterval?: number;
-  // id: 0x26
+  /** Application-defined key-value pairs. (id: 0x26) */
   userProperties?: UserProperties;
 };
 
-type AcknolagePacketProperties = {
-  // id: 0x1F
+type AcknowledgementPacketProperties = {
+  /** Human readable reason for diagnostics. (id: 0x1F) */
   reasonString?: string;
-  // id: 0x26
+  /** Application-defined key-value pairs. (id: 0x26) */
   userProperties?: UserProperties;
 };
 
-export type PubackProperties = AcknolagePacketProperties;
-export type PubrecProperties = AcknolagePacketProperties;
-export type PubrelProperties = AcknolagePacketProperties;
-export type PubcompProperties = AcknolagePacketProperties;
-export type SubackProperties = AcknolagePacketProperties;
-export type UnsubackProperties = AcknolagePacketProperties;
+/** Properties of PUBACK. */
+export type PubackProperties = AcknowledgementPacketProperties;
+/** Properties of PUBREC. */
+export type PubrecProperties = AcknowledgementPacketProperties;
+/** Properties of PUBREL. */
+export type PubrelProperties = AcknowledgementPacketProperties;
+/** Properties of PUBCOMP. */
+export type PubcompProperties = AcknowledgementPacketProperties;
+/** Properties of SUBACK. */
+export type SubackProperties = AcknowledgementPacketProperties;
+/** Properties of UNSUBACK. */
+export type UnsubackProperties = AcknowledgementPacketProperties;
 
+/** All MQTT 5.0 properties: the properties of every packet combined into one type. */
 export type Properties =
   & ConnectProperties
   & ConnackProperties
@@ -204,6 +237,11 @@ export type Properties =
   & SubackProperties
   & AuthProperties;
 
+/**
+ * Encodes properties to bytes, prefixed with the property length.
+ * @param properties the properties to encode. Encoded as an empty property list if omitted.
+ * @returns the encoded bytes.
+ */
 export function propertiesToBytes(properties?: Properties): Uint8Array {
   if (typeof properties === 'undefined') {
     return new Uint8Array([0x00]);
@@ -334,6 +372,14 @@ export function propertiesToBytes(properties?: Properties): Uint8Array {
   return concatBytes([numToVariableByteInteger(bytes.length), bytes]);
 }
 
+/**
+ * Decodes properties from a buffer.
+ * @param buffer the buffer that contains the properties.
+ * @param offset the position of the first property in the buffer.
+ * @param propertyLength the length of the properties in bytes.
+ * @returns the decoded properties.
+ * @throws {UnsupportedPropertyError} if a property identifier is not supported.
+ */
 export function parseMqttProperties(
   buffer: Uint8Array,
   offset: number,
@@ -493,7 +539,7 @@ export function parseMqttProperties(
         properties.sharedSubscriptionAvailable = buffer[pos++] === 1 ? true : false;
         break;
       default:
-        throw new UnsuportedPropertyError(propertyId);
+        throw new UnsupportedPropertyError(propertyId);
     }
   }
 

@@ -4,44 +4,49 @@
  */
 
 import * as MqttUtils from '../mqtt_utils/mod.ts';
-import type { ConnectPacket } from './connect.ts';
+import type {
+  AuthPacket,
+  ConnackPacket,
+  ConnectPacket,
+  DisconnectPacket,
+  PingreqPacket,
+  PingrespPacket,
+  PubackPacket,
+  PubcompPacket,
+  PublishPacket,
+  PubrecPacket,
+  PubrelPacket,
+  SubackPacket,
+  SubscribePacket,
+  UnsubackPacket,
+  UnsubscribePacket,
+} from './packet_types.ts';
 import { parse as connectParse, toBytes as connectToBytes } from './connect.ts';
-import type { ConnackPacket } from './connack.ts';
 import { parse as connackParse, toBytes as connackToBytes } from './connack.ts';
-import type { PublishPacket } from './publish.ts';
 import { parse as publishParse, toBytes as publishToBytes } from './publish.ts';
-import type { PubackPacket } from './puback.ts';
 import { parse as pubackParse, toBytes as pubackToBytes } from './puback.ts';
-import type { PubrecPacket } from './pubrec.ts';
 import { parse as pubrecParse, toBytes as pubrecToBytes } from './pubrec.ts';
-import type { PubrelPacket } from './pubrel.ts';
 import { parse as pubrelParse, toBytes as pubrelToBytes } from './pubrel.ts';
-import type { PubcompPacket } from './pubcomp.ts';
 import { parse as pubcompParse, toBytes as pubcompToBytes } from './pubcomp.ts';
 
-import type { SubscribePacket, Subscription } from './subscribe.ts';
 import { parse as subscribeParse, toBytes as subscribeToBytes } from './subscribe.ts';
-import type { SubackPacket } from './suback.ts';
 import { parse as subackParse, toBytes as subackToBytes } from './suback.ts';
-import type { UnsubscribePacket } from './unsubscribe.ts';
 import { parse as unsubscribeParse, toBytes as unsubscribeToBytes } from './unsubscribe.ts';
-import type { UnsubackPacket } from './unsuback.ts';
 import { parse as unsubackParse, toBytes as unsubackToBytes } from './unsuback.ts';
-import type { PingreqPacket } from './pingreq.ts';
 import { parse as pingreqParse, toBytes as pingreqToBytes } from './pingreq.ts';
-import type { PingrespPacket } from './pingresp.ts';
 import { parse as pingrespParse, toBytes as pingrespToBytes } from './pingresp.ts';
-import type { DisconnectPacket } from './disconnect.ts';
 import { parse as disconnectParse, toBytes as disconnectToBytes } from './disconnect.ts';
-import type { AuthPacket } from './auth.ts';
 import { parse as authParse, toBytes as authToBytes } from './auth.ts';
 
 import * as Mqtt from '../mqtt/mod.ts';
 import * as MqttPacketsError from './error.ts';
+/** Errors thrown when encoding or decoding packets. */
 export * as MqttPacketsError from './error.ts';
 
-export type { Subscription };
+// `export *` keeps the packet types visible in the docs of the MqttPackets namespace.
+export * from './packet_types.ts';
 
+/** Any MQTT packet. Narrow it by its `type`. */
 export type AnyPacket =
   | ConnectPacket
   | ConnackPacket
@@ -59,24 +64,13 @@ export type AnyPacket =
   | DisconnectPacket
   | AuthPacket;
 
-export type {
-  AuthPacket,
-  ConnackPacket,
-  ConnectPacket,
-  DisconnectPacket,
-  PingreqPacket,
-  PingrespPacket,
-  PubackPacket,
-  PubcompPacket,
-  PublishPacket,
-  PubrecPacket,
-  PubrelPacket,
-  SubackPacket,
-  SubscribePacket,
-  UnsubackPacket,
-  UnsubscribePacket,
-};
-
+/**
+ * Encodes a packet to bytes.
+ * @param packet the packet to encode.
+ * @param protocolVersion the protocol version to encode the packet for.
+ * @returns the encoded bytes.
+ * @throws {MqttPacketsError.MqttPacketSerializeError} if the packet cannot be encoded.
+ */
 export function packetToBytes(
   packet: AnyPacket,
   protocolVersion: Mqtt.ProtocolVersion,
@@ -130,7 +124,7 @@ export function packetToBytes(
         bytes = authToBytes(packet, protocolVersion);
         break;
       default:
-        throw new MqttPacketsError.UnsuportedPacketError('unknown');
+        throw new MqttPacketsError.UnsupportedPacketError('unknown');
     }
 
     return bytes;
@@ -139,6 +133,13 @@ export function packetToBytes(
   }
 }
 
+/**
+ * Decodes the bytes of a single complete packet.
+ * @param buffer the bytes of the packet.
+ * @param protocolVersion the protocol version to decode the packet for.
+ * @returns the decoded packet.
+ * @throws {MqttPacketsError.MqttPacketParseError} if the bytes cannot be decoded.
+ */
 export function decode(
   buffer: Uint8Array,
   protocolVersion: Mqtt.ProtocolVersion = Mqtt.ProtocolVersion.MQTT_V5,
@@ -250,7 +251,7 @@ function parsePacket(
       packet = authParse(variableHeaderAndPayload, remainingLength, protocolVersion);
       break;
     default:
-      throw new MqttPacketsError.UnsuportedPacketError('unknown');
+      throw new MqttPacketsError.UnsupportedPacketError('unknown');
   }
 
   return packet as AnyPacket;

@@ -252,7 +252,6 @@ Deno.test({ name: '@publish_qos0', only: false }, async (context) => {
             { key: 'userProp2', val: 'userData2' },
             { key: 'userProp2', val: 'userData3' },
           ],
-          subscriptionIdentifier: 3,
           contentType: 'application/json',
         };
 
@@ -281,7 +280,6 @@ Deno.test({ name: '@publish_qos0', only: false }, async (context) => {
               { key: 'userProp2', val: 'userData3' },
             ],
           );
-          assertEquals(packet.properties?.subscriptionIdentifier, 3);
           assertEquals(packet.properties?.contentType, 'application/json');
           resolve();
         });
@@ -540,7 +538,6 @@ Deno.test({ name: '@publish_qos1', only: false }, async (context) => {
             { key: 'userProp2', val: 'userData2' },
             { key: 'userProp2', val: 'userData3' },
           ],
-          subscriptionIdentifier: 3,
           contentType: 'application/json',
         };
 
@@ -569,7 +566,6 @@ Deno.test({ name: '@publish_qos1', only: false }, async (context) => {
               { key: 'userProp2', val: 'userData3' },
             ],
           );
-          assertEquals(packet.properties?.subscriptionIdentifier, 3);
           assertEquals(packet.properties?.contentType, 'application/json');
 
           broker.sendPuback(
@@ -632,7 +628,7 @@ Deno.test({ name: '@publish_qos2', only: false }, async (context) => {
         // test
         broker.on('publish', (event) => {
           const packet = event.detail;
-          assertEquals(packet.qos, Mqtt.QoS.EXACTRY_ONCE);
+          assertEquals(packet.qos, Mqtt.QoS.EXACTLY_ONCE);
           assertEquals(packet.dup, false);
           assertEquals(packet.retain, false);
           assertEquals(packet.packetId, 1);
@@ -665,7 +661,7 @@ Deno.test({ name: '@publish_qos2', only: false }, async (context) => {
           'topicA',
           new TextEncoder().encode('payloadA'),
           {
-            qos: Mqtt.QoS.EXACTRY_ONCE,
+            qos: Mqtt.QoS.EXACTLY_ONCE,
           },
         );
         assertEquals(result.result, 0); // 0 success
@@ -710,7 +706,7 @@ Deno.test({ name: '@publish_qos2', only: false }, async (context) => {
         // test
         broker.on('publish', (event) => {
           const packet = event.detail;
-          assertEquals(packet.qos, Mqtt.QoS.EXACTRY_ONCE);
+          assertEquals(packet.qos, Mqtt.QoS.EXACTLY_ONCE);
           assertEquals(packet.dup, false);
           assertEquals(packet.retain, false);
           assertEquals(packet.packetId, 1);
@@ -742,7 +738,7 @@ Deno.test({ name: '@publish_qos2', only: false }, async (context) => {
         const result = await client.publish(
           'topicA',
           new TextEncoder().encode('payloadA'),
-          { qos: Mqtt.QoS.EXACTRY_ONCE },
+          { qos: Mqtt.QoS.EXACTLY_ONCE },
         );
         assertEquals(result.result, Mqtt.ReasonCode.Success);
         assertEquals(result.reason, undefined);
@@ -787,7 +783,7 @@ Deno.test({ name: '@publish_qos2', only: false }, async (context) => {
         // test
         broker.on('publish', (event) => {
           const packet = event.detail;
-          assertEquals(packet.qos, Mqtt.QoS.EXACTRY_ONCE);
+          assertEquals(packet.qos, Mqtt.QoS.EXACTLY_ONCE);
           assertEquals(packet.dup, false);
           assertEquals(packet.retain, false);
           assertEquals(packet.packetId, 1);
@@ -813,7 +809,7 @@ Deno.test({ name: '@publish_qos2', only: false }, async (context) => {
         const result = await client.publish(
           'topicA',
           new TextEncoder().encode('payloadA'),
-          { qos: Mqtt.QoS.EXACTRY_ONCE },
+          { qos: Mqtt.QoS.EXACTLY_ONCE },
         );
         assertEquals(result.result, Mqtt.ReasonCode.QuotaExceeded);
         assertEquals(result.reason, 'Quota exceeded');
@@ -866,13 +862,12 @@ Deno.test({ name: '@publish_qos2', only: false }, async (context) => {
             { key: 'userProp2', val: 'userData2' },
             { key: 'userProp2', val: 'userData3' },
           ],
-          subscriptionIdentifier: 3,
           contentType: 'application/json',
         };
 
         broker.on('publish', (event) => {
           const packet = event.detail;
-          assertEquals(packet.qos, Mqtt.QoS.EXACTRY_ONCE);
+          assertEquals(packet.qos, Mqtt.QoS.EXACTLY_ONCE);
           assertEquals(packet.packetId, 1);
           assertEquals(packet.topic, 'topicA');
           assertEquals(
@@ -895,7 +890,6 @@ Deno.test({ name: '@publish_qos2', only: false }, async (context) => {
               { key: 'userProp2', val: 'userData3' },
             ],
           );
-          assertEquals(packet.properties?.subscriptionIdentifier, 3);
           assertEquals(packet.properties?.contentType, 'application/json');
 
           broker.sendPubrec(
@@ -921,7 +915,7 @@ Deno.test({ name: '@publish_qos2', only: false }, async (context) => {
         const result = await client.publish(
           'topicA',
           new TextEncoder().encode('payloadA'),
-          { qos: Mqtt.QoS.EXACTRY_ONCE },
+          { qos: Mqtt.QoS.EXACTLY_ONCE },
           properties,
         );
         assertEquals(result.result, Mqtt.ReasonCode.Success);
@@ -1093,7 +1087,7 @@ Deno.test({ name: '@receive malformed pubrec', only: false }, async (context) =>
           broker.sendRawBytes(client.getClientId(), malformedPacket);
         });
 
-        client.publish('topicA', 'payload', { qos: Mqtt.QoS.EXACTRY_ONCE });
+        client.publish('topicA', 'payload', { qos: Mqtt.QoS.EXACTLY_ONCE });
 
         await promise;
       } catch (err) {
@@ -1181,7 +1175,7 @@ Deno.test({ name: '@receive malformed pubcomp', only: false }, async (context) =
           broker.sendRawBytes(client.getClientId(), malformedPacket);
         });
 
-        client.publish('topicA', 'payload', { qos: Mqtt.QoS.EXACTRY_ONCE });
+        client.publish('topicA', 'payload', { qos: Mqtt.QoS.EXACTLY_ONCE });
 
         await promise;
       } catch (err) {

@@ -2,13 +2,7 @@ import * as Mqtt from '../mqtt/mod.ts';
 import * as MqttProperties from '../mqtt_properties/mod.ts';
 import { MqttUtilsError } from '../mqtt_utils/mod.ts';
 import { concatBytes, numToTwoByteInteger, numToVariableByteInteger, twoByteIntegerToNum, variableByteIntegerToNum } from '../mqtt_utils/mod.ts';
-
-export type PubrecPacket = {
-  type: 'pubrec';
-  packetId: number;
-  reasonCode?: number;
-  properties?: MqttProperties.PubrecProperties;
-};
+import type { PubrecPacket } from './packet_types.ts';
 
 export function toBytes(
   packet: PubrecPacket,
@@ -31,7 +25,7 @@ export function toBytes(
   const variableHeader = concatBytes(variableHeaderChunks);
 
   const fixedHeader = [
-    (Mqtt.PacketType.PUBREC << 4) + Mqtt.fixexHeaderFlag.PUBREC,
+    (Mqtt.PacketType.PUBREC << 4) + Mqtt.fixedHeaderFlag.PUBREC,
     ...numToVariableByteInteger(variableHeader.length),
   ];
 
