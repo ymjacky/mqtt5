@@ -1,8 +1,9 @@
 name: Publish
 on:
-  push:
-    branches:
-      - main
+  # Publish to JSR only when a GitHub Release is published, so merging a
+  # version bump into main does not publish a half-finished release.
+  release:
+    types: [published]
 
 jobs:
   publish:
@@ -14,5 +15,19 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: install deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      - name: check that the release tag matches the package version
+        run: |
+          version=$(grep -m1 '"version"' deno.jsonc | sed -E 's/.*"version": *"([^"]+)".*/\1/')
+          if [ "${{ github.event.release.tag_name }}" != "v${version}" ]; then
+            echo "release tag ${{ github.event.release.tag_name }} does not match deno.jsonc version v${version}"
+            exit 1
+          fi
+
       - name: Publish package
-        run: npx jsr publish
+        run: deno publish

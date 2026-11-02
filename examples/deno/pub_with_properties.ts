@@ -1,4 +1,4 @@
-import { Mqtt, MqttClient, MqttProperties } from 'jsr:@ymjacky/mqtt5';
+import { Mqtt, MqttClient, MqttProperties } from '@ymjacky/mqtt5';
 
 const logger = (msg: string, ...args: unknown[]) => {
   console.log('[Publisher]', msg, ...args);

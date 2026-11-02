@@ -6,7 +6,12 @@
     "./browser": "./browser/mod.ts"
   },
   "imports": {
+    // Lets the examples import the package the same way users do after `deno add jsr:@ymjacky/mqtt5`.
+    "@ymjacky/mqtt5": "./deno/mod.ts",
     "std/": "https://deno.land/std@0.219.0/"
+  },
+  "publish": {
+    "include": ["deno/", "browser/mod.ts", "lib/", "readme.md", "LICENSE"]
   },
   "fmt": {
     "indentWidth": 2,

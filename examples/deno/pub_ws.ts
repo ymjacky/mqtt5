@@ -1,4 +1,4 @@
-import { Mqtt, WebSocketMqttClient } from 'jsr:@ymjacky/mqtt5';
+import { Mqtt, WebSocketMqttClient } from '@ymjacky/mqtt5';
 
 const logger = (msg: string, ...args: unknown[]) => {
   console.log('[WS-Publisher]', msg, ...args);
