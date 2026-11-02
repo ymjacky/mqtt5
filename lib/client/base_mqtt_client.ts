@@ -36,8 +36,19 @@ const defaultDisconnectTimeout = 1 * 1000;
 const defaultPingrespTimeout = 2 * 1000;
 
 /**
- * Abstract MQTT Client.
- * Typical functions are implemented in this class.
+ * The API shared by {@link MqttClient} and {@link WebSocketMqttClient}: connecting, publishing, subscribing and events.
+ *
+ * It is exported as a type only, e.g. to write a function that accepts either client.
+ * It is not meant to be subclassed; its protected members may change without notice.
+ *
+ * @example
+ * ```ts
+ * import { type BaseMqttClient, Mqtt } from '@ymjacky/mqtt5';
+ *
+ * async function subscribeAll(client: BaseMqttClient, topics: string[]) {
+ *   await client.subscribe(topics, Mqtt.QoS.AT_LEAST_ONCE);
+ * }
+ * ```
  */
 export abstract class BaseMqttClient {
   protected url: URL;
@@ -174,48 +185,60 @@ export abstract class BaseMqttClient {
   protected abstract open(): Promise<void>;
 
   /**
-   * Connect to Broker.
+   * Connects to the broker: opens the connection, sends CONNECT and waits for CONNACK.
    *
-   * @param options ConnectOptions
-   * @returns Promise<ConnackPacket>
+   * The returned promise resolves with the CONNACK packet even when the broker rejects the connection,
+   * so check its `reasonCode` (MQTT 5.0) / `returnCode` (MQTT 3.1.1).
+   * After the client is closed, it can connect again with this method; it does not reconnect automatically.
+   *
+   * @param options CONNECT options: clean start, MQTT 5.0 properties and will message.
+   * @returns the received CONNACK packet.
+   * @throws {StateIsNotOfflineError} if the client is already connected or connecting.
+   * @throws {ConnectTimeout} if CONNACK is not received within `connectTimeoutMS`.
    * @example
    * mqtt
    * ```ts
+   * import { MqttClient } from '@ymjacky/mqtt5';
+   *
    * const client = new MqttClient();
    * await client.connect();
    * ```
    *
    * using properties
    * ```ts
-   *   const properties: MqttProperties.ConnectProperties = {
-   *     sessionExpiryInterval: 300,
-   *     receiveMaximum: 10,
-   *     maximumPacketSize: 128,
-   *     topicAliasMaximum: 20,
-   *     requestResponseInformation: false,
-   *     requestProblemInformation: false,
-   *     userProperties: [
-   *       { key: 'userProp1', val: 'userData1' },
-   *       { key: 'userProp2', val: 'userData2' },
-   *       { key: 'userProp2', val: 'userData3' },
-   *     ],
-   *   };
-   *   const client = new MqttClient();
-   *   await client.connect({ properties });
+   * import { MqttClient, MqttProperties } from '@ymjacky/mqtt5';
+   *
+   * const properties: MqttProperties.ConnectProperties = {
+   *   sessionExpiryInterval: 300,
+   *   receiveMaximum: 10,
+   *   maximumPacketSize: 128,
+   *   topicAliasMaximum: 20,
+   *   requestResponseInformation: false,
+   *   requestProblemInformation: false,
+   *   userProperties: [
+   *     { key: 'userProp1', val: 'userData1' },
+   *     { key: 'userProp2', val: 'userData2' },
+   *     { key: 'userProp2', val: 'userData3' },
+   *   ],
+   * };
+   * const client = new MqttClient();
+   * await client.connect({ properties });
    * ```
    *
    * using will
    * ```ts
-   *   const client = new MqttClient();
-   *   const willPayload = new TextEncoder().encode('will message');
-   *   await client.connect({
-   *     will: {
-   *       topic: 'topicA',
-   *       qos: Mqtt.QoS.AT_LEAST_ONCE,
-   *       payload: willPayload,
-   *       properties: { userProperties: [{ key: 'userProp1', val: 'userData1' }] },
-   *     },
-   *   });
+   * import { Mqtt, MqttClient } from '@ymjacky/mqtt5';
+   *
+   * const client = new MqttClient();
+   * const willPayload = new TextEncoder().encode('will message');
+   * await client.connect({
+   *   will: {
+   *     topic: 'topicA',
+   *     qos: Mqtt.QoS.AT_LEAST_ONCE,
+   *     payload: willPayload,
+   *     properties: { userProperties: [{ key: 'userProp1', val: 'userData1' }] },
+   *   },
+   * });
    * ```
    */
   public async connect(
@@ -285,26 +308,36 @@ export abstract class BaseMqttClient {
   }
 
   /**
-   * Returns the current number of sent publish messages that have not been completed
+   * Returns the number of sent QoS 1 / QoS 2 PUBLISH messages whose acknowledgment flow has not completed yet.
    */
   public async publishInflightCount(): Promise<number> {
     return await this.session.publishInflightCount();
   }
 
   /**
-   * Send a publish packet.
+   * Publishes a message.
+   *
+   * The returned promise resolves when the flow for the QoS level completes: right after sending for QoS 0,
+   * on PUBACK for QoS 1, and on PUBCOMP for QoS 2. A failure reported by the broker resolves with its reason code
+   * in {@link PublishResult.result} instead of rejecting.
+   *
    * @param topic topic name
-   * @param payload publish payload
-   * @param options PublishOptions
-   * @param properties UserPublishProperties
-   * @returns Promise<PublishResult>
+   * @param payload payload. A string is encoded as UTF-8.
+   * @param options QoS, retain and DUP flags. QoS defaults to `Mqtt.QoS.AT_MOST_ONCE`.
+   * @param properties MQTT 5.0 PUBLISH properties.
+   * @returns the result of the publish flow.
+   * @throws {StateIsNotOnlineError} if the client is not connected.
    * @example
    * ```ts
+   * import { Mqtt, MqttClient, MqttProperties } from '@ymjacky/mqtt5';
+   *
+   * const client = new MqttClient();
+   *
    * await client.publish('topicA', 'payload', { qos: Mqtt.QoS.AT_MOST_ONCE });
    * await client.publish('topicA', 'payload', { qos: Mqtt.QoS.AT_LEAST_ONCE });
    * await client.publish('topicA', 'payload', { qos: Mqtt.QoS.EXACTRY_ONCE });
    * await client.publish('topicA', new TextEncoder().encode('payloadA'), { qos: Mqtt.QoS.EXACTRY_ONCE });
-   * await client.publish('topicA', 'payloadA' { qos: Mqtt.QoS.AT_LEAST_ONCE, dup: true, retain: true });
+   * await client.publish('topicA', 'payloadA', { qos: Mqtt.QoS.AT_LEAST_ONCE, dup: true, retain: true });
    *
    * const pubProperties: MqttProperties.UserPublishProperties = {
    *   payloadFormatIndicator: 1,
@@ -395,12 +428,17 @@ export abstract class BaseMqttClient {
   }
 
   /**
-   * Send subscribe packets.
+   * Subscribes to a topic filter and waits for SUBACK.
    * @param topicFilter topic name or topic filter
-   * @param qos Mqtt.QoS
-   * @param properties MqttProperties.SubscribeProperties
+   * @param qos QoS level. Defaults to `Mqtt.QoS.AT_MOST_ONCE`.
+   * @param properties MQTT 5.0 SUBSCRIBE properties.
+   * @returns the reason codes of SUBACK.
    * @example
    * ```ts
+   * import { Mqtt, MqttClient } from '@ymjacky/mqtt5';
+   *
+   * const client = new MqttClient();
+   *
    * await client.subscribe('topicA', Mqtt.QoS.AT_MOST_ONCE);
    * ```
    */
@@ -411,12 +449,17 @@ export abstract class BaseMqttClient {
   ): Promise<SubscribeResults>;
 
   /**
-   * Send subscribe packets.
-   * @param topicFilters topic name or topic filter
-   * @param qos Mqtt.QoS
-   * @param properties MqttProperties.SubscribeProperties
+   * Subscribes to multiple topic filters with one SUBSCRIBE packet and waits for SUBACK.
+   * @param topicFilters topic names or topic filters
+   * @param qos QoS level. Defaults to `Mqtt.QoS.AT_MOST_ONCE`.
+   * @param properties MQTT 5.0 SUBSCRIBE properties.
+   * @returns the reason codes of SUBACK.
    * @example
    * ```ts
+   * import { Mqtt, MqttClient } from '@ymjacky/mqtt5';
+   *
+   * const client = new MqttClient();
+   *
    * await client.subscribe(['topicA', 'topicB'], Mqtt.QoS.AT_MOST_ONCE);
    * ```
    */
@@ -427,12 +470,17 @@ export abstract class BaseMqttClient {
   ): Promise<SubscribeResults>;
 
   /**
-   * Send subscribe packets.
-   * @param subscription SubscriptionOption
-   * @param qos Mqtt.QoS
-   * @param properties MqttProperties.SubscribeProperties
+   * Subscribes to a topic filter with MQTT 5.0 subscription options and waits for SUBACK.
+   * @param subscription topic filter and subscription options. Its `qos` takes precedence over the `qos` argument.
+   * @param qos QoS level. Defaults to `Mqtt.QoS.AT_MOST_ONCE`.
+   * @param properties MQTT 5.0 SUBSCRIBE properties.
+   * @returns the reason codes of SUBACK.
    * @example
    * ```ts
+   * import { Mqtt, MqttClient } from '@ymjacky/mqtt5';
+   *
+   * const client = new MqttClient();
+   *
    * await client.subscribe({ topicFilter: 'topicA', qos: Mqtt.QoS.AT_MOST_ONCE, retainHandling: Mqtt.RetainHandling.DoNotSend, retainAsPublished: true, noLocal: true });
    * ```
    */
@@ -443,12 +491,17 @@ export abstract class BaseMqttClient {
   ): Promise<SubscribeResults>;
 
   /**
-   * Send subscribe packets.
-   * @param subscriptions SubscriptionOption[]
-   * @param qos Mqtt.QoS
-   * @param properties MqttProperties.SubscribeProperties
+   * Subscribes to multiple topic filters with subscription options with one SUBSCRIBE packet and waits for SUBACK.
+   * @param subscriptions topic filters and subscription options. Their `qos` takes precedence over the `qos` argument.
+   * @param qos QoS level. Defaults to `Mqtt.QoS.AT_MOST_ONCE`.
+   * @param properties MQTT 5.0 SUBSCRIBE properties.
+   * @returns the reason codes of SUBACK.
    * @example
    * ```ts
+   * import { Mqtt, MqttClient } from '@ymjacky/mqtt5';
+   *
+   * const client = new MqttClient();
+   *
    * await client.subscribe(
    *   [
    *     { topicFilter: 'topicA', qos: Mqtt.QoS.AT_MOST_ONCE },
@@ -466,7 +519,7 @@ export abstract class BaseMqttClient {
   ): Promise<SubscribeResults>;
 
   /**
-   * Send subscribe packets.
+   * Subscribes to one or more topic filters and waits for SUBACK.
    */
   public async subscribe(
     input: SubscriptionOption | string | (SubscriptionOption | string)[],
@@ -500,11 +553,16 @@ export abstract class BaseMqttClient {
   }
 
   /**
-   * Send unsubscribe packets.
-   * @param topicFilter topic name and topic filter.
-   * @param properties UnsubackProperties
+   * Unsubscribes from a topic filter and waits for UNSUBACK.
+   * @param topicFilter topic name or topic filter
+   * @param properties MQTT 5.0 UNSUBSCRIBE properties.
+   * @returns the reason codes of UNSUBACK.
    * @example
    * ```ts
+   * import { MqttClient, MqttProperties } from '@ymjacky/mqtt5';
+   *
+   * const client = new MqttClient();
+   *
    * await client.unsubscribe('topicA');
    *
    * const properties: MqttProperties.UnsubscribeProperties = {
@@ -520,11 +578,16 @@ export abstract class BaseMqttClient {
   public async unsubscribe(topicFilter: string, properties?: MqttProperties.UnsubackProperties): Promise<UnsubscribeResults>;
 
   /**
-   * Send unsubscribe packets.
-   * @param topicFilters topic name and topic filter
-   * @param properties UnsubackProperties
+   * Unsubscribes from multiple topic filters with one UNSUBSCRIBE packet and waits for UNSUBACK.
+   * @param topicFilters topic names or topic filters
+   * @param properties MQTT 5.0 UNSUBSCRIBE properties.
+   * @returns the reason codes of UNSUBACK.
    * @example
    * ```ts
+   * import { MqttClient } from '@ymjacky/mqtt5';
+   *
+   * const client = new MqttClient();
+   *
    * await client.unsubscribe(
    *   [
    *     'topicA',
@@ -537,7 +600,7 @@ export abstract class BaseMqttClient {
   public async unsubscribe(topicFilters: string[], properties?: MqttProperties.UnsubackProperties): Promise<UnsubscribeResults>;
 
   /**
-   * Send unsubscribe packets.
+   * Unsubscribes from one or more topic filters and waits for UNSUBACK.
    */
   public async unsubscribe(
     input: string | string[],
@@ -560,20 +623,30 @@ export abstract class BaseMqttClient {
   }
 
   /**
-   * Send disconnect packets or force disconnect.
-   * Used for disconnecting.
-   * Normally sends a DISCONNECT packet and waits for the Broker to disconnect.
-   * In case of forced disconnection, the connection is terminated without sending a DISCONNECT packet.
-   * @param force true is force disconnect, false is send disconnect packet.
-   * @param properties DisconnectProperties
+   * Disconnects from the broker.
+   *
+   * Normally sends DISCONNECT and waits for the connection to close (closes it after `disconnectTimeoutMS`).
+   * With `force`, closes the connection without sending DISCONNECT, so the broker publishes the will message.
+   * Resolves immediately if the client is not connected.
+   *
+   * @param force `true` to close without sending DISCONNECT.
+   * @param properties MQTT 5.0 DISCONNECT properties.
    * @example
    * normal disconnection
    * ```ts
+   * import { MqttClient } from '@ymjacky/mqtt5';
+   *
+   * const client = new MqttClient();
+   *
    * await client.disconnect();
    * ```
    *
    * using disconnect properties.
    * ```ts
+   * import { MqttClient, MqttProperties } from '@ymjacky/mqtt5';
+   *
+   * const client = new MqttClient();
+   *
    * const properties: MqttProperties.DisconnectProperties = {
    *   reasonString: 'trouble',
    *   sessionExpiryInterval: 300,
@@ -582,6 +655,10 @@ export abstract class BaseMqttClient {
    * ```
    * force disconnect
    * ```ts
+   * import { MqttClient } from '@ymjacky/mqtt5';
+   *
+   * const client = new MqttClient();
+   *
    * await client.disconnect(true);
    * ```
    */
@@ -629,14 +706,14 @@ export abstract class BaseMqttClient {
   }
 
   /**
-   * Send Auth packet.
-   * @param reasonCode ReasonCode
-   * @param properties AuthProperties
+   * Sends AUTH (MQTT 5.0 enhanced authentication). Receive AUTH from the broker with the `auth` event.
+   * @param reasonCode e.g. `Mqtt.ReasonCode.ContinueAuthentication` or `Mqtt.ReasonCode.ReAuthenticate`.
+   * @param properties AUTH properties, such as `authenticationMethod` and `authenticationData`.
    */
   public async auth(
     reasonCode?: Mqtt.ReasonCode,
     properties?: MqttProperties.AuthProperties,
-  ) {
+  ): Promise<void> {
     const packet: AuthPacket = {
       type: 'auth',
       reasonCode,
@@ -1168,11 +1245,25 @@ export abstract class BaseMqttClient {
   }
 
   /**
-   * @param type
-   * @param callback
+   * Registers an event listener. `event.detail` holds the received packet.
+   *
+   * | Event        | `event.detail`     | When                                                      |
+   * | ------------ | ------------------ | --------------------------------------------------------- |
+   * | `publish`    | `PublishPacket`    | A message is received.                                    |
+   * | `connack`    | `ConnackPacket`    | CONNACK is received.                                      |
+   * | `disconnect` | `DisconnectPacket` | The broker sends DISCONNECT (MQTT 5.0).                   |
+   * | `auth`       | `AuthPacket`       | The broker sends AUTH (MQTT 5.0 enhanced authentication). |
+   * | `closed`     | -                  | The connection is closed, for any reason.                 |
+   *
+   * @param type event type
+   * @param callback listener
    * @example
    * Wait for receipt of a connack packet.
    * ```ts
+   * import { MqttClient } from '@ymjacky/mqtt5';
+   *
+   * const client = new MqttClient();
+   *
    * client.on('connack', (event) => {
    *   const connackPacket = event.detail;
    *   console.log(connackPacket);
@@ -1181,15 +1272,23 @@ export abstract class BaseMqttClient {
    *
    * Wait for receipt of a publish message.
    * ```ts
+   * import { MqttClient } from '@ymjacky/mqtt5';
+   *
+   * const client = new MqttClient();
+   *
    * client.on('publish', (event) => {
    *   const packet = event.detail;
-   *   const receiveMessage = decoder.decode(packet.payload);
+   *   const receiveMessage = new TextDecoder().decode(packet.payload);
    *   console.log(`topic: ${packet.topic}`, `message: ${receiveMessage}`);
    * });
    * ```
    *
    * Wait for events when disconnected from the broker or disconnected by itself.
    * ```ts
+   * import { MqttClient } from '@ymjacky/mqtt5';
+   *
+   * const client = new MqttClient();
+   *
    * client.on('closed', () => {
    *   console.log('closed');
    * });
@@ -1197,6 +1296,10 @@ export abstract class BaseMqttClient {
    *
    * Waiting to receive Disconnect packets sent by the Broker
    * ```ts
+   * import { MqttClient } from '@ymjacky/mqtt5';
+   *
+   * const client = new MqttClient();
+   *
    * client.on('disconnect', (event) => {
    *   const disconnectPacket = event.detail;
    *   console.log(disconnectPacket.reasonCode);
@@ -1204,6 +1307,10 @@ export abstract class BaseMqttClient {
    * ```
    * wait for Auth packet.
    * ```ts
+   * import { MqttClient } from '@ymjacky/mqtt5';
+   *
+   * const client = new MqttClient();
+   *
    * client.on('auth', (event) => {
    *   const authPacket = event.detail;
    *   console.log(authPacket);
@@ -1217,6 +1324,11 @@ export abstract class BaseMqttClient {
     this.eventTarget.addEventListener(type, callback as EventListener);
   };
 
+  /**
+   * Removes an event listener registered with {@link BaseMqttClient.on}.
+   * @param type event type
+   * @param callback the listener passed to `on()`
+   */
   public off = <T extends keyof CustomEventMap>(
     type: T,
     callback: CustomEventListener<CustomEventMap[T]>,
@@ -1225,8 +1337,9 @@ export abstract class BaseMqttClient {
   };
 
   /**
-   * return clientId.
-   * @returns clientId
+   * Returns the client identifier: the one specified in the client options, or, after connecting with an empty ID to an MQTT 5.0 broker,
+   * the one assigned by the broker (Assigned Client Identifier).
+   * @returns client identifier
    */
   public getClientId(): string {
     return this.clientId;
