@@ -3,7 +3,6 @@ import { Session } from './session.ts';
 import { TopicAliasManager } from './topic_alias.ts';
 import { ClientOptions, ConnectOptions, PublishOptions, PublishResult, SubscribeResults, SubscriptionOption, UnsubscribeResults } from './client_types.ts';
 import { ConnectTimeout, MalformedPacketError, SendPacketError, StateIsNotOfflineError, StateIsNotOnlineError } from './error.ts';
-import { InvalidQoSError } from '../mqtt_utils/mod.ts';
 import { Deferred } from './promise.ts';
 import { IncomingMemoryStore, IncomingStore } from '../mqtt_store/mod.ts';
 import { createCustomEvent, CustomEventListener, CustomEventMap } from './events.ts';
@@ -1000,8 +999,6 @@ export abstract class BaseMqttClient {
           createCustomEvent('publish', { detail: packet }),
         );
       }
-    } else {
-      throw new InvalidQoSError(packet.qos);
     }
   }
 
