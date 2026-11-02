@@ -1,3 +1,8 @@
+/**
+ * This module contains the option and result types of the clients
+ * @module
+ */
+
 import { Mqtt, MqttProperties } from '../mod.ts';
 import { IncomingStore, OutgoingStore } from '../mqtt_store/mod.ts';
 import { Subscription } from '../mqtt_packets/mod.ts';

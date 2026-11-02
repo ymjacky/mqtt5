@@ -18,15 +18,20 @@ import {
   variableByteIntegerToNum,
 } from '../mqtt_utils/mod.ts';
 
+/** The property identifier is not supported. */
 export class UnsuportedPropertyError extends Error {
+  /** Creates the error for the given property identifier. */
   constructor(propertyId: number) {
     super(`unsuported property. propertyId: ${propertyId}`);
   }
 } // // id: 0x01
 
+/** A key-value pair of a user property. */
 export type StringPair = { key: string; val: string };
+/** User properties (id: 0x26). The same key can appear more than once. */
 export type UserProperties = StringPair[];
 
+/** Properties of CONNECT. */
 export type ConnectProperties = {
   // id: 0x11
   sessionExpiryInterval?: number;
@@ -48,6 +53,7 @@ export type ConnectProperties = {
   maximumPacketSize?: number;
 };
 
+/** Properties of CONNACK. */
 export type ConnackProperties = {
   // id: 0x11
   sessionExpiryInterval?: number;
@@ -85,6 +91,7 @@ export type ConnackProperties = {
   sharedSubscriptionAvailable?: boolean;
 };
 
+/** Properties of PUBLISH. */
 export type PublishProperties = {
   // id: 0x01
   payloadFormatIndicator?: number;
@@ -104,6 +111,7 @@ export type PublishProperties = {
   userProperties?: UserProperties;
 };
 
+/** Properties of PUBLISH that users can set with `publish()`. Topic aliases are managed by the client. */
 export type UserPublishProperties = {
   // id: 0x01
   payloadFormatIndicator?: number;
@@ -123,6 +131,7 @@ export type UserPublishProperties = {
   userProperties?: UserProperties;
 };
 
+/** Properties of SUBSCRIBE. */
 export type SubscribeProperties = {
   // id: 0x0B
   subscriptionIdentifier?: number;
@@ -130,11 +139,13 @@ export type SubscribeProperties = {
   userProperties?: UserProperties;
 };
 
+/** Properties of UNSUBSCRIBE. */
 export type UnsubscribeProperties = {
   // id: 0x26
   userProperties?: UserProperties;
 };
 
+/** Properties of DISCONNECT. */
 export type DisconnectProperties = {
   // id: 0x11
   sessionExpiryInterval?: number;
@@ -146,6 +157,7 @@ export type DisconnectProperties = {
   userProperties?: UserProperties;
 };
 
+/** Properties of AUTH. */
 export type AuthProperties = {
   // id: 0x15
   authenticationMethod?: string;
@@ -156,6 +168,7 @@ export type AuthProperties = {
   // id: 0x26
   userProperties?: UserProperties;
 };
+/** Properties of the will message in CONNECT. */
 export type WillProperties = {
   // id: 0x01
   payloadFormatIndicator?: number;
@@ -180,13 +193,20 @@ type AcknolagePacketProperties = {
   userProperties?: UserProperties;
 };
 
+/** Properties of PUBACK. */
 export type PubackProperties = AcknolagePacketProperties;
+/** Properties of PUBREC. */
 export type PubrecProperties = AcknolagePacketProperties;
+/** Properties of PUBREL. */
 export type PubrelProperties = AcknolagePacketProperties;
+/** Properties of PUBCOMP. */
 export type PubcompProperties = AcknolagePacketProperties;
+/** Properties of SUBACK. */
 export type SubackProperties = AcknolagePacketProperties;
+/** Properties of UNSUBACK. */
 export type UnsubackProperties = AcknolagePacketProperties;
 
+/** All MQTT 5.0 properties; the union of the properties of every packet. */
 export type Properties =
   & ConnectProperties
   & ConnackProperties
@@ -204,6 +224,11 @@ export type Properties =
   & SubackProperties
   & AuthProperties;
 
+/**
+ * Encodes properties to bytes, prefixed with the property length.
+ * @param properties the properties to encode. Encoded as an empty property list if omitted.
+ * @returns the encoded bytes.
+ */
 export function propertiesToBytes(properties?: Properties): Uint8Array {
   if (typeof properties === 'undefined') {
     return new Uint8Array([0x00]);
@@ -334,6 +359,14 @@ export function propertiesToBytes(properties?: Properties): Uint8Array {
   return concatBytes([numToVariableByteInteger(bytes.length), bytes]);
 }
 
+/**
+ * Decodes properties from a buffer.
+ * @param buffer the buffer that contains the properties.
+ * @param offset the position of the first property in the buffer.
+ * @param propertyLength the length of the properties in bytes.
+ * @returns the decoded properties.
+ * @throws {UnsuportedPropertyError} if a property identifier is not supported.
+ */
 export function parseMqttProperties(
   buffer: Uint8Array,
   offset: number,

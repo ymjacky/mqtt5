@@ -38,10 +38,12 @@ import { parse as authParse, toBytes as authToBytes } from './auth.ts';
 
 import * as Mqtt from '../mqtt/mod.ts';
 import * as MqttPacketsError from './error.ts';
+/** Errors thrown when encoding or decoding packets. */
 export * as MqttPacketsError from './error.ts';
 
 export type { Subscription };
 
+/** Any MQTT packet. Narrow it by its `type`. */
 export type AnyPacket =
   | ConnectPacket
   | ConnackPacket
@@ -77,6 +79,13 @@ export type {
   UnsubscribePacket,
 };
 
+/**
+ * Encodes a packet to bytes.
+ * @param packet the packet to encode.
+ * @param protocolVersion the protocol version to encode the packet for.
+ * @returns the encoded bytes.
+ * @throws {MqttPacketsError.MqttPacketSerializeError} if the packet cannot be encoded.
+ */
 export function packetToBytes(
   packet: AnyPacket,
   protocolVersion: Mqtt.ProtocolVersion,
@@ -139,6 +148,13 @@ export function packetToBytes(
   }
 }
 
+/**
+ * Decodes the bytes of a single complete packet.
+ * @param buffer the bytes of the packet.
+ * @param protocolVersion the protocol version to decode the packet for.
+ * @returns the decoded packet.
+ * @throws {MqttPacketsError.MqttPacketParseError} if the bytes cannot be decoded.
+ */
 export function decode(
   buffer: Uint8Array,
   protocolVersion: Mqtt.ProtocolVersion = Mqtt.ProtocolVersion.MQTT_V5,
