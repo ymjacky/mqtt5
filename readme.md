@@ -61,23 +61,22 @@ await client.disconnect();
 
 All options are optional.
 
-| Option                            | Default                        | Description                                                                                       |
-| --------------------------------- | ------------------------------ | ------------------------------------------------------------------------------------------------- |
-| `url`                             | `mqtt://127.0.0.1:1883`        | Broker URL. `MqttClient`: `mqtt:` or `mqtts:`. `WebSocketMqttClient`: `ws:` or `wss:` (required). |
-| `clientId`                        | `''`                           | Client identifier. With an empty ID, an MQTT 5.0 broker assigns one.                              |
-| `username` / `password`           | -                              | Credentials sent in CONNECT.                                                                      |
-| `protocolVersion`                 | `Mqtt.ProtocolVersion.MQTT_V5` | `MQTT_V5` or `MQTT_V3_1_1`.                                                                       |
-| `clean`                           | `true`                         | Clean Start (5.0) / Clean Session (3.1.1).                                                        |
-| `keepAlive`                       | `10`                           | Keep alive interval in **seconds**.                                                               |
-| `connectTimeoutMS`                | `10000`                        | Time to wait for CONNACK, in milliseconds.                                                        |
-| `disconnectTimeoutMS`             | `1000`                         | Time to wait for the connection to close after DISCONNECT, in milliseconds.                       |
-| `pingrespTimeoutMS`               | `2000`                         | Time to wait for PINGRESP, in milliseconds.                                                       |
-| `caCerts`                         | -                              | CA certificates (PEM) for `mqtts:` (`MqttClient` only).                                           |
-| `cert` / `privateKey`             | -                              | Client certificate and private key (PEM) for TLS client authentication (`MqttClient` only).       |
-| `topicAliasMaximumAboutSend`      | -                              | MQTT 5.0: topic alias maximum for outgoing PUBLISH packets. See [Topic aliases](#topic-aliases).  |
-| `topicAliasMaximumAboutReceive`   | -                              | MQTT 5.0: topic alias maximum sent to the broker in CONNECT. See [Topic aliases](#topic-aliases). |
-| `incomingStore` / `outgoingStore` | in-memory stores               | Stores for in-flight QoS 1/2 messages. See [Session store](#session-store).                       |
-| `logger`                          | -                              | `(msg: string, ...args: unknown[]) => void`, called with debug logs.                              |
+| Option                          | Default                        | Description                                                                                       |
+| ------------------------------- | ------------------------------ | ------------------------------------------------------------------------------------------------- |
+| `url`                           | `mqtt://127.0.0.1:1883`        | Broker URL. `MqttClient`: `mqtt:` or `mqtts:`. `WebSocketMqttClient`: `ws:` or `wss:` (required). |
+| `clientId`                      | `''`                           | Client identifier. With an empty ID, an MQTT 5.0 broker assigns one.                              |
+| `username` / `password`         | -                              | Credentials sent in CONNECT.                                                                      |
+| `protocolVersion`               | `Mqtt.ProtocolVersion.MQTT_V5` | `MQTT_V5` or `MQTT_V3_1_1`.                                                                       |
+| `clean`                         | `true`                         | Clean Start (5.0) / Clean Session (3.1.1).                                                        |
+| `keepAlive`                     | `10`                           | Keep alive interval in **seconds**.                                                               |
+| `connectTimeoutMS`              | `10000`                        | Time to wait for CONNACK, in milliseconds.                                                        |
+| `disconnectTimeoutMS`           | `1000`                         | Time to wait for the connection to close after DISCONNECT, in milliseconds.                       |
+| `pingrespTimeoutMS`             | `2000`                         | Time to wait for PINGRESP, in milliseconds.                                                       |
+| `caCerts`                       | -                              | CA certificates (PEM) for `mqtts:` (`MqttClient` only).                                           |
+| `cert` / `privateKey`           | -                              | Client certificate and private key (PEM) for TLS client authentication (`MqttClient` only).       |
+| `topicAliasMaximumAboutSend`    | -                              | MQTT 5.0: topic alias maximum for outgoing PUBLISH packets. See [Topic aliases](#topic-aliases).  |
+| `topicAliasMaximumAboutReceive` | -                              | MQTT 5.0: topic alias maximum sent to the broker in CONNECT. See [Topic aliases](#topic-aliases). |
+| `logger`                        | -                              | `(msg: string, ...args: unknown[]) => void`, called with debug logs.                              |
 
 ### MQTT 3.1.1
 
@@ -295,12 +294,11 @@ Request Response Information with the `requestResponseInformation` CONNECT prope
 
 ### Session store
 
-In-flight QoS 1/2 messages are kept in memory by default, so they are lost when the process exits. To persist them, implement `Store.IncomingStore` and
-`Store.OutgoingStore` and pass them as `incomingStore` and `outgoingStore`. `outgoingStore` is used only when `clean` is `false`.
+In-flight QoS 1/2 messages are kept in memory, so they are lost when the process exits. A persistent session store is planned.
 
 ## Not supported
 
-- A built-in persistent session store (planned). See [Session store](#session-store) for a workaround.
+- A persistent session store (planned).
 - Specifying CA certificates for WebSocket Secure (`wss://`). The runtime's trust store is used.
 - Disabling TLS certificate verification (`rejectUnauthorized`).
 - Automatic reconnection.
