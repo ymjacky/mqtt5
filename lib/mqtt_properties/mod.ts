@@ -334,7 +334,7 @@ export function propertiesToBytes(properties?: Properties): Uint8Array {
     chunks.push([0x23], numToTwoByteInteger(properties.topicAlias));
   }
   // id: 0x24, type: Byte
-  if (properties.maximumQoS) { // Mqtt.QoS,
+  if (typeof properties.maximumQoS !== 'undefined') { // Mqtt.QoS, 0 is meaningful (QoS 0 only)
     chunks.push([0x24, properties.maximumQoS & 0xFF]);
   }
   // id: 0x25, type: Byte

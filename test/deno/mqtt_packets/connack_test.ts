@@ -755,3 +755,29 @@ Deno.test('encodeConnackPacketMQTT5ServerKeepAliveZero', function () {
     ]),
   );
 });
+
+// Maximum QoS 0 (QoS 0 only) must be encoded, not dropped as absent (absent means QoS 2).
+Deno.test('encodeConnackPacketMQTT5MaximumQoSZero', function () {
+  assertEquals(
+    toBytes(
+      {
+        type: 'connack',
+        sessionPresent: false,
+        reasonCode: 0,
+        properties: { maximumQoS: Mqtt.QoS.AT_MOST_ONCE },
+      },
+      Mqtt.ProtocolVersion.MQTT_V5, // ProtocolVersion
+    ),
+    new Uint8Array([
+      // fixedHeader
+      (0b0010 << 4) + 0b0000,
+      5, // remainingLength
+      // variableHeader
+      0, // connack flags
+      0, // reason code (success)
+      2, // properties length
+      0x24, // maximum qos
+      0,
+    ]),
+  );
+});
