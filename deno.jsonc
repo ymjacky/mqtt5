@@ -42,7 +42,7 @@
   },
   "tasks": {
     "test": "deno test --allow-net --allow-read --trace-leaks test/deno/",
-    "tsc": "deno check --doc deno/mod.ts browser/mod.ts",
+    "tsc": "deno check --doc deno/mod.ts browser/mod.ts && deno check --doc-only readme.md",
     "check": "deno lint && deno task tsc && deno task test",
     "build_ems": "deno run --allow-read --allow-write --allow-net --allow-env browser/bundle.ts"
   }
