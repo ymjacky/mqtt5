@@ -394,15 +394,10 @@ export abstract class BaseMqttClient {
       topicId = tid;
     }
 
-    let publishProperties = properties as MqttProperties.PublishProperties;
-    // set topic alias
-    if (topicId) {
-      if (publishProperties) {
-        publishProperties.topicAlias = topicId;
-      } else {
-        publishProperties = { topicAlias: topicId };
-      }
-    }
+    // Set the topic alias on a copy: the caller's object may be shared by other publishes, possibly running concurrently.
+    const publishProperties: MqttProperties.PublishProperties | undefined = (properties || topicId)
+      ? { ...properties, ...(topicId > 0 && { topicAlias: topicId }) }
+      : undefined;
 
     if (qos === Mqtt.QoS.AT_MOST_ONCE) {
       const packet: PublishPacket = {

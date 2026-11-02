@@ -82,15 +82,16 @@ export class Session {
   ) {
     this.inflightPublish.set(packet.packetId!, deferred);
 
-    if (omittedTopic) {
-      const copiedPacket = { ...packet };
-      if (packet.properties) {
-        copiedPacket.properties = { ...packet.properties };
-        delete copiedPacket?.properties?.topicAlias;
-      }
+    // Topic aliases are valid only on the current connection, so the packet is stored
+    // for resending with its topic name and without the topic alias.
+    if (packet.properties?.topicAlias) {
+      const copiedPacket = { ...packet, properties: { ...packet.properties } };
+      delete copiedPacket.properties.topicAlias;
 
       // Restore omitted topics and then register them
-      copiedPacket.topic = omittedTopic;
+      if (omittedTopic) {
+        copiedPacket.topic = omittedTopic;
+      }
       return await this.outgoingStore.store(copiedPacket);
     } else {
       return await this.outgoingStore.store(packet);
