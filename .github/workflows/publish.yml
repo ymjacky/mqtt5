@@ -24,8 +24,8 @@ jobs:
       - name: check that the release tag matches the package version
         run: |
           version=$(grep -m1 '"version"' deno.jsonc | sed -E 's/.*"version": *"([^"]+)".*/\1/')
-          if [ "${{ github.event.release.tag_name }}" != "v${version}" ]; then
-            echo "release tag ${{ github.event.release.tag_name }} does not match deno.jsonc version v${version}"
+          if [ "${{ github.event.release.tag_name }}" != "${version}" ]; then
+            echo "release tag ${{ github.event.release.tag_name }} does not match deno.jsonc version ${version}"
             exit 1
           fi
 
