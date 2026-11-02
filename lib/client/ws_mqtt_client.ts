@@ -94,20 +94,13 @@ export class WebSocketMqttClient extends BaseMqttClient {
       try {
         array = this.adjustReadBytes(temporaryReceiveBytes);
       } catch (streamError) {
-        if (!(streamError instanceof MalformedPacketError)) {
-          // Not a framing error caused by malformed data from the peer;
-          // treat as a fatal/unexpected error.
-          throw streamError;
-        }
+        // Rethrows non-framing errors.
+        this.handleFramingError(streamError);
 
-        // The byte stream framing is desynchronized (e.g. an invalid
-        // Remaining Length), so we can no longer safely interpret further
-        // bytes on this connection. `this.conn.onclose` will call
-        // detectClosed() once the connection actually closes (either from
-        // handleMalformedPacket()'s close()/DISCONNECT-then-timer, or from
-        // the broker).
-        this.log(`Malformed packet received (framing error): ${streamError.message}`);
-        this.handleMalformedPacket(streamError);
+        // We can no longer safely interpret further bytes on this
+        // connection. `this.conn.onclose` will call detectClosed() once the
+        // connection actually closes (either from handleMalformedPacket()'s
+        // close()/DISCONNECT-then-timer, or from the broker).
         return;
       }
 

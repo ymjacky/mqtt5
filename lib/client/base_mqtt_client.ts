@@ -2,7 +2,7 @@ import { Mqtt, MqttPackets, MqttProperties } from '../mod.ts';
 import { Session } from './session.ts';
 import { TopicAliasManager } from './topic_alias.ts';
 import { ClientOptions, ConnectOptions, PublishOptions, PublishResult, SubscribeResults, SubscriptionOption, UnsubscribeResults } from './client_types.ts';
-import { ConnectTimeout, SendPacketError, StateIsNotOfflineError, StateIsNotOnlineError } from './error.ts';
+import { ConnectTimeout, MalformedPacketError, SendPacketError, StateIsNotOfflineError, StateIsNotOnlineError } from './error.ts';
 import { InvalidQoSError } from '../mqtt_utils/mod.ts';
 import { Deferred } from './promise.ts';
 import { IncomingMemoryStore, IncomingStore } from '../mqtt_store/mod.ts';
@@ -688,6 +688,25 @@ export abstract class BaseMqttClient {
     }
 
     return Promise.resolve();
+  }
+
+  /**
+   * Handle an error raised while framing packets off the transport.
+   *
+   * A MalformedPacketError means the byte stream framing is desynchronized
+   * (e.g. an invalid Remaining Length), so it is handled per protocol version
+   * and the returned promise settles when that handling completes. Subclasses
+   * must stop interpreting further bytes on the connection afterwards. Any
+   * other error is not caused by malformed data from the peer and is thrown
+   * synchronously.
+   */
+  protected handleFramingError(streamError: unknown): Promise<void> {
+    if (!(streamError instanceof MalformedPacketError)) {
+      throw streamError;
+    }
+
+    this.log(`Malformed packet received (framing error): ${streamError.message}`);
+    return this.handleMalformedPacket(streamError);
   }
 
   protected detectClosed() {
