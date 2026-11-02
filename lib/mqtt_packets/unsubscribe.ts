@@ -13,7 +13,7 @@ export type UnsubscribePacket = {
   type: 'unsubscribe';
   packetId: number;
   topicFilters: string[];
-  properties?: MqttProperties.UnsubackProperties;
+  properties?: MqttProperties.UnsubscribeProperties;
 };
 
 export function toBytes(
