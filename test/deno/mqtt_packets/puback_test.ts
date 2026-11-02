@@ -1,5 +1,5 @@
 import { assertEquals, assertThrows } from 'std/assert/mod.ts';
-import type { PubackPacket } from '../../../lib/mqtt_packets/puback.ts';
+import type { PubackPacket } from '../../../lib/mqtt_packets/packet_types.ts';
 import { parse, toBytes } from '../../../lib/mqtt_packets/puback.ts';
 import * as Mqtt from '../../../lib/mqtt/mod.ts';
 

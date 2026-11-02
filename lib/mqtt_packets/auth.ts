@@ -1,12 +1,7 @@
 import * as Mqtt from '../mqtt/mod.ts';
 import * as MqttProperties from '../mqtt_properties/mod.ts';
 import { concatBytes, numToVariableByteInteger, variableByteIntegerToNum } from '../mqtt_utils/mod.ts';
-
-export type AuthPacket = {
-  type: 'auth';
-  reasonCode?: number;
-  properties?: MqttProperties.AuthProperties;
-};
+import type { AuthPacket } from './packet_types.ts';
 
 export function toBytes(
   packet: AuthPacket,

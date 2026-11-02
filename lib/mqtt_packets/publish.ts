@@ -11,17 +11,7 @@ import {
   variableByteIntegerToNum,
 } from '../mqtt_utils/mod.ts';
 import * as MqttProperties from '../mqtt_properties/mod.ts';
-
-export type PublishPacket = {
-  type: 'publish';
-  topic: string;
-  payload: Uint8Array;
-  dup: boolean;
-  retain: boolean;
-  qos: Mqtt.QoS;
-  packetId?: number;
-  properties?: MqttProperties.PublishProperties;
-};
+import type { PublishPacket } from './packet_types.ts';
 
 export function toBytes(
   packet: PublishPacket,

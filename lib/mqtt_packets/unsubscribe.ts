@@ -8,13 +8,7 @@ import {
   variableByteIntegerToNum,
 } from '../mqtt_utils/mod.ts';
 import * as MqttProperties from '../mqtt_properties/mod.ts';
-
-export type UnsubscribePacket = {
-  type: 'unsubscribe';
-  packetId: number;
-  topicFilters: string[];
-  properties?: MqttProperties.UnsubscribeProperties;
-};
+import type { UnsubscribePacket } from './packet_types.ts';
 
 export function toBytes(
   packet: UnsubscribePacket,

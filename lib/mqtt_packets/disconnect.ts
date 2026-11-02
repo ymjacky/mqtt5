@@ -1,12 +1,7 @@
 import * as Mqtt from '../mqtt/mod.ts';
 import * as MqttProperties from '../mqtt_properties/mod.ts';
 import { concatBytes, numToVariableByteInteger, variableByteIntegerToNum } from '../mqtt_utils/mod.ts';
-
-export type DisconnectPacket = {
-  type: 'disconnect';
-  reasonCode?: number;
-  properties?: MqttProperties.DisconnectProperties;
-};
+import type { DisconnectPacket } from './packet_types.ts';
 
 export function toBytes(
   packet: DisconnectPacket,

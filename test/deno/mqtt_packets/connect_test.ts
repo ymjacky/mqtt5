@@ -1,5 +1,5 @@
 import { assertEquals } from 'std/assert/mod.ts';
-import type { ConnectPacket } from '../../../lib/mqtt_packets/connect.ts';
+import type { ConnectPacket } from '../../../lib/mqtt_packets/packet_types.ts';
 import { parse, toBytes } from '../../../lib/mqtt_packets/connect.ts';
 import * as Mqtt from '../../../lib/mqtt/mod.ts';
 

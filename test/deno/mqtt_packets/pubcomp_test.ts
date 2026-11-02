@@ -1,5 +1,5 @@
 import { assertEquals, assertThrows } from 'std/assert/mod.ts';
-import type { PubcompPacket } from '../../../lib/mqtt_packets/pubcomp.ts';
+import type { PubcompPacket } from '../../../lib/mqtt_packets/packet_types.ts';
 import { parse, toBytes } from '../../../lib/mqtt_packets/pubcomp.ts';
 import * as Mqtt from '../../../lib/mqtt/mod.ts';
 

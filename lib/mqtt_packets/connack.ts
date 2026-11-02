@@ -1,14 +1,7 @@
 import * as Mqtt from '../mqtt/mod.ts';
 import * as MqttProperties from '../mqtt_properties/mod.ts';
 import { concatBytes, numToVariableByteInteger, variableByteIntegerToNum } from '../mqtt_utils/mod.ts';
-
-export type ConnackPacket = {
-  type: 'connack';
-  sessionPresent: boolean;
-  returnCode?: Mqtt.V3_1_1_ConnectReturnCode;
-  reasonCode?: Mqtt.ReasonCode;
-  properties?: MqttProperties.ConnackProperties;
-};
+import type { ConnackPacket } from './packet_types.ts';
 
 export function toBytes(
   packet: ConnackPacket,

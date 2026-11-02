@@ -1,13 +1,7 @@
 import * as Mqtt from '../mqtt/mod.ts';
 import { concatBytes, numToTwoByteInteger, numToVariableByteInteger, twoByteIntegerToNum, variableByteIntegerToNum } from '../mqtt_utils/mod.ts';
 import * as MqttProperties from '../mqtt_properties/mod.ts';
-
-export type UnsubackPacket = {
-  type: 'unsuback';
-  packetId: number;
-  reasonCodes?: number[];
-  properties?: MqttProperties.UnsubackProperties;
-};
+import type { UnsubackPacket } from './packet_types.ts';
 
 export function toBytes(
   packet: UnsubackPacket,

@@ -1,14 +1,7 @@
 import * as Mqtt from '../mqtt/mod.ts';
 import { concatBytes, numToTwoByteInteger, numToVariableByteInteger, twoByteIntegerToNum, variableByteIntegerToNum } from '../mqtt_utils/mod.ts';
 import * as MqttProperties from '../mqtt_properties/mod.ts';
-
-export type SubackPacket = {
-  type: 'suback';
-  packetId: number;
-  returnCodes?: number[];
-  reasonCodes?: number[];
-  properties?: MqttProperties.SubackProperties;
-};
+import type { SubackPacket } from './packet_types.ts';
 
 export function toBytes(
   packet: SubackPacket,

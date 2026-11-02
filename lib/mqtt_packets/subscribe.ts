@@ -9,21 +9,7 @@ import {
   variableByteIntegerToNum,
 } from '../mqtt_utils/mod.ts';
 import * as MqttProperties from '../mqtt_properties/mod.ts';
-
-export type SubscribePacket = {
-  type: 'subscribe';
-  packetId: number;
-  subscriptions: Subscription[];
-  properties?: MqttProperties.SubscribeProperties;
-};
-
-export type Subscription = {
-  topicFilter: string;
-  qos: Mqtt.QoS;
-  retainHandling?: Mqtt.RetainHandling;
-  retainAsPublished?: boolean;
-  noLocal?: boolean;
-};
+import type { SubscribePacket, Subscription } from './packet_types.ts';
 
 export function toBytes(
   packet: SubscribePacket,
