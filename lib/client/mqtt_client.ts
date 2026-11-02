@@ -18,18 +18,37 @@ const writerFactory: WriterFactory = (
 };
 
 /**
- * MQTT Client.
+ * MQTT client that connects over TCP (`mqtt://`) or TLS (`mqtts://`). Deno only;
+ * in the browser, use {@link WebSocketMqttClient}.
+ *
+ * @example
+ * ```ts
+ * import { Mqtt, MqttClient } from '@ymjacky/mqtt5';
+ *
+ * const client = new MqttClient({
+ *   url: new URL('mqtt://127.0.0.1:1883'),
+ *   clientId: 'clientA',
+ *   protocolVersion: Mqtt.ProtocolVersion.MQTT_V5,
+ * });
+ * await client.connect();
+ * ```
  */
 export class MqttClient extends BaseMqttClient {
+  /** The underlying TCP or TLS connection. */
   protected conn?: Deno.Conn;
   private reader?: ReadableStreamDefaultReader<Uint8Array>;
   private frameBuffer = new MqttStream.MqttFrameBuffer();
 
+  /**
+   * Creates a client. It does not connect until {@link MqttClient.connect} is called.
+   * @param options client options. `url` must use `mqtt:` or `mqtts:` (default `mqtt://127.0.0.1:1883`).
+   */
   constructor(options?: ClientOptions) {
     super(options);
   }
 
-  protected async open() {
+  /** Opens the TCP or TLS connection and starts the receive loop. */
+  protected async open(): Promise<void> {
     const openSocket = async () => {
       if (this.url.protocol === 'mqtt:') {
         return await Deno.connect({
@@ -117,6 +136,7 @@ export class MqttClient extends BaseMqttClient {
     });
   }
 
+  /** Closes the connection. */
   protected async close(): Promise<void> {
     if (this.conn) {
       if (this.reader) {

@@ -4,12 +4,34 @@ import * as MqttStream from '../mqtt_stream_utils/mod.ts';
 import { Deferred } from './promise.ts';
 
 /**
- * MQTT client for WebSocket and WebSocket Secure
+ * MQTT client that connects over WebSocket (`ws://`) or WebSocket Secure (`wss://`), using the `mqtt` subprotocol.
+ * Works in Deno and the browser.
+ *
+ * For `wss://`, the broker certificate is verified against the runtime's trust store; `caCerts`, `cert` and
+ * `privateKey` are ignored.
+ *
+ * @example
+ * ```ts
+ * import { Mqtt, WebSocketMqttClient } from '@ymjacky/mqtt5';
+ *
+ * const client = new WebSocketMqttClient({
+ *   url: new URL('ws://127.0.0.1:8080'),
+ *   clientId: 'clientA',
+ *   protocolVersion: Mqtt.ProtocolVersion.MQTT_V5,
+ * });
+ * await client.connect();
+ * ```
  */
 export class WebSocketMqttClient extends BaseMqttClient {
+  /** The underlying WebSocket. */
   protected conn?: WebSocket;
   private frameBuffer = new MqttStream.MqttFrameBuffer();
 
+  /**
+   * Creates a client. It does not connect until {@link WebSocketMqttClient.connect} is called.
+   * @param options client options. `url` is required and must use `ws:` or `wss:`.
+   * @throws {Error} if `url` is not specified.
+   */
   constructor(options?: ClientOptions) {
     if (!options?.url) {
       throw new Error('uri required');
@@ -17,6 +39,7 @@ export class WebSocketMqttClient extends BaseMqttClient {
     super(options);
   }
 
+  /** Opens the WebSocket connection. */
   protected open(): Promise<void> {
     const deferred = new Deferred<void>();
 
@@ -76,6 +99,7 @@ export class WebSocketMqttClient extends BaseMqttClient {
     return deferred.promise;
   }
 
+  /** Closes the connection. */
   protected async close(): Promise<void> {
     if (this.conn) {
       await this.conn.close();

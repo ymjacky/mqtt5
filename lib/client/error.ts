@@ -1,3 +1,4 @@
+/** The connection was closed by the peer. */
 export class ConnectionClosed extends Error {
   readonly #className = 'ConnectionClosed';
   constructor() {
@@ -5,6 +6,7 @@ export class ConnectionClosed extends Error {
   }
 }
 
+/** A received packet could not be decoded. */
 export class MalformedPacketError extends Error {
   readonly #className = 'MalformedPacketError';
   constructor(message: string) {
@@ -12,6 +14,7 @@ export class MalformedPacketError extends Error {
   }
 }
 
+/** The connection was reset. */
 export class ConnectionReset extends Error {
   readonly #className = 'ConnectionReset';
   constructor(message: string) {
@@ -19,6 +22,7 @@ export class ConnectionReset extends Error {
   }
 }
 
+/** CONNACK was not received within `connectTimeoutMS`. Rejected by `connect()`. */
 export class ConnectTimeout extends Error {
   readonly #className = 'ConnectTimeout';
   constructor() {
@@ -26,6 +30,7 @@ export class ConnectTimeout extends Error {
   }
 }
 
+/** `connect()` was called while the client is connected or connecting. */
 export class StateIsNotOfflineError extends Error {
   readonly #className = 'StateIsNotOfflineError';
   constructor(message: string) {
@@ -33,6 +38,7 @@ export class StateIsNotOfflineError extends Error {
   }
 }
 
+/** `publish()` was called while the client is not connected. */
 export class StateIsNotOnlineError extends Error {
   readonly #className = 'StateIsNotOnlineError';
   constructor(message: string) {
@@ -40,6 +46,7 @@ export class StateIsNotOnlineError extends Error {
   }
 }
 
+/** A packet could not be sent because the client is not connected. */
 export class SendPacketError extends Error {
   readonly #className = 'SendPacketError';
   constructor() {
@@ -47,6 +54,7 @@ export class SendPacketError extends Error {
   }
 }
 
+/** The URL protocol is not supported by the client (`MqttClient` accepts `mqtt:` and `mqtts:`). */
 export class UnexpectedUrlProtocol extends Error {
   readonly #className = 'UnexpectedUrlProtocolextends';
   constructor(message: string) {
