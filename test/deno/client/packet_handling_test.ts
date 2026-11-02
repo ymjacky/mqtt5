@@ -77,7 +77,6 @@ Deno.test({ name: '@packet handling', only: false }, async (context) => {
         });
 
         await client.connect();
-        broker.startRead(client.getClientId());
 
         broker.on('pubcomp', (event) => {
           const packet = event.detail;
@@ -136,7 +135,6 @@ Deno.test({ name: '@packet handling', only: false }, async (context) => {
         });
 
         await client.connect();
-        broker.startRead(client.getClientId());
 
         // The client keeps working after the handler failure.
         client.on('publish', (event) => {

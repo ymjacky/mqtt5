@@ -30,7 +30,6 @@ Deno.test({ name: '@reconnect', only: false }, async (context) => {
         });
 
         await client.connect();
-        broker.startRead(client.getClientId());
         broker.on('disconnect', (event) => {
           const packet = event.detail;
           assertExists(packet);
@@ -79,7 +78,6 @@ Deno.test({ name: '@reconnect', only: false }, async (context) => {
         await client.connect().then((connack) => {
           assertEquals(connack.sessionPresent, false);
         });
-        broker.startRead(client.getClientId());
         broker.on('disconnect', (event) => {
           const packet = event.detail;
           assertExists(packet);

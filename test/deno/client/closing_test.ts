@@ -31,7 +31,6 @@ Deno.test({ name: '@closing', only: false }, async (context) => {
         });
 
         await client.connect();
-        broker.startRead(client.getClientId());
 
         broker.on('disconnect', (event) => {
           const packet = event.detail;
@@ -73,7 +72,6 @@ Deno.test({ name: '@closing', only: false }, async (context) => {
         });
 
         await client.connect();
-        broker.startRead(client.getClientId());
 
         broker.on('disconnect', (event) => {
           const packet = event.detail;
@@ -119,7 +117,6 @@ Deno.test({ name: '@closing', only: false }, async (context) => {
         });
 
         await client.connect();
-        broker.startRead(client.getClientId());
 
         broker.on('disconnect', (event) => {
           const packet = event.detail;
@@ -164,7 +161,6 @@ Deno.test({ name: '@closing', only: false }, async (context) => {
         });
 
         await client.connect();
-        broker.startRead(client.getClientId());
 
         const properties: MqttProperties.DisconnectProperties = {
           reasonString: 'trouble',
@@ -211,7 +207,6 @@ Deno.test({ name: '@closing', only: false }, async (context) => {
         });
 
         await client.connect();
-        broker.startRead(client.getClientId());
 
         broker.on('closed', () => {
           resolve();
@@ -251,7 +246,6 @@ Deno.test({ name: '@closing', only: false }, async (context) => {
         });
 
         await client.connect();
-        broker.startRead(client.getClientId());
 
         broker.on('disconnect', (event) => {
           const packet = event.detail;
@@ -301,8 +295,6 @@ Deno.test({ name: '@closing', only: false }, async (context) => {
           resolve();
         });
         broker.on('connect', (event) => {
-          broker.startRead(client.getClientId());
-
           const packet = event.detail;
           client.disconnect(false, properties);
           broker.sendConnack(packet.clientId, false, packet.protocolVersion);

@@ -207,7 +207,6 @@ Deno.test({ name: '@receive publish_qos1', only: false }, async (context) => {
             returnCode: Mqtt.V3_1_1_ConnectReturnCode.ConnectionAccepted,
           },
         );
-        broker.startRead(client.getClientId());
 
         client.on('publish', (event) => {
           const packet = event.detail;
@@ -278,8 +277,6 @@ Deno.test({ name: '@receive publish_qos1', only: false }, async (context) => {
             reasonCode: Mqtt.ReasonCode.Success,
           },
         );
-
-        broker.startRead(client.getClientId());
 
         client.on('publish', (event) => {
           const packet = event.detail;
@@ -388,7 +385,6 @@ Deno.test({ name: '@receive publish_qos2', only: false }, async (context) => {
             returnCode: Mqtt.V3_1_1_ConnectReturnCode.ConnectionAccepted,
           },
         );
-        broker.startRead(client.getClientId());
 
         client.on('publish', (event) => {
           const packet = event.detail;
@@ -469,8 +465,6 @@ Deno.test({ name: '@receive publish_qos2', only: false }, async (context) => {
             reasonCode: Mqtt.ReasonCode.Success,
           },
         );
-
-        broker.startRead(client.getClientId());
 
         client.on('publish', (event) => {
           const packet = event.detail;
@@ -592,8 +586,6 @@ Deno.test({ name: '@receive malformed publish', only: false }, async (context) =
           },
         );
 
-        broker.startRead(client.getClientId());
-
         // v3.1.1 has no reason code on DISCONNECT, so the client closes the
         // connection directly instead of sending a (misleading) DISCONNECT.
         broker.on('disconnect', () => {
@@ -672,8 +664,6 @@ Deno.test({ name: '@receive malformed publish', only: false }, async (context) =
             reasonCode: Mqtt.ReasonCode.Success,
           },
         );
-
-        broker.startRead(client.getClientId());
 
         // Monitor DISCONNECT (no PUBACK/PUBREC for malformed packets)
         broker.on('disconnect', (event) => {

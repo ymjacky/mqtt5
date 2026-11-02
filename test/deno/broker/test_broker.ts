@@ -107,14 +107,14 @@ export class TestBroker extends EventTarget {
 
     if (packet.type === 'connect') {
       // Hand over the reader and any bytes already buffered after CONNECT.
-      this.clients.set(
-        packet.clientId,
-        new Client(packet.clientId, packet.protocolVersion, conn, reader, frameBuffer),
-      );
+      const client = new Client(packet.clientId, packet.protocolVersion, conn, reader, frameBuffer);
+      this.clients.set(packet.clientId, client);
 
       this.dispatchEvent(
         createCustomEvent('connect', { detail: packet }),
       );
+
+      this.readPackets(client);
     }
   }
 
@@ -179,123 +179,25 @@ export class TestBroker extends EventTarget {
     }
   }
 
-  async startRead(clientId: string) {
-    const client = this.clients.get(clientId);
-    if (!client) { // not found
-      return;
-    }
-
+  // Read packets until the connection is closed and dispatch each one as the event of the same name.
+  private async readPackets(client: Client) {
     try {
-      do {
+      while (true) {
         const receiveBytes = await readPacketBytes(client.reader, client.frameBuffer);
         log('receiveBytes', receiveBytes);
         const packet = MqttPackets.decode(receiveBytes, client.protocolVersion);
         log('receivePacket', packet);
 
-        switch (packet.type) {
-          case 'connect':
-            log('receive connect packet');
-            break;
-          case 'connack':
-            log('receive connack packet');
-            break;
-          case 'publish':
-            this.dispatchEvent(
-              createCustomEvent('publish', {
-                detail: packet as MqttPackets.PublishPacket,
-              }),
-            );
-            break;
-          case 'puback':
-            this.dispatchEvent(
-              createCustomEvent('puback', {
-                detail: packet as MqttPackets.PubackPacket,
-              }),
-            );
-            break;
-          case 'pubrec':
-            this.dispatchEvent(
-              createCustomEvent('pubrec', {
-                detail: packet as MqttPackets.PubrecPacket,
-              }),
-            );
-            break;
-          case 'pubrel':
-            this.dispatchEvent(
-              createCustomEvent('pubrel', {
-                detail: packet as MqttPackets.PubrelPacket,
-              }),
-            );
-            break;
-          case 'pubcomp':
-            this.dispatchEvent(
-              createCustomEvent('pubcomp', {
-                detail: packet as MqttPackets.PubcompPacket,
-              }),
-            );
-            break;
-          case 'subscribe':
-            this.dispatchEvent(
-              createCustomEvent('subscribe', {
-                detail: packet as MqttPackets.SubscribePacket,
-              }),
-            );
-            break;
-          case 'suback':
-            this.dispatchEvent(
-              createCustomEvent('suback', {
-                detail: packet as MqttPackets.SubackPacket,
-              }),
-            );
-            break;
-          case 'unsubscribe':
-            this.dispatchEvent(
-              createCustomEvent('unsubscribe', {
-                detail: packet as MqttPackets.UnsubscribePacket,
-              }),
-            );
-            break;
-          case 'unsuback':
-            this.dispatchEvent(
-              createCustomEvent('unsuback', {
-                detail: packet as MqttPackets.UnsubackPacket,
-              }),
-            );
-            break;
-          case 'pingreq':
-            this.dispatchEvent(
-              createCustomEvent('pingreq', {
-                detail: packet as MqttPackets.PingreqPacket,
-              }),
-            );
-            break;
-          case 'pingresp':
-            log('receive pingresp packet');
-            break;
-          case 'disconnect':
-            this.dispatchEvent(
-              createCustomEvent('disconnect', {
-                detail: packet as MqttPackets.DisconnectPacket,
-              }),
-            );
-            break;
-          case 'auth':
-            log('receive auth packet');
-            this.dispatchEvent(
-              createCustomEvent('auth', {
-                detail: packet as MqttPackets.AuthPacket,
-              }),
-            );
-            break;
-        }
-      } while (true);
+        this.dispatchEvent(new CustomEvent(packet.type, { detail: packet }));
+      }
     } catch (e) {
       if (e instanceof ClientErrors.ConnectionClosed) {
         this.dispatchEvent(
           createCustomEvent('closed', {}),
         );
       } else {
-        throw e;
+        // Nobody awaits this loop, so log the error instead of leaving an unhandled rejection.
+        log('read error', e);
       }
     }
   }
