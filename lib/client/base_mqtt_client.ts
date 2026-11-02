@@ -632,6 +632,8 @@ export abstract class BaseMqttClient {
    * Normally sends DISCONNECT and waits for the connection to close (closes it after `disconnectTimeoutMS`).
    * With `force`, closes the connection without sending DISCONNECT, so the broker publishes the will message.
    * Resolves immediately if the client is not connected.
+   * If a disconnect is already in progress, waits for the same close without sending DISCONNECT again;
+   * with `force`, closes the connection now instead of waiting for the broker. `properties` of this call are ignored.
    *
    * @param force `true` to close without sending DISCONNECT.
    * @param properties MQTT 5.0 DISCONNECT properties.
@@ -670,17 +672,35 @@ export abstract class BaseMqttClient {
     force: boolean = false,
     properties?: MqttProperties.DisconnectProperties,
   ): Promise<void> {
+    // A disconnect is already in progress: wait for the same close instead of sending DISCONNECT again.
+    if (this.waitForClose) {
+      const waitForClose = this.waitForClose;
+      if (force && this.connectionState === 'online') {
+        // Do not wait for the broker or disconnectTimeoutMS to close the connection.
+        await this.close();
+      }
+      return waitForClose.promise;
+    }
+
     const deferred = new Deferred<void>();
     this.waitForClose = deferred;
 
     if (this.connectionState === 'connecting') {
       this.log('A disconnect request was accepted while connected');
       if (this.unresolvedConnect) {
-        await this.unresolvedConnect.promise;
+        try {
+          await this.unresolvedConnect.promise;
+        } catch (err) {
+          // connect() failed, so there is no connection to close. Release the calls waiting for it.
+          this.waitForClose = undefined;
+          deferred.resolve();
+          throw err;
+        }
       }
     }
 
     if (this.connectionState === 'offline') {
+      this.waitForClose = undefined;
       deferred.resolve();
     } else {
       await this.doDisconnect(force, undefined, properties);
@@ -822,6 +842,7 @@ export abstract class BaseMqttClient {
 
     if (this.waitForClose) {
       this.waitForClose.resolve();
+      this.waitForClose = undefined;
     }
 
     this.eventTarget.dispatchEvent(
