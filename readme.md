@@ -1,5 +1,5 @@
 # mqtt5
-[![jsr](https://jsr.io/badges/@ymjacky/mqtt5)](https://jsr.io/badges/@ymjacky/mqtt5)
+[![jsr](https://jsr.io/badges/@ymjacky/mqtt5)](https://jsr.io/@ymjacky/mqtt5)
 
 ``mqtt5`` is a client library for the MQTT protocol, written in Typescript for deno and the browser.
 
@@ -17,7 +17,7 @@ you can use [jsr](https://jsr.io/@ymjacky/mqtt5).
 
 #### connect mqtt
 ```ts
-import { Mqtt, MqttProperties, MqttClient } from "jsr:@ymjacky/mqtt5";
+import { Mqtt, MqttClient } from "jsr:@ymjacky/mqtt5";
 
 const logger = (msg: string, ...args: unknown[]) => {
   console.log('[Subscriber]', msg, ...args);
@@ -27,6 +27,7 @@ async function main() {
   const client = new MqttClient({
     url: new URL('mqtt://127.0.0.1:1883'),
     clientId: 'clientA',
+    username: 'user',
     password: 'pass',
     logger: logger,
     clean: true,
@@ -55,7 +56,7 @@ main();
 #### connect mqtts (mqtt over TLS)
 
 ```ts
-import { Mqtt, MqttProperties, MqttClient } from "jsr:@ymjacky/mqtt5";
+import { Mqtt, MqttClient } from "jsr:@ymjacky/mqtt5";
 
 const logger = (msg: string, ...args: unknown[]) => {
   console.log('[Subscriber]', msg, ...args);
@@ -63,8 +64,9 @@ const logger = (msg: string, ...args: unknown[]) => {
 
 async function main() {
   const client = new MqttClient({
-    url: new URL('mqtts://127.0.0.1:1883'),
+    url: new URL('mqtts://127.0.0.1:8883'),
     clientId: 'clientA',
+    username: 'user',
     password: 'pass',
     logger: logger,
     clean: true,
@@ -82,7 +84,7 @@ main();
 #### connect mqtts using CA
 
 ```ts
-import { Mqtt, MqttProperties, MqttClient } from "jsr:@ymjacky/mqtt5";
+import { Mqtt, MqttClient } from "jsr:@ymjacky/mqtt5";
 
 const logger = (msg: string, ...args: unknown[]) => {
   console.log('[Subscriber]', msg, ...args);
@@ -90,8 +92,9 @@ const logger = (msg: string, ...args: unknown[]) => {
 
 async function main() {
   const client = new MqttClient({
-    url: new URL('mqtts://127.0.0.1:1883'),
+    url: new URL('mqtts://127.0.0.1:8883'),
     clientId: 'clientA',
+    username: 'user',
     password: 'pass',
     logger: logger,
     clean: true,
@@ -109,11 +112,11 @@ main();
 
 ### Browser
 
-The following command creates ``mqtt5.js`` in the browser directory.
+The following command creates ``mqtt5.mjs`` in the browser directory.
 ```
 deno task build_ems
 ```
-Import and use ``mqtt5.js``.
+Import and use ``mqtt5.mjs``.
 
 ```html
 <!DOCTYPE html>

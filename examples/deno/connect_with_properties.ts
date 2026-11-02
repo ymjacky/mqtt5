@@ -29,8 +29,8 @@ async function main() {
   };
 
   const connack = await client.connect({ properties });
-  logger(`Conncak  reasonCode: ${connack.reasonCode}, sessionPresent: ${connack.sessionPresent}`);
-  logger('Conncak  properties:', connack.properties);
+  logger(`Connack reasonCode: ${connack.reasonCode}, sessionPresent: ${connack.sessionPresent}`);
+  logger('Connack properties:', connack.properties);
 
   const disconnectProperties: MqttProperties.DisconnectProperties = {
     reasonString: 'trouble',

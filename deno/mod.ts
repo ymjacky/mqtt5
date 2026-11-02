@@ -29,6 +29,9 @@
  * ```ts
  * import { Mqtt, MqttClient } from 'jsr:@ymjacky/mqtt5';
  *
+ * const logger = (msg: string, ...args: unknown[]) => {
+ *  console.log(msg, ...args);
+ * };
  * const client = new MqttClient({
  *   url: new URL('mqtt://127.0.0.1:1883'),
  *   clientId: 'clientA',
@@ -63,7 +66,7 @@
  * });
  * ```
  *
- * @example MQTT over TLS useing CA cert.
+ * @example MQTT over TLS using a CA certificate
  * ```ts
  * import { Mqtt, MqttClient } from 'jsr:@ymjacky/mqtt5';
  *
@@ -86,7 +89,7 @@
  * await client.connect();
  * ```
  *
- * @example MQTT over WebSocket Sercure
+ * @example MQTT over WebSocket Secure
  * ```ts
  * import { Mqtt, WebSocketMqttClient } from 'jsr:@ymjacky/mqtt5';
  *
@@ -98,7 +101,7 @@
  * await client.connect();
  * ```
  *
- * @example Connect with MQTT V5.0 Propertires
+ * @example Connect with MQTT V5.0 properties
  * ```ts
  * import { MqttClient, MqttProperties } from 'jsr:@ymjacky/mqtt5';
  *
@@ -182,7 +185,7 @@
  *   await client.subscribe('topicA', Mqtt.QoS.AT_LEAST_ONCE);
  *   await client.subscribe(['topicB', 'topicC', 'topicD'], Mqtt.QoS.AT_LEAST_ONCE);
  *
- *   const subPproperties: MqttProperties.SubscribeProperties = {
+ *   const subProperties: MqttProperties.SubscribeProperties = {
  *     userProperties: [
  *       { key: 'userProp1', val: 'userData1' },
  *       { key: 'userProp2', val: 'userData2' },
@@ -190,7 +193,7 @@
  *     ],
  *     subscriptionIdentifier: 1,
  *   };
- *   await client.subscribe('topicE', Mqtt.QoS.AT_LEAST_ONCE, subPproperties);
+ *   await client.subscribe('topicE', Mqtt.QoS.AT_LEAST_ONCE, subProperties);
  *
  *   client.subscribe('topicF', Mqtt.QoS.AT_LEAST_ONCE)
  *     .then((value) => {

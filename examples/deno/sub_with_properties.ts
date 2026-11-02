@@ -24,7 +24,7 @@ async function main() {
     logger(`topic: ${packet.topic}`, `message: ${receiveMessage}`);
   });
 
-  const subPproperties: MqttProperties.SubscribeProperties = {
+  const subProperties: MqttProperties.SubscribeProperties = {
     userProperties: [
       { key: 'userProp1', val: 'userData1' },
       { key: 'userProp2', val: 'userData2' },
@@ -32,7 +32,7 @@ async function main() {
     ],
     subscriptionIdentifier: 1,
   };
-  await client.subscribe(['topicA', 'topicB', 'topicC'], Mqtt.QoS.AT_LEAST_ONCE, subPproperties);
+  await client.subscribe(['topicA', 'topicB', 'topicC'], Mqtt.QoS.AT_LEAST_ONCE, subProperties);
 }
 
 main();
