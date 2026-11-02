@@ -35,6 +35,11 @@ const defaultConnectTimeout = 10 * 1000;
 const defaultDisconnectTimeout = 1 * 1000;
 const defaultPingrespTimeout = 2 * 1000;
 
+/** Returns `value` if it is a positive number, otherwise `defaultValue`. */
+function positiveOrDefault(value: number | undefined, defaultValue: number): number {
+  return value !== undefined && value > 0 ? value : defaultValue;
+}
+
 /**
  * The API shared by {@link MqttClient} and {@link WebSocketMqttClient}: connecting, publishing, subscribing and events.
  *
@@ -56,7 +61,10 @@ export abstract class BaseMqttClient {
   private userName?: string;
   private password?: string;
   private clientId: string;
+  // Keep Alive sent in CONNECT.
   private keepAlive: number;
+  // Keep Alive used for the current connection: the Server Keep Alive in CONNACK if present, otherwise keepAlive.
+  private currentKeepAlive: number;
   /** The MQTT protocol version used for the connection. */
   protected protocolVersion: Mqtt.ProtocolVersion;
   private clean: boolean;
@@ -114,13 +122,8 @@ export abstract class BaseMqttClient {
     this.userName = options?.username;
     this.password = options?.password;
     this.clientId = options?.clientId || '';
-    this.keepAlive = (() => {
-      if (options?.keepAlive) {
-        return options.keepAlive > 0 ? options.keepAlive : 0;
-      } else {
-        return defaultKeepAlive;
-      }
-    })();
+    this.keepAlive = options?.keepAlive === undefined ? defaultKeepAlive : Math.max(options.keepAlive, 0);
+    this.currentKeepAlive = this.keepAlive;
     this.protocolVersion = options?.protocolVersion || Mqtt.ProtocolVersion.MQTT_V5;
     this.clean = (() => {
       if (options) {
@@ -128,8 +131,8 @@ export abstract class BaseMqttClient {
       }
       return true;
     })();
-    this.connectTimeout = options?.connectTimeoutMS || defaultConnectTimeout;
-    this.disconnectTimeout = options?.disconnectTimeoutMS || defaultDisconnectTimeout;
+    this.connectTimeout = positiveOrDefault(options?.connectTimeoutMS, defaultConnectTimeout);
+    this.disconnectTimeout = positiveOrDefault(options?.disconnectTimeoutMS, defaultDisconnectTimeout);
 
     this.connectionState = 'offline';
     this.incomingStore = options?.incomingStore || new IncomingMemoryStore();
@@ -145,7 +148,7 @@ export abstract class BaseMqttClient {
     this.privateKey = options?.privateKey;
 
     this.eventTarget = new EventTarget();
-    this.pingrespTimeoutMs = options?.pingrespTimeoutMS || defaultPingrespTimeout;
+    this.pingrespTimeoutMs = positiveOrDefault(options?.pingrespTimeoutMS, defaultPingrespTimeout);
     this.timers = {};
 
     if (this.protocolVersion == Mqtt.ProtocolVersion.MQTT_V5 && options?.topicAliasMaximumAboutSend) {
@@ -920,13 +923,8 @@ export abstract class BaseMqttClient {
         this.session.clearAllStores(this.clientId);
       }
 
-      if (packet.properties) {
-        if (packet.properties.serverKeepAlive) {
-          if (this.keepAlive > packet.properties.serverKeepAlive) {
-            this.keepAlive = packet.properties.serverKeepAlive;
-          }
-        }
-      }
+      // The Server Keep Alive replaces the Keep Alive sent in CONNECT for this connection, even when it is higher or 0.
+      this.currentKeepAlive = packet.properties?.serverKeepAlive ?? this.keepAlive;
 
       // Topic aliases are valid per connection, and an absent Topic Alias Maximum means 0 (no aliases allowed).
       const topicAliasMaximum = Math.min(this.topicAliasMaximumAboutSend ?? 0, packet.properties?.topicAliasMaximum ?? 0);
@@ -1213,7 +1211,7 @@ export abstract class BaseMqttClient {
 
   /** Sends PINGREQ when nothing is sent within the keep alive interval. */
   private startKeepAliveTimer() {
-    if (!this.keepAlive) {
+    if (!this.currentKeepAlive) {
       return;
     }
 
@@ -1223,7 +1221,7 @@ export abstract class BaseMqttClient {
         await this.sendPacket({ type: 'pingreq' });
         this.startPingrespTimer();
       },
-      this.keepAlive * 1000,
+      this.currentKeepAlive * 1000,
     );
   }
   /** Stops the timer started by startKeepAliveTimer(). */

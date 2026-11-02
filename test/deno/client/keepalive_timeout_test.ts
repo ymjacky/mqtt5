@@ -210,4 +210,210 @@ Deno.test({ name: '@keepAliveTimeout', only: false }, async (context) => {
       );
     },
   );
+
+  await context.step(
+    'keepAlive 0 is sent as 0',
+    async () => {
+      const broker = new TestBroker();
+
+      try {
+        broker.listen();
+
+        const client = new MqttClient({
+          clientId: 'cid',
+          logger: logger,
+          keepAlive: 0,
+        });
+
+        broker.on('connect', (event) => {
+          const packet = event.detail;
+          assertEquals(packet.keepAlive, 0);
+          broker.sendConnack(packet.clientId, false, packet.protocolVersion);
+        });
+
+        await client.connect();
+        await client.disconnect(true);
+      } finally {
+        await broker.destroy();
+      }
+    },
+  );
+
+  await context.step(
+    'use Server Keep Alive when the client sent 0',
+    async () => {
+      const { promise, resolve } = Promise.withResolvers<void>();
+
+      const broker = new TestBroker();
+
+      try {
+        broker.listen();
+
+        const client = new MqttClient({
+          clientId: 'cid',
+          logger: logger,
+          keepAlive: 0,
+        });
+
+        broker.on('connect', (event) => {
+          const packet = event.detail;
+          broker.sendConnack(packet.clientId, false, packet.protocolVersion, Mqtt.ReasonCode.Success, { serverKeepAlive: 1 });
+        });
+
+        broker.on('pingreq', () => {
+          broker.sendPingresp('cid', Mqtt.ProtocolVersion.MQTT_V5);
+          resolve();
+        });
+
+        await client.connect();
+        await promise;
+        await client.disconnect(true);
+      } finally {
+        await broker.destroy();
+      }
+    },
+  );
+
+  await context.step(
+    'use Server Keep Alive when it is higher than keepAlive',
+    async () => {
+      const { promise, resolve } = Promise.withResolvers<number>();
+
+      const broker = new TestBroker();
+
+      try {
+        broker.listen();
+
+        const client = new MqttClient({
+          clientId: 'cid',
+          logger: logger,
+          keepAlive: 1,
+        });
+
+        broker.on('connect', (event) => {
+          const packet = event.detail;
+          broker.sendConnack(packet.clientId, false, packet.protocolVersion, Mqtt.ReasonCode.Success, { serverKeepAlive: 2 });
+        });
+
+        let connectedAt = 0;
+        broker.on('pingreq', () => {
+          broker.sendPingresp('cid', Mqtt.ProtocolVersion.MQTT_V5);
+          resolve(Date.now() - connectedAt);
+        });
+
+        await client.connect();
+        connectedAt = Date.now();
+
+        // keepAlive (1 s) would send PINGREQ after about 1000 ms.
+        const elapsed = await promise;
+        assert(elapsed >= 1500, `PINGREQ was sent after ${elapsed} ms`);
+        await client.disconnect(true);
+      } finally {
+        await broker.destroy();
+      }
+    },
+  );
+
+  await context.step(
+    'Server Keep Alive 0 disables keep alive',
+    async () => {
+      const broker = new TestBroker();
+
+      try {
+        broker.listen();
+
+        const client = new MqttClient({
+          clientId: 'cid',
+          logger: logger,
+          keepAlive: 1,
+        });
+
+        broker.on('connect', (event) => {
+          const packet = event.detail;
+          broker.sendConnack(packet.clientId, false, packet.protocolVersion, Mqtt.ReasonCode.Success, { serverKeepAlive: 0 });
+        });
+
+        let pingreqReceived = false;
+        broker.on('pingreq', () => {
+          pingreqReceived = true;
+        });
+
+        await client.connect();
+
+        // keepAlive (1 s) would send PINGREQ after about 1000 ms.
+        await new Promise((resolve) => setTimeout(resolve, 1500));
+
+        assertEquals(pingreqReceived, false);
+        await client.disconnect(true);
+      } finally {
+        await broker.destroy();
+      }
+    },
+  );
+
+  await context.step(
+    'Server Keep Alive applies only to that connection',
+    async () => {
+      const broker = new TestBroker();
+
+      try {
+        broker.listen();
+
+        const client = new MqttClient({
+          clientId: 'cid',
+          logger: logger,
+          keepAlive: 20,
+        });
+
+        const sentKeepAlives: (number | undefined)[] = [];
+        broker.on('connect', (event) => {
+          const packet = event.detail;
+          sentKeepAlives.push(packet.keepAlive);
+          broker.sendConnack(packet.clientId, false, packet.protocolVersion, Mqtt.ReasonCode.Success, { serverKeepAlive: 5 });
+        });
+
+        await client.connect();
+        await client.disconnect(true);
+        await client.connect();
+        await client.disconnect(true);
+
+        assertEquals(sentKeepAlives, [20, 20]);
+      } finally {
+        await broker.destroy();
+      }
+    },
+  );
+
+  await context.step(
+    'timeouts that are not positive use the default',
+    async () => {
+      const broker = new TestBroker();
+
+      try {
+        broker.listen();
+
+        const client = new MqttClient({
+          clientId: 'cid',
+          logger: logger,
+          connectTimeoutMS: 0,
+          disconnectTimeoutMS: -1,
+          pingrespTimeoutMS: 0,
+        });
+
+        // A connect timeout of 0 ms would reject before this CONNACK arrives.
+        broker.on('connect', (event) => {
+          const packet = event.detail;
+          setTimeout(() => {
+            broker.sendConnack(packet.clientId, false, packet.protocolVersion);
+          }, 100);
+        });
+
+        const connack = await client.connect();
+        assertEquals(connack.reasonCode, Mqtt.ReasonCode.Success);
+        await client.disconnect(true);
+      } finally {
+        await broker.destroy();
+      }
+    },
+  );
 });
