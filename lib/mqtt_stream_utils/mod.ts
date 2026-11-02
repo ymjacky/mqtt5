@@ -1,5 +1,9 @@
-import { ConnectionClosed, ConnectionReset, MalformedPacketError } from '../client/error.ts';
+import { ConnectionClosed, ConnectionReset } from '../client/error.ts';
 import * as MqttUtils from '../mqtt_utils/mod.ts';
+import { decodeRemainingLength } from './remaining_length.ts';
+
+export { decodeRemainingLength } from './remaining_length.ts';
+export { MqttFrameBuffer } from './frame_buffer.ts';
 
 export async function readMqttBytes(
   reader: ReadableStreamBYOBReader,
@@ -18,30 +22,19 @@ export async function readMqttBytes(
     receiveChunks.push(readValue.value);
 
     // parse remainingLength
-    const remainingLengthBytes = [];
-    let readLength = 0;
+    const remainingLengthBytes: number[] = [];
+    let remainingLength: { number: number; size: number } | undefined;
     do {
       const readValue = await reader.read(new Uint8Array(1));
       if (readValue.done) {
         throw new ConnectionClosed();
       }
 
-      readLength++;
       remainingLengthBytes.push(readValue.value[0]);
-
       receiveChunks.push(readValue.value);
 
-      if ((readValue.value[0] >> 7) == 0) {
-        break;
-      } else if (readLength == 4) {
-        throw new MalformedPacketError('malformed variable byte integer: remaining length exceeds 4 bytes');
-      }
-    } while (readLength < 4);
-
-    const remainingLength = MqttUtils.variableByteIntegerToNum(
-      new Uint8Array(remainingLengthBytes),
-      0,
-    );
+      remainingLength = decodeRemainingLength(new Uint8Array(remainingLengthBytes), 0);
+    } while (!remainingLength);
 
     if (remainingLength.number > 0) {
       readValue = await reader.read(

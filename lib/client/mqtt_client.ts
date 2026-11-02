@@ -1,8 +1,7 @@
-import { MqttPackets } from '../mod.ts';
 import { BaseMqttClient } from './base_mqtt_client.ts';
 import type { ClientOptions, WriterFactory, WriterFunction } from './client_types.ts';
 import * as MqttStream from '../mqtt_stream_utils/mod.ts';
-import { ConnectionClosed, ConnectionReset, MalformedPacketError, UnexpectedUrlProtocol } from './error.ts';
+import { ConnectionClosed, ConnectionReset, UnexpectedUrlProtocol } from './error.ts';
 
 // curry: generate write function
 const writerFactory: WriterFactory = (
@@ -75,44 +74,18 @@ export class MqttClient extends BaseMqttClient {
           try {
             receiveBytes = await MqttStream.readMqttBytes(this.reader);
           } catch (streamError) {
-            if (!(streamError instanceof MalformedPacketError)) {
-              // Not a framing error caused by malformed data from the peer;
-              // treat as a fatal/unexpected error (e.g. ConnectionClosed).
-              throw streamError;
-            }
+            // Rethrows non-framing errors (e.g. ConnectionClosed).
+            await this.handleFramingError(streamError);
 
-            // The byte stream framing is desynchronized (e.g. an invalid
-            // Remaining Length), so we can no longer safely read further
-            // packets on this connection. Notify the peer if possible and
-            // tear down the connection ourselves; the disconnect timer
+            // We can no longer safely read further packets on this
+            // connection, so tear it down ourselves; the disconnect timer
             // started by handleMalformedPacket() won't help here because
             // nothing else awaits `this.reader` once we stop this loop.
-            this.log(`Malformed packet received (framing error): ${streamError.message}`);
-            await this.handleMalformedPacket(streamError);
             await this.close();
             this.detectClosed();
             break;
           }
-          this.log('receive bytes', receiveBytes);
-
-          // Wrap packet decoding to handle malformed packets
-          try {
-            const packet = MqttPackets.decode(receiveBytes, this.protocolVersion);
-            this.log('receive packet', packet);
-            this.packetReceived(packet);
-          } catch (decodeError) {
-            if (!(decodeError instanceof MqttPackets.MqttPacketsError.MqttPacketParseError)) {
-              // Not caused by malformed data from the peer; treat as a fatal/unexpected error.
-              throw decodeError;
-            }
-
-            // Handle malformed packet
-            this.log(`Malformed packet received: ${decodeError.message}`);
-            this.log(`Raw bytes (first 20): ${receiveBytes.slice(0, 20)}`);
-
-            // Send appropriate response based on protocol version and packet type
-            await this.handleMalformedPacket(decodeError);
-          }
+          await this.handleReceivedBytes(receiveBytes);
         } catch (e) {
           this.detectClosed();
           if (e instanceof ConnectionClosed) {

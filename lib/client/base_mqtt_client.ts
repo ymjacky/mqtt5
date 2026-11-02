@@ -2,7 +2,7 @@ import { Mqtt, MqttPackets, MqttProperties } from '../mod.ts';
 import { Session } from './session.ts';
 import { TopicAliasManager } from './topic_alias.ts';
 import { ClientOptions, ConnectOptions, PublishOptions, PublishResult, SubscribeResults, SubscriptionOption, UnsubscribeResults } from './client_types.ts';
-import { ConnectTimeout, SendPacketError, StateIsNotOfflineError, StateIsNotOnlineError } from './error.ts';
+import { ConnectTimeout, MalformedPacketError, SendPacketError, StateIsNotOfflineError, StateIsNotOnlineError } from './error.ts';
 import { InvalidQoSError } from '../mqtt_utils/mod.ts';
 import { Deferred } from './promise.ts';
 import { IncomingMemoryStore, IncomingStore } from '../mqtt_store/mod.ts';
@@ -656,6 +656,57 @@ export abstract class BaseMqttClient {
       // If we can't even send error responses, just log and close
       this.log('Error while handling malformed packet:', handlingError);
     }
+  }
+
+  /**
+   * Decode the bytes of a single complete MQTT packet and dispatch it.
+   * Called by subclasses once a packet has been framed off the transport.
+   *
+   * Decoding and dispatching are performed synchronously, so packets are
+   * processed in the order this method is called. A malformed packet is
+   * handled per protocol version and the returned promise settles when that
+   * handling completes; any other error is thrown synchronously.
+   */
+  protected handleReceivedBytes(receiveBytes: Uint8Array): Promise<void> {
+    this.log('receive bytes', receiveBytes);
+
+    try {
+      const packet = MqttPackets.decode(receiveBytes, this.protocolVersion);
+      this.log('receive packet', packet);
+      this.packetReceived(packet);
+    } catch (decodeError) {
+      if (!(decodeError instanceof MqttPackets.MqttPacketsError.MqttPacketParseError)) {
+        // Not caused by malformed data from the peer; treat as a fatal/unexpected error.
+        throw decodeError;
+      }
+
+      this.log(`Malformed packet received: ${decodeError.message}`);
+      this.log(`Raw bytes (first 20): ${receiveBytes.slice(0, 20)}`);
+
+      // Send appropriate response based on protocol version
+      return this.handleMalformedPacket(decodeError);
+    }
+
+    return Promise.resolve();
+  }
+
+  /**
+   * Handle an error raised while framing packets off the transport.
+   *
+   * A MalformedPacketError means the byte stream framing is desynchronized
+   * (e.g. an invalid Remaining Length), so it is handled per protocol version
+   * and the returned promise settles when that handling completes. Subclasses
+   * must stop interpreting further bytes on the connection afterwards. Any
+   * other error is not caused by malformed data from the peer and is thrown
+   * synchronously.
+   */
+  protected handleFramingError(streamError: unknown): Promise<void> {
+    if (!(streamError instanceof MalformedPacketError)) {
+      throw streamError;
+    }
+
+    this.log(`Malformed packet received (framing error): ${streamError.message}`);
+    return this.handleMalformedPacket(streamError);
   }
 
   protected detectClosed() {
