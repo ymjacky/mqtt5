@@ -1,7 +1,6 @@
-import { MqttUtils } from '../mod.ts';
 import { BaseMqttClient } from './base_mqtt_client.ts';
 import { ClientOptions } from './client_types.ts';
-import { MalformedPacketError } from './error.ts';
+import * as MqttStream from '../mqtt_stream_utils/mod.ts';
 import { Deferred } from './promise.ts';
 
 /**
@@ -9,70 +8,20 @@ import { Deferred } from './promise.ts';
  */
 export class WebSocketMqttClient extends BaseMqttClient {
   protected conn?: WebSocket;
-  private readBuffers: Array<number>;
+  private frameBuffer = new MqttStream.MqttFrameBuffer();
 
   constructor(options?: ClientOptions) {
     if (!options?.url) {
       throw new Error('uri required');
     }
     super(options);
-    this.readBuffers = [];
-  }
-
-  private adjustReadBytes(data: Uint8Array): Array<Uint8Array> | undefined {
-    const results: Array<Uint8Array> = [];
-
-    data.forEach((byte) => {
-      this.readBuffers.push(byte);
-    });
-
-    do {
-      if (this.readBuffers.length < 2) {
-        break;
-      }
-      const remainingLengthBytes = [];
-      let offset = 1;
-      const rb = new Uint8Array([...this.readBuffers]);
-      do {
-        const byte = rb[offset];
-
-        remainingLengthBytes.push(byte);
-        if ((byte >> 7) == 0) {
-          break;
-        } else if (offset == 4) {
-          // offset is 1-based (rb[0] is the fixed header byte), so offset==4
-          // here means this is the 4th Remaining Length byte; the MQTT spec
-          // allows at most 4 bytes for a Variable Byte Integer.
-          throw new MalformedPacketError('malformed variable byte integer: remaining length exceeds 4 bytes');
-        }
-        offset++;
-      } while (offset < 5);
-
-      const remainingLength = MqttUtils.variableByteIntegerToNum(
-        new Uint8Array([...remainingLengthBytes]),
-        0,
-      );
-
-      const fixedHeaderSize = 1 + remainingLength.size;
-      if (fixedHeaderSize + remainingLength.number > this.readBuffers.length) {
-        break;
-      }
-
-      const receiveByte = new Uint8Array([...this.readBuffers.slice(0, remainingLength.number + fixedHeaderSize)]);
-      results.push(receiveByte);
-      this.readBuffers = this.readBuffers.slice(remainingLength.number + fixedHeaderSize);
-    } while (this.readBuffers.length > 0);
-
-    if (results.length === 0) {
-      return undefined;
-    } else {
-      return results;
-    }
   }
 
   protected open(): Promise<void> {
     const deferred = new Deferred<void>();
 
+    // Discard any partial packet left over from a previous connection.
+    this.frameBuffer = new MqttStream.MqttFrameBuffer();
     this.conn = new WebSocket(this.url, 'mqtt');
     this.conn.binaryType = 'arraybuffer';
 
@@ -88,11 +37,11 @@ export class WebSocketMqttClient extends BaseMqttClient {
     };
 
     this.conn.onmessage = (e: MessageEvent<unknown>) => {
-      const temporaryReceiveBytes = new Uint8Array(e.data as ArrayBuffer);
+      this.frameBuffer.append(new Uint8Array(e.data as ArrayBuffer));
 
-      let array: Array<Uint8Array> | undefined;
+      let array: Array<Uint8Array>;
       try {
-        array = this.adjustReadBytes(temporaryReceiveBytes);
+        array = this.frameBuffer.takePackets();
       } catch (streamError) {
         // Rethrows non-framing errors.
         this.handleFramingError(streamError);
@@ -101,10 +50,6 @@ export class WebSocketMqttClient extends BaseMqttClient {
         // connection. `this.conn.onclose` will call detectClosed() once the
         // connection actually closes (either from handleMalformedPacket()'s
         // close()/DISCONNECT-then-timer, or from the broker).
-        return;
-      }
-
-      if (typeof array === 'undefined') {
         return;
       }
 
