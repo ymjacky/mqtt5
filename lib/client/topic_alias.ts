@@ -38,30 +38,20 @@ export class TopicAliasManager {
   }
 
   private async registerTopic(topic: string) {
-    if (this.topicAliasMap.has(topic)) {
-      const tid = this.topicAliasMap.get(topic);
-      if (tid) {
-        this.topicIdProvider.release(tid);
-      }
-      const topicId = await this.acquireTopicId();
-      this.topicAliasMap.set(topic, topicId);
-      return topicId;
-    } else {
-      if (this.isFull()) {
-        const lruTopic = this.topicAliasMap.lruKey();
-        if (lruTopic) {
-          const tid = this.topicAliasMap.get(lruTopic);
-          if (tid) {
-            this.topicIdProvider.release(tid);
-          }
-          this.topicAliasMap.delete(lruTopic);
+    if (this.isFull()) {
+      const lruTopic = this.topicAliasMap.lruKey();
+      if (lruTopic) {
+        const tid = this.topicAliasMap.get(lruTopic);
+        if (tid) {
+          this.topicIdProvider.release(tid);
         }
+        this.topicAliasMap.delete(lruTopic);
       }
-
-      const topicId = await this.acquireTopicId();
-      this.topicAliasMap.set(topic, topicId);
-      return topicId;
     }
+
+    const topicId = await this.acquireTopicId();
+    this.topicAliasMap.set(topic, topicId);
+    return topicId;
   }
 
   public releaseTopic(topic: string) {
