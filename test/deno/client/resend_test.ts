@@ -62,7 +62,6 @@ Deno.test({ name: '@resend from MemoryStore', only: false }, async (context) => 
                 { key: 'userProp2', val: 'userData3' },
               ],
             );
-            assertEquals(packet.properties?.subscriptionIdentifier, 3);
             assertEquals(packet.properties?.contentType, 'application/json');
 
             broker.sendPuback(
@@ -89,7 +88,6 @@ Deno.test({ name: '@resend from MemoryStore', only: false }, async (context) => 
             { key: 'userProp2', val: 'userData2' },
             { key: 'userProp2', val: 'userData3' },
           ],
-          subscriptionIdentifier: 3,
           contentType: 'application/json',
         };
 
@@ -287,7 +285,6 @@ Deno.test({ name: '@resend from MemoryStore', only: false }, async (context) => 
                 { key: 'userProp2', val: 'userData3' },
               ],
             );
-            assertEquals(packet.properties?.subscriptionIdentifier, 3);
             assertEquals(packet.properties?.contentType, 'application/json');
 
             broker.sendPuback(
@@ -314,7 +311,6 @@ Deno.test({ name: '@resend from MemoryStore', only: false }, async (context) => 
             { key: 'userProp2', val: 'userData2' },
             { key: 'userProp2', val: 'userData3' },
           ],
-          subscriptionIdentifier: 3,
           contentType: 'application/json',
         };
 
@@ -512,7 +508,6 @@ Deno.test({ name: '@resend from MemoryStore', only: false }, async (context) => 
               { key: 'userProp2', val: 'userData3' },
             ],
           );
-          assertEquals(packet.properties?.subscriptionIdentifier, 3);
           assertEquals(packet.properties?.contentType, 'application/json');
 
           broker.sendPubrec(
@@ -547,7 +542,6 @@ Deno.test({ name: '@resend from MemoryStore', only: false }, async (context) => 
             { key: 'userProp2', val: 'userData2' },
             { key: 'userProp2', val: 'userData3' },
           ],
-          subscriptionIdentifier: 3,
           contentType: 'application/json',
         };
 
@@ -751,7 +745,6 @@ Deno.test({ name: '@resend from MemoryStore', only: false }, async (context) => 
                 { key: 'userProp2', val: 'userData3' },
               ],
             );
-            assertEquals(packet.properties?.subscriptionIdentifier, 3);
             assertEquals(packet.properties?.contentType, 'application/json');
 
             assertEquals(packet.topic, 'topicA');
@@ -786,7 +779,6 @@ Deno.test({ name: '@resend from MemoryStore', only: false }, async (context) => 
                 { key: 'userProp2', val: 'userData3' },
               ],
             );
-            assertEquals(packet.properties?.subscriptionIdentifier, 3);
             assertEquals(packet.properties?.contentType, 'application/json');
 
             assertEquals(packet.properties?.topicAlias, 1);
@@ -821,7 +813,6 @@ Deno.test({ name: '@resend from MemoryStore', only: false }, async (context) => 
             { key: 'userProp2', val: 'userData2' },
             { key: 'userProp2', val: 'userData3' },
           ],
-          subscriptionIdentifier: 3,
           contentType: 'application/json',
         };
 

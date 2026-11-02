@@ -132,7 +132,11 @@ export type UserPublishProperties = {
   responseTopic?: string;
   /** Data that relates a response message to its request. (id: 0x09) */
   correlationData?: Uint8Array;
-  /** Identifier of the subscription, from 1 to 268,435,455. (id: 0x0B) */
+  /**
+   * Identifier of the subscription. (id: 0x0B)
+   *
+   * @deprecated A client must not send it in PUBLISH (MQTT 5.0 [MQTT-3.3.4-6]); only the broker sets it.
+   */
   subscriptionIdentifier?: number;
   // // id: 0x23
   // topicAlias?: number;
