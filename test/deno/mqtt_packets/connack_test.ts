@@ -728,3 +728,30 @@ Deno.test('decodeShortConnackPacketsMQTT5', function () {
   assertThrows(() => parse(Uint8Array.from([32, 2]), 0, Mqtt.ProtocolVersion.MQTT_V5));
   assertThrows(() => parse(Uint8Array.from([32, 2, 0]), 1, Mqtt.ProtocolVersion.MQTT_V5));
 });
+
+// Server Keep Alive 0 (keep alive disabled) must be encoded, not dropped as absent.
+Deno.test('encodeConnackPacketMQTT5ServerKeepAliveZero', function () {
+  assertEquals(
+    toBytes(
+      {
+        type: 'connack',
+        sessionPresent: false,
+        reasonCode: 0,
+        properties: { serverKeepAlive: 0 },
+      },
+      Mqtt.ProtocolVersion.MQTT_V5, // ProtocolVersion
+    ),
+    new Uint8Array([
+      // fixedHeader
+      (0b0010 << 4) + 0b0000,
+      6, // remainingLength
+      // variableHeader
+      0, // connack flags
+      0, // reason code (success)
+      3, // properties length
+      0x13, // server keep alive
+      0,
+      0,
+    ]),
+  );
+});

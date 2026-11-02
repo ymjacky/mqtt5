@@ -285,7 +285,7 @@ export function propertiesToBytes(properties?: Properties): Uint8Array {
     chunks.push([0x12], stringToUtfEncodedString(properties.assignedClientIdentifier));
   }
   // id: 0x13, type: Two Byte Integer
-  if (properties.serverKeepAlive) { // number ,
+  if (typeof properties.serverKeepAlive !== 'undefined') { // number, 0 is meaningful (keep alive disabled)
     chunks.push([0x13], numToTwoByteInteger(properties.serverKeepAlive));
   }
   // id: 0x15

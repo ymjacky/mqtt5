@@ -28,7 +28,8 @@ export type ClientOptions = {
    */
   clean?: boolean;
   /**
-   * Keep alive interval in seconds.
+   * Keep alive interval in seconds. 0 disables keep alive (no PINGREQ is sent).
+   * If the broker's CONNACK has a Server Keep Alive (MQTT 5.0), that value is used for the connection instead.
    * @default {10}
    */
   keepAlive?: number;
@@ -37,12 +38,12 @@ export type ClientOptions = {
   /** Password sent in CONNECT. */
   password?: string;
   /**
-   * Time to wait for CONNACK, in milliseconds.
+   * Time to wait for CONNACK, in milliseconds. A value that is not positive uses the default.
    * @default {10000}
    */
   connectTimeoutMS?: number;
   /**
-   * Time to wait for the connection to close after sending DISCONNECT, in milliseconds.
+   * Time to wait for the connection to close after sending DISCONNECT, in milliseconds. A value that is not positive uses the default.
    * @default {1000}
    */
   disconnectTimeoutMS?: number;
@@ -75,7 +76,7 @@ export type ClientOptions = {
    */
   privateKey?: string;
   /**
-   * Time to wait for PINGRESP, in milliseconds.
+   * Time to wait for PINGRESP, in milliseconds. A value that is not positive uses the default.
    * @default {2000}
    */
   pingrespTimeoutMS?: number;

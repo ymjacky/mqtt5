@@ -69,7 +69,7 @@ All options are optional.
 | `username` / `password`         | -                              | Credentials sent in CONNECT.                                                                                                          |
 | `protocolVersion`               | `Mqtt.ProtocolVersion.MQTT_V5` | `MQTT_V5` or `MQTT_V3_1_1`.                                                                                                           |
 | `clean`                         | `true`                         | Clean Start (5.0) / Clean Session (3.1.1).                                                                                            |
-| `keepAlive`                     | `10`                           | Keep alive interval in **seconds**.                                                                                                   |
+| `keepAlive`                     | `10`                           | Keep alive interval in **seconds**. `0` disables it. A Server Keep Alive in CONNACK (5.0) overrides it.                               |
 | `connectTimeoutMS`              | `10000`                        | Time to wait for CONNACK, in milliseconds.                                                                                            |
 | `disconnectTimeoutMS`           | `1000`                         | Time to wait for the connection to close after DISCONNECT, in milliseconds.                                                           |
 | `pingrespTimeoutMS`             | `2000`                         | Time to wait for PINGRESP, in milliseconds.                                                                                           |
