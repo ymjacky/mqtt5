@@ -575,7 +575,7 @@ export abstract class BaseMqttClient {
    * await client.unsubscribe('topicB', properties);
    * ```
    */
-  public async unsubscribe(topicFilter: string, properties?: MqttProperties.UnsubackProperties): Promise<UnsubscribeResults>;
+  public async unsubscribe(topicFilter: string, properties?: MqttProperties.UnsubscribeProperties): Promise<UnsubscribeResults>;
 
   /**
    * Unsubscribes from multiple topic filters with one UNSUBSCRIBE packet and waits for UNSUBACK.
@@ -597,14 +597,14 @@ export abstract class BaseMqttClient {
    * );
    * ```
    */
-  public async unsubscribe(topicFilters: string[], properties?: MqttProperties.UnsubackProperties): Promise<UnsubscribeResults>;
+  public async unsubscribe(topicFilters: string[], properties?: MqttProperties.UnsubscribeProperties): Promise<UnsubscribeResults>;
 
   /**
    * Unsubscribes from one or more topic filters and waits for UNSUBACK.
    */
   public async unsubscribe(
     input: string | string[],
-    properties?: MqttProperties.UnsubackProperties,
+    properties?: MqttProperties.UnsubscribeProperties,
   ): Promise<UnsubscribeResults> {
     const unsubs = Array.isArray(input) ? input : [input];
 
