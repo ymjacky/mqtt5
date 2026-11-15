@@ -19,9 +19,9 @@ export function fourByteIntegerToNum(
   offset: number,
 ): number {
   return (
-    (buffer[offset] << 24) +
-    (buffer[offset + 1] << 26) +
-    (buffer[offset + 2] << 8) +
-    (buffer[offset + 3])
-  );
+    (buffer[offset] << 24) |
+    (buffer[offset + 1] << 16) |
+    (buffer[offset + 2] << 8) |
+    buffer[offset + 3]
+  ) >>> 0;
 }
