@@ -10,7 +10,7 @@ testPropertyCases([
   // id: 0x11 (sessionExpiryInterval)
   { name: 'sessionExpiryInterval', encode: { sessionExpiryInterval: 3600 }, bytes: [0x11, 0x00, 0x00, 0x0E, 0x10] },
   { name: 'sessionExpiryInterval 0xFFFFFFFF', encode: { sessionExpiryInterval: 0xFFFFFFFF }, bytes: [0x11, 0xFF, 0xFF, 0xFF, 0xFF] },
-  { name: 'sessionExpiryInterval 0', decode: { sessionExpiryInterval: 0 }, bytes: [0x11, 0x00, 0x00, 0x00, 0x00] },
+  { name: 'sessionExpiryInterval 0', encode: { sessionExpiryInterval: 0 }, bytes: [0x11, 0x00, 0x00, 0x00, 0x00] },
 
   // id: 0x18 (willDelayInterval)
   { name: 'willDelayInterval', encode: { willDelayInterval: 60 }, bytes: [0x18, 0x00, 0x00, 0x00, 0x3C] },

@@ -275,7 +275,7 @@ export function propertiesToBytes(properties?: Properties): Uint8Array {
     });
   }
   // id: 0x11, type: Four Byte Integer
-  if (properties.sessionExpiryInterval) { // number ,
+  if (typeof properties.sessionExpiryInterval !== 'undefined') { // number, 0 is meaningful in DISCONNECT (ends the session) and CONNACK
     chunks.push([0x11], numToFourByteInteger(properties.sessionExpiryInterval));
   }
   // id: 0x12
