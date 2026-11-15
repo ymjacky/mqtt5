@@ -26,11 +26,6 @@ export class UnsupportedPropertyError extends Error {
   }
 }
 
-/** @deprecated Use {@link UnsupportedPropertyError} instead. */
-export const UnsuportedPropertyError: typeof UnsupportedPropertyError = UnsupportedPropertyError;
-/** @deprecated Use {@link UnsupportedPropertyError} instead. */
-export type UnsuportedPropertyError = UnsupportedPropertyError;
-
 /** A key-value pair of a user property. */
 export type StringPair = { key: string; val: string };
 /** User properties (id: 0x26). The same key can appear more than once. */
