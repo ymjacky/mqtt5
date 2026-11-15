@@ -137,6 +137,8 @@ export abstract class BaseMqttClient {
   // Maximum Packet Size of the broker (CONNACK) for the current connection. No limit if undefined.
   private maximumPacketSizeAboutSend?: number;
   private waitForClose?: Deferred<void>;
+  // Settles when the PUBLISH of the last publish() call has been written or has failed (see waitForPublishTurn()).
+  private publishQueue: Promise<void> = Promise.resolve();
 
   /** Creates a client. Use {@link MqttClient} or {@link WebSocketMqttClient}. */
   constructor(options?: ClientOptions) {
@@ -410,6 +412,9 @@ export abstract class BaseMqttClient {
    * in {@link PublishResult.result} instead of rejecting.
    * A rejection of an ignored promise does not terminate the process; await the promise to handle failures.
    *
+   * Messages are sent in the order publish() is called, whatever their QoS: each PUBLISH is sent after the PUBLISH
+   * of the previous call has been written to the connection, or has failed.
+   *
    * @param topic topic name
    * @param payload payload. A string is encoded as UTF-8.
    * @param options QoS, retain and DUP flags. QoS defaults to `Mqtt.QoS.AT_MOST_ONCE`.
@@ -483,50 +488,73 @@ export abstract class BaseMqttClient {
 
     const buffer: Uint8Array = (typeof payload === 'string') ? new TextEncoder().encode(payload) : payload;
 
-    const packetId = qos === Mqtt.QoS.AT_MOST_ONCE ? 0 : await this.session.acquirePacketId();
-    // Without a topic alias: it is set right before writing.
-    const packet: PublishPacket = {
-      type: 'publish',
-      topic,
-      payload: buffer,
-      dup,
-      retain,
-      qos,
-      packetId,
-      // a copy: the caller may change or reuse the object while the packet is kept in the session
-      properties: properties && { ...properties },
-    };
-
-    let bytes: Uint8Array | undefined;
-    if (qos !== Mqtt.QoS.AT_MOST_ONCE) {
-      // The session keeps the packet with its Topic Name and without a topic alias, which is valid only on the current
-      // connection, to resend it after reconnecting. Encode it in that form before storing it: a packet that cannot be
-      // encoded or is too large must not stay there to be resent.
-      try {
-        bytes = this.encodePacket(packet);
-        await this.session.storePublish(packet, deferred);
-      } catch (err) {
-        // Not stored, so not sent either.
-        this.session.releasePacketId(packetId);
-        throw err;
+    const finished = await this.waitForPublishTurn();
+    try {
+      // The connection may have been closed while waiting.
+      if (this.connectionState !== 'online') {
+        throw new StateIsNotOnlineError('publish');
       }
-    }
 
-    // No await from here until the packet is written (see encodePublishToWrite()).
-    const [sending, sendingBytes] = this.encodePublishToWrite(packet, bytes);
-    await this.sendPacket(sending, sendingBytes);
-    if (qos === Mqtt.QoS.AT_MOST_ONCE) {
-      deferred.resolve({ result: 0, reason: '' });
+      const packetId = qos === Mqtt.QoS.AT_MOST_ONCE ? 0 : await this.session.acquirePacketId();
+      // Without a topic alias: it is set right before writing.
+      const packet: PublishPacket = {
+        type: 'publish',
+        topic,
+        payload: buffer,
+        dup,
+        retain,
+        qos,
+        packetId,
+        // a copy: the caller may change or reuse the object while the packet is kept in the session
+        properties: properties && { ...properties },
+      };
+
+      let bytes: Uint8Array | undefined;
+      if (qos !== Mqtt.QoS.AT_MOST_ONCE) {
+        // The session keeps the packet with its Topic Name and without a topic alias, which is valid only on the current
+        // connection, to resend it after reconnecting. Encode it in that form before storing it: a packet that cannot be
+        // encoded or is too large must not stay there to be resent.
+        try {
+          bytes = this.encodePacket(packet);
+          await this.session.storePublish(packet, deferred);
+        } catch (err) {
+          // Not stored, so not sent either.
+          this.session.releasePacketId(packetId);
+          throw err;
+        }
+      }
+
+      // No await from here until the packet is written (see encodePublishToWrite()).
+      const [sending, sendingBytes] = this.encodePublishToWrite(packet, bytes);
+      await this.sendPacket(sending, sendingBytes);
+      if (qos === Mqtt.QoS.AT_MOST_ONCE) {
+        deferred.resolve({ result: 0, reason: '' });
+      }
+    } finally {
+      finished();
     }
+  }
+
+  /**
+   * Waits for the turn of a publish() call: until the PUBLISH of every earlier call has been written or has failed.
+   * publish() calls are processed one at a time, in the order of the calls. Otherwise a PUBLISH could overtake
+   * an earlier one, e.g. a QoS 0 PUBLISH does not wait for the session store as QoS 1 and 2 do.
+   * @returns a function to call when the PUBLISH of this call has been written or has failed: the next call starts then.
+   */
+  private async waitForPublishTurn(): Promise<() => void> {
+    const previous = this.publishQueue;
+    const finished = new Deferred<void>();
+    this.publishQueue = finished.promise;
+    await previous;
+    return () => finished.resolve();
   }
 
   /**
    * Sets the topic alias of the connection, if topic aliases are used, and encodes PUBLISH to write it.
    *
-   * Call it right before writing, with no await in between: PUBLISH packets can be written in another order than
-   * publish() was called, e.g. a QoS 0 PUBLISH does not wait for the session store. A topic alias is resolved here
-   * in the order the packets are written, so it is sent without the Topic Name only after the PUBLISH that registers it
-   * (Topic Name and Topic Alias) has been written.
+   * Call it right before writing, with no await in between. A topic alias is then resolved in the order the packets
+   * are written, so it is sent without the Topic Name only after the PUBLISH that registers it (Topic Name and
+   * Topic Alias) has been written.
    *
    * A PUBLISH that is too large only because it registers a new alias is sent without the alias,
    * and the alias is released: the broker never receives it.
@@ -839,6 +867,8 @@ export abstract class BaseMqttClient {
    * Disconnects from the broker.
    *
    * Normally sends DISCONNECT and waits for the connection to close (closes it after `disconnectTimeoutMS`).
+   * DISCONNECT is sent after the PUBLISH packets of the publish() calls made before, so they are not lost;
+   * their QoS 1 and 2 flows may not complete before the connection closes.
    * With `force`, closes the connection without sending DISCONNECT, so the broker publishes the will message.
    * Resolves immediately if the client is not connected.
    * If a disconnect is already in progress, waits for the same close without sending DISCONNECT again;
@@ -915,6 +945,10 @@ export abstract class BaseMqttClient {
       deferred.resolve();
     } else {
       try {
+        if (!force) {
+          // Send the messages of the publish() calls made before: nothing may be sent after DISCONNECT [MQTT-3.14.4-1].
+          await this.publishQueue;
+        }
         await this.doDisconnect(force, undefined, properties);
       } catch (err) {
         // DISCONNECT was not sent (e.g. a property cannot be encoded), so the connection may stay open.

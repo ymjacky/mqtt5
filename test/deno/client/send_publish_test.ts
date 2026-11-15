@@ -1,4 +1,4 @@
-import { ClientErrors, ClientTypes, Mqtt, MqttClient, MqttProperties } from '../../../deno/mod.ts';
+import { ClientErrors, ClientTypes, Mqtt, MqttClient, MqttPackets, MqttProperties, Store } from '../../../deno/mod.ts';
 import { TestBroker } from '../broker/test_broker.ts';
 import { assertEquals, assertRejects, fail } from 'std/assert/mod.ts';
 
@@ -1463,3 +1463,179 @@ Deno.test({ name: '@publish too large', only: false }, async (context) => {
     },
   );
 }); // @publish too large
+
+Deno.test({ name: '@publish order', only: false }, async (context) => {
+  // Takes time to store the PUBLISH with the payload '1'.
+  class SlowStore extends Store.MemoryStore {
+    override async store(packet: MqttPackets.PublishPacket | MqttPackets.PubrelPacket): Promise<void> {
+      if (packet.type === 'publish' && new TextDecoder().decode(packet.payload) === '1') {
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+      return super.store(packet);
+    }
+  }
+
+  // Records the packets in the order the broker receives them, and completes the QoS 1 and 2 flows.
+  function recordPackets(broker: TestBroker): string[] {
+    const received: string[] = [];
+    broker.on('publish', (event) => {
+      const packet = event.detail;
+      received.push(`${new TextDecoder().decode(packet.payload)}(QoS${packet.qos})`);
+      if (packet.qos === Mqtt.QoS.AT_LEAST_ONCE) {
+        broker.sendPuback('cid', packet.packetId!, Mqtt.ProtocolVersion.MQTT_V5);
+      } else if (packet.qos === Mqtt.QoS.EXACTLY_ONCE) {
+        broker.sendPubrec('cid', packet.packetId!, Mqtt.ProtocolVersion.MQTT_V5);
+      }
+    });
+    broker.on('pubrel', (event) => {
+      broker.sendPubcomp('cid', event.detail.packetId, Mqtt.ProtocolVersion.MQTT_V5);
+    });
+    broker.on('disconnect', () => {
+      received.push('DISCONNECT');
+    });
+    return received;
+  }
+
+  async function waitFor(condition: () => boolean) {
+    while (!condition()) {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+  }
+
+  // Rejects if the promise does not settle within 1 s, instead of letting the test hang.
+  async function settleWithin<T>(promise: Promise<T>, label: string): Promise<T> {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timeout = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => reject(new Error(`${label} did not settle within 1 s`)), 1000);
+    });
+    try {
+      return await Promise.race([promise, timeout]);
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  await context.step(
+    'messages are sent in the order publish() is called, whatever their QoS',
+    async () => {
+      const broker = new TestBroker();
+      try {
+        broker.listen();
+        broker.on('connect', (event) => {
+          const packet = event.detail;
+          broker.sendConnack(packet.clientId, false, packet.protocolVersion, Mqtt.ReasonCode.Success);
+        });
+        const client = new MqttClient({ clientId: 'cid', logger: logger });
+        await client.connect();
+        const received = recordPackets(broker);
+
+        const qosList = [1, 0, 2, 0, 1, 2, 0] as const;
+        await Promise.all(qosList.map((qos, i) => client.publish('topicA', `${i + 1}`, { qos })));
+        // A QoS 0 publish() resolves when it is sent, maybe before the broker receives it.
+        await waitFor(() => received.length === qosList.length);
+
+        assertEquals(received, ['1(QoS1)', '2(QoS0)', '3(QoS2)', '4(QoS0)', '5(QoS1)', '6(QoS2)', '7(QoS0)']);
+
+        await client.disconnect();
+      } catch (err) {
+        fail(`error occured: ${err}`);
+      } finally {
+        await broker.destroy();
+      }
+    },
+  );
+
+  await context.step(
+    'a publish() does not overtake an earlier one that takes time to store',
+    async () => {
+      const broker = new TestBroker();
+      try {
+        broker.listen();
+        broker.on('connect', (event) => {
+          const packet = event.detail;
+          broker.sendConnack(packet.clientId, false, packet.protocolVersion, Mqtt.ReasonCode.Success);
+        });
+        // a custom store is used only without Clean Start
+        const client = new MqttClient({ clientId: 'cid', logger: logger, clean: false, outgoingStore: new SlowStore() });
+        await client.connect();
+        const received = recordPackets(broker);
+
+        await Promise.all([
+          client.publish('topicA', '1', { qos: Mqtt.QoS.AT_LEAST_ONCE }),
+          client.publish('topicA', '2', { qos: Mqtt.QoS.AT_LEAST_ONCE }),
+          client.publish('topicA', '3', { qos: Mqtt.QoS.AT_MOST_ONCE }),
+        ]);
+        await waitFor(() => received.length === 3);
+
+        assertEquals(received, ['1(QoS1)', '2(QoS1)', '3(QoS0)']);
+
+        await client.disconnect();
+      } catch (err) {
+        fail(`error occured: ${err}`);
+      } finally {
+        await broker.destroy();
+      }
+    },
+  );
+
+  await context.step(
+    'disconnect() sends DISCONNECT after the messages of the publish() calls made before',
+    async () => {
+      const broker = new TestBroker();
+      try {
+        broker.listen();
+        broker.on('connect', (event) => {
+          const packet = event.detail;
+          broker.sendConnack(packet.clientId, false, packet.protocolVersion, Mqtt.ReasonCode.Success);
+        });
+        const client = new MqttClient({ clientId: 'cid', logger: logger, clean: false, outgoingStore: new SlowStore() });
+        await client.connect();
+        const received = recordPackets(broker);
+
+        // not awaited: the QoS 1 flow may not complete before the connection closes
+        client.publish('topicA', '1', { qos: Mqtt.QoS.AT_LEAST_ONCE });
+        client.publish('topicA', '2', { qos: Mqtt.QoS.AT_MOST_ONCE });
+        await client.disconnect();
+        await waitFor(() => received.length === 3);
+
+        assertEquals(received, ['1(QoS1)', '2(QoS0)', 'DISCONNECT']);
+      } catch (err) {
+        fail(`error occured: ${err}`);
+      } finally {
+        await broker.destroy();
+      }
+    },
+  );
+
+  await context.step(
+    'a publish() waiting for an earlier one rejects when the connection closes meanwhile, and is not stored',
+    async () => {
+      const broker = new TestBroker();
+      try {
+        broker.listen();
+        broker.on('connect', (event) => {
+          const packet = event.detail;
+          broker.sendConnack(packet.clientId, false, packet.protocolVersion, Mqtt.ReasonCode.Success);
+        });
+        const client = new MqttClient({ clientId: 'cid', logger: logger, clean: false, outgoingStore: new SlowStore() });
+        await client.connect();
+        const closed = Promise.withResolvers<void>();
+        client.on('closed', () => closed.resolve());
+
+        const first = client.publish('topicA', '1', { qos: Mqtt.QoS.AT_LEAST_ONCE }); // takes time to store
+        const second = client.publish('topicA', '2', { qos: Mqtt.QoS.AT_LEAST_ONCE });
+        first.catch(() => {}); // stored before the close, then cannot be sent
+        await broker.closeConnectionFromBroker('cid');
+        await closed.promise;
+
+        await assertRejects(() => settleWithin(second, "publish() of '2'"), ClientErrors.StateIsNotOnlineError);
+        await first.catch(() => {});
+        assertEquals(await client.publishInflightCount(), 1); // only the 1st, to be resent after reconnecting
+      } catch (err) {
+        fail(`error occured: ${err}`);
+      } finally {
+        await broker.destroy();
+      }
+    },
+  );
+}); // @publish order
