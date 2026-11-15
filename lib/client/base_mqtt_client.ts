@@ -504,11 +504,12 @@ export abstract class BaseMqttClient {
       // encoded or is too large must not stay there to be resent.
       try {
         bytes = this.encodePacket(packet);
+        await this.session.storePublish(packet, deferred);
       } catch (err) {
+        // Not stored, so not sent either.
         this.session.releasePacketId(packetId);
         throw err;
       }
-      await this.session.storePublish(packet, deferred);
     }
 
     // No await from here until the packet is written (see encodePublishToWrite()).
@@ -988,23 +989,30 @@ export abstract class BaseMqttClient {
   protected async handleMalformedPacket(error: Error): Promise<void> {
     try {
       this.log('handling malformed packet', error);
-      if (this.protocolVersion === Mqtt.ProtocolVersion.MQTT_V3_1_1) {
-        // MQTT v3.1.1: DISCONNECT has no reason code and unconditionally signals a
-        // clean disconnect, which also causes the broker to discard the Will message.
-        // Since this is an abnormal condition caused by the peer, close the connection
-        // directly instead of sending a misleading DISCONNECT.
-        this.log('Closing connection (v3.1.1) due to malformed packet');
-        await this.close();
-      } else if (this.protocolVersion === Mqtt.ProtocolVersion.MQTT_V5) {
-        // MQTT v5.0: Send DISCONNECT with MalformedPacket reason code
-        // Note: We don't send PUBACK/PUBREC/AUTH responses for malformed packets
-        // because we cannot trust the packet type or content in malformed data
-        this.log('Sending DISCONNECT (v5.0) with MalformedPacket reason code');
-        await this.doDisconnect(false, Mqtt.ReasonCode.MalformedPacket);
-      }
+      // Note: We don't send PUBACK/PUBREC/AUTH responses for malformed packets
+      // because we cannot trust the packet type or content in malformed data
+      await this.disconnectWithError(Mqtt.ReasonCode.MalformedPacket);
     } catch (handlingError) {
       // If we can't even send error responses, just log and close
       this.log('Error while handling malformed packet:', handlingError);
+    }
+  }
+
+  /**
+   * Ends the connection because of an error: sends DISCONNECT with `reasonCode` (MQTT 5.0),
+   * or closes the connection (MQTT 3.1.1). The broker publishes the Will Message.
+   */
+  private async disconnectWithError(reasonCode: Mqtt.ReasonCode): Promise<void> {
+    if (this.protocolVersion === Mqtt.ProtocolVersion.MQTT_V3_1_1) {
+      // MQTT v3.1.1: DISCONNECT has no reason code and unconditionally signals a
+      // clean disconnect, which also causes the broker to discard the Will message.
+      // Since this is an abnormal condition, close the connection directly instead of
+      // sending a misleading DISCONNECT.
+      this.log('Closing connection (v3.1.1) because of an error');
+      await this.close();
+    } else {
+      this.log(`Sending DISCONNECT (v5.0) with reason code ${reasonCode}`);
+      await this.doDisconnect(false, reasonCode);
     }
   }
 
@@ -1281,19 +1289,32 @@ export abstract class BaseMqttClient {
     }
   }
 
+  /**
+   * Ends the flow of a sent PUBLISH on its acknowledgment (PUBACK, PUBCOMP, or PUBREC with an error Reason Code),
+   * and resolves its publish() with the Reason Code.
+   * If the packet cannot be removed from the store, the acknowledgment is handled as not received: the connection is
+   * closed, and the stored packet is resent after reconnecting, to be acknowledged again. publish() keeps waiting.
+   */
+  private async completePublishFlow(packet: PubackPacket | PubrecPacket | PubcompPacket) {
+    let deferred: Deferred<PublishResult> | undefined;
+    try {
+      deferred = await this.session.endPublishFlow(packet.packetId);
+    } catch (err) {
+      this.log(`cannot remove the flow from the store on ${packet.type}, closing the connection to continue it after reconnecting`, packet, err);
+      await this.disconnectWithError(Mqtt.ReasonCode.UnspecifiedError);
+      return;
+    }
+    if (packet.reasonCode) {
+      deferred?.resolve({ result: packet.reasonCode, reason: packet.properties?.reasonString });
+    } else {
+      deferred?.resolve({ result: Mqtt.ReasonCode.Success });
+    }
+  }
+
   /** Handles PUBACK: completes a QoS 1 publish. */
   private async handlePuback(packet: PubackPacket) {
     if (await this.session.packetIdInUse(packet.packetId)) {
-      await this.session.discard(packet);
-      const deferred = this.session.getPublishDeferred(packet.packetId);
-      if (deferred) {
-        if (packet.reasonCode) {
-          const reason = packet.properties?.reasonString;
-          deferred.resolve({ result: packet.reasonCode, reason });
-        } else {
-          deferred.resolve({ result: Mqtt.ReasonCode.Success });
-        }
-      }
+      await this.completePublishFlow(packet);
     } else {
       this.log(`Unknown packetId received, it ignore. (packetId:${packet.packetId})`, 'puback');
     }
@@ -1308,13 +1329,7 @@ export abstract class BaseMqttClient {
       if (
         packet.reasonCode && packet.reasonCode >= Mqtt.ReasonCode.UnspecifiedError // UnspecifiedError: 128
       ) {
-        await this.session.discard(packet);
-
-        const deferred = this.session.getPublishDeferred(packet.packetId);
-        if (deferred) {
-          const reason = packet.properties?.reasonString;
-          deferred.resolve({ result: packet.reasonCode, reason });
-        }
+        await this.completePublishFlow(packet);
         return;
       }
 
@@ -1323,7 +1338,18 @@ export abstract class BaseMqttClient {
         packetId: packet.packetId,
       };
 
-      this.session.storePubrel(pubrel);
+      // Store PUBREL before sending it, as PUBLISH is. It replaces the stored PUBLISH, which must not be resent
+      // after PUBREL has been sent [MQTT-4.3.3-6], and the flow cannot complete before it is stored.
+      try {
+        await this.session.storePubrel(pubrel);
+      } catch (err) {
+        // PUBREL is not sent. The stored PUBLISH is resent after reconnecting, the broker answers it with PUBREC again,
+        // and storing PUBREL is tried again. Nothing is resent while the connection is open, so close it.
+        // publish() keeps waiting for the flow.
+        this.log('cannot store PUBREL, closing the connection to continue the flow after reconnecting', pubrel, err);
+        await this.disconnectWithError(Mqtt.ReasonCode.UnspecifiedError);
+        return;
+      }
       this.sendPacketInBackground(pubrel);
     } else {
       this.log(`Unknown packetId received. (packetId:${packet.packetId})`, 'pubrec');
@@ -1377,17 +1403,7 @@ export abstract class BaseMqttClient {
   /** Handles PUBCOMP: completes a QoS 2 publish. */
   private async handlePubcomp(packet: PubcompPacket) {
     if (await this.session.packetIdInUse(packet.packetId)) {
-      await this.session.discard(packet);
-
-      const deferred = this.session.getPublishDeferred(packet.packetId);
-      if (deferred) {
-        if (packet.reasonCode) {
-          const reason = packet.properties?.reasonString;
-          deferred.resolve({ result: packet.reasonCode, reason });
-        } else {
-          deferred.resolve({ result: Mqtt.ReasonCode.Success });
-        }
-      }
+      await this.completePublishFlow(packet);
     } else {
       this.log(`Unknown packetId received, it ignore. (packetId:${packet.packetId})`, 'pubcomp');
     }
@@ -1398,9 +1414,9 @@ export abstract class BaseMqttClient {
     if (await this.session.packetIdInUse(packet.packetId)) {
       const rvList = packet.reasonCodes ? packet.reasonCodes : packet.returnCodes;
 
-      await this.session.discard(packet);
-
+      // Take the deferred before releasing the packet ID: a subscribe() that gets the ID again must not lose its own.
       const deferred = this.session.getSubscribeDeferred(packet.packetId);
+      this.session.releasePacketId(packet.packetId);
       if (deferred) {
         const reason = packet.properties?.reasonString;
         deferred.resolve({ reasons: rvList!, reason });
@@ -1413,8 +1429,9 @@ export abstract class BaseMqttClient {
   /** Handles UNSUBACK: resolves `unsubscribe()`. */
   private async handleUnsuback(packet: UnsubackPacket) {
     if (await this.session.packetIdInUse(packet.packetId)) {
-      await this.session.discard(packet);
+      // Take the deferred before releasing the packet ID: an unsubscribe() that gets the ID again must not lose its own.
       const deferred = this.session.getUnsubscribeDeferred(packet.packetId);
+      this.session.releasePacketId(packet.packetId);
       if (deferred) {
         if (packet.reasonCodes) {
           const reason = packet.properties?.reasonString;
