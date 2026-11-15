@@ -1195,6 +1195,11 @@ export abstract class BaseMqttClient {
       return;
     }
     this.connectionState = 'online';
+    // publish() can be called from now on. Take a turn in the publish queue before any await: the calls wait until
+    // the session and the settings of the connection are updated and the packets kept in the session are resent.
+    // Otherwise a new PUBLISH could be written before the resent ones, or get the packet ID of a stored packet
+    // that is not registered yet, when the store has packets of a previous process.
+    const publishTurn = this.waitForPublishTurn();
 
     this.stopConnectTimer();
 
@@ -1213,25 +1218,30 @@ export abstract class BaseMqttClient {
       }
     }
 
-    if (connectionSuceeded) {
-      // server generates clientId
-      if (packet.properties?.assignedClientIdentifier) {
-        this.clientId = packet.properties.assignedClientIdentifier;
+    const publishTurnFinished = await publishTurn;
+    try {
+      if (connectionSuceeded) {
+        // server generates clientId
+        if (packet.properties?.assignedClientIdentifier) {
+          this.clientId = packet.properties.assignedClientIdentifier;
+        }
+        if (!packet.sessionPresent) {
+          await this.session.clearAllStores(this.clientId);
+        }
+
+        this.maximumPacketSizeAboutSend = packet.properties?.maximumPacketSize;
+
+        // The Server Keep Alive replaces the Keep Alive sent in CONNECT for this connection, even when it is higher or 0.
+        this.currentKeepAlive = packet.properties?.serverKeepAlive ?? this.keepAlive;
+
+        // Topic aliases are valid per connection, and an absent Topic Alias Maximum means 0 (no aliases allowed).
+        const topicAliasMaximum = Math.min(this.topicAliasMaximumAboutSend ?? 0, packet.properties?.topicAliasMaximum ?? 0);
+        this.topicAliasManagerAboutSend = topicAliasMaximum > 0 ? new TopicAliasManager(topicAliasMaximum) : undefined;
+
+        await this.resendSessionPackets();
       }
-      if (!packet.sessionPresent) {
-        await this.session.clearAllStores(this.clientId);
-      }
-
-      this.maximumPacketSizeAboutSend = packet.properties?.maximumPacketSize;
-
-      // The Server Keep Alive replaces the Keep Alive sent in CONNECT for this connection, even when it is higher or 0.
-      this.currentKeepAlive = packet.properties?.serverKeepAlive ?? this.keepAlive;
-
-      // Topic aliases are valid per connection, and an absent Topic Alias Maximum means 0 (no aliases allowed).
-      const topicAliasMaximum = Math.min(this.topicAliasMaximumAboutSend ?? 0, packet.properties?.topicAliasMaximum ?? 0);
-      this.topicAliasManagerAboutSend = topicAliasMaximum > 0 ? new TopicAliasManager(topicAliasMaximum) : undefined;
-
-      await this.resendSessionPackets();
+    } finally {
+      publishTurnFinished();
     }
 
     if (this.unresolvedConnect) {
