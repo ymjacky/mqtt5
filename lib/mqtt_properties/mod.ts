@@ -254,15 +254,15 @@ export function propertiesToBytes(properties?: Properties): Uint8Array {
     chunks.push([0x01, properties.payloadFormatIndicator & 0xFF]);
   }
   // id: 0x02 , type: Four Byte Integer
-  if (properties.messageExpiryInterval) { // number ,
+  if (typeof properties.messageExpiryInterval !== 'undefined') { // number, 0 is meaningful (expires immediately if not deliverable)
     chunks.push([0x02], numToFourByteInteger(properties.messageExpiryInterval));
   }
   // id: 0x03
-  if (properties.contentType) { // string,
+  if (typeof properties.contentType !== 'undefined') { // string, '' is encoded as a zero-length string
     chunks.push([0x03], stringToUtfEncodedString(properties.contentType));
   }
   // id: 0x08
-  if (properties.responseTopic) { // string ,
+  if (typeof properties.responseTopic !== 'undefined') { // string, '' is encoded as a zero-length string
     chunks.push([0x08], stringToUtfEncodedString(properties.responseTopic));
   }
   // id: 0x09
@@ -284,7 +284,7 @@ export function propertiesToBytes(properties?: Properties): Uint8Array {
     chunks.push([0x11], numToFourByteInteger(properties.sessionExpiryInterval));
   }
   // id: 0x12
-  if (properties.assignedClientIdentifier) { // string,
+  if (typeof properties.assignedClientIdentifier !== 'undefined') { // string, '' is encoded as a zero-length string
     chunks.push([0x12], stringToUtfEncodedString(properties.assignedClientIdentifier));
   }
   // id: 0x13, type: Two Byte Integer
@@ -292,7 +292,7 @@ export function propertiesToBytes(properties?: Properties): Uint8Array {
     chunks.push([0x13], numToTwoByteInteger(properties.serverKeepAlive));
   }
   // id: 0x15
-  if (properties.authenticationMethod) { // string ,
+  if (typeof properties.authenticationMethod !== 'undefined') { // string, '' is encoded as a zero-length string
     chunks.push([0x15], stringToUtfEncodedString(properties.authenticationMethod));
   }
   // id: 0x16
@@ -313,15 +313,15 @@ export function propertiesToBytes(properties?: Properties): Uint8Array {
     chunks.push([0x19, properties.requestResponseInformation ? 1 : 0]);
   }
   // id: 0x1A
-  if (properties.responseInformation) { // string,
+  if (typeof properties.responseInformation !== 'undefined') { // string, '' is encoded as a zero-length string
     chunks.push([0x1A], stringToUtfEncodedString(properties.responseInformation));
   }
   // id: 0x1C
-  if (properties.serverReference) { // string,
+  if (typeof properties.serverReference !== 'undefined') { // string, '' is encoded as a zero-length string
     chunks.push([0x1C], stringToUtfEncodedString(properties.serverReference));
   }
   // id: 0x1F
-  if (properties.reasonString) { // string,
+  if (typeof properties.reasonString !== 'undefined') { // string, '' is encoded as a zero-length string
     chunks.push([0x1F], stringToUtfEncodedString(properties.reasonString));
   }
   // id: 0x21 type: Two Byte Integer
