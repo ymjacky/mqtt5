@@ -1,11 +1,14 @@
 import { LruCache } from '../cache/mod.ts';
 import { ReuseIdProvider } from '../id_provider/mod.ts';
-import { Deferred } from './promise.ts';
 
+/**
+ * Assigns topic aliases to the topics of sent PUBLISH packets, on one connection.
+ * The methods are synchronous: the client resolves the alias right before it writes PUBLISH, with no await in between,
+ * so the aliases follow the order in which the packets are written.
+ */
 export class TopicAliasManager {
   private topicIdProvider: ReuseIdProvider;
   private topicAliasMap: LruCache<string, number>;
-  private deferred?: Deferred<void>;
 
   constructor(topicAliasMaximum: number) {
     this.topicIdProvider = new ReuseIdProvider(1, topicAliasMaximum);
@@ -20,28 +23,21 @@ export class TopicAliasManager {
     return this.topicAliasMap.size() == this.topicAliasMap.capacity();
   }
 
-  public async getTopicId(topic: string): Promise<[boolean, number]> {
-    while (this.deferred) {
-      await this.deferred.promise;
+  /**
+   * Returns the topic alias of the topic. A topic without one gets a new alias,
+   * replacing the least used topic when all aliases are in use.
+   * @returns whether the alias is new, and the alias.
+   * A new alias must be sent with the Topic Name; it can be sent without it after that PUBLISH has been written.
+   */
+  public getTopicId(topic: string): [boolean, number] {
+    const topicId = this.topicAliasMap.get(topic);
+    if (topicId) {
+      return [false, topicId];
     }
-
-    const gate = new Deferred<void>();
-    this.deferred = gate;
-    try {
-      let topicId = this.topicAliasMap.get(topic);
-      let generated = false;
-      if (!topicId) {
-        topicId = await this.registerTopic(topic);
-        generated = true;
-      }
-      return [generated, topicId];
-    } finally {
-      this.deferred = undefined;
-      gate.resolve();
-    }
+    return [true, this.registerTopic(topic)];
   }
 
-  private async registerTopic(topic: string) {
+  private registerTopic(topic: string) {
     if (this.isFull()) {
       const lruTopic = this.topicAliasMap.lruKey();
       if (lruTopic) {
@@ -53,11 +49,12 @@ export class TopicAliasManager {
       }
     }
 
-    const topicId = await this.acquireTopicId();
+    const topicId = this.topicIdProvider.acquire();
     this.topicAliasMap.set(topic, topicId);
     return topicId;
   }
 
+  /** Removes the topic alias of the topic, e.g. when the PUBLISH that registers it is not sent. */
   public releaseTopic(topic: string) {
     if (this.topicAliasMap.has(topic)) {
       const topicId = this.topicAliasMap.get(topic);
@@ -66,9 +63,5 @@ export class TopicAliasManager {
         this.topicAliasMap.delete(topic);
       }
     }
-  }
-
-  private async acquireTopicId() {
-    return await this.topicIdProvider.acquire();
   }
 }

@@ -1,4 +1,4 @@
-import { Mqtt, MqttClient, MqttProperties } from '../../../deno/mod.ts';
+import { Mqtt, MqttClient, MqttPackets, MqttProperties, Store } from '../../../deno/mod.ts';
 import { TestBroker } from '../broker/test_broker.ts';
 import { assertEquals, fail } from 'std/assert/mod.ts';
 
@@ -384,3 +384,129 @@ Deno.test({ name: '@send topic alias', only: false }, async (context) => {
     },
   );
 }); // topic alias
+
+Deno.test({ name: '@send topic alias, concurrent publishes', only: false }, async (context) => {
+  // The PUBLISH packets may be written in either order. Whichever the broker receives first must register the alias
+  // with the Topic Name, before the other one uses it with an empty Topic Name.
+  function assertAliasRegisteredFirst(received: { message: string; topic: string; topicAlias?: number }[]) {
+    assertEquals(received.map(({ topic, topicAlias }) => ({ topic, topicAlias })), [
+      { topic: 'topicA', topicAlias: 1 },
+      { topic: '', topicAlias: 1 },
+    ]);
+    assertEquals(received.map(({ message }) => message).sort(), ['1st', '2nd']);
+  }
+
+  await context.step(
+    'concurrent QoS 1 and QoS 0 publishes to the same topic use the topic alias without the Topic Name only after it is registered',
+    async () => {
+      const broker = new TestBroker();
+
+      try {
+        broker.listen();
+
+        const client = new MqttClient({
+          clientId: 'cid',
+          logger: logger,
+          clean: true,
+          connectTimeoutMS: 10000,
+          keepAlive: 10,
+          topicAliasMaximumAboutSend: 10,
+        });
+
+        broker.on('connect', (event) => {
+          const packet = event.detail;
+          broker.sendConnack(packet.clientId, false, packet.protocolVersion, 0, { topicAliasMaximum: 10 });
+        });
+
+        await client.connect();
+
+        // in the order the broker receives them
+        const received: { message: string; topic: string; topicAlias?: number }[] = [];
+        broker.on('publish', (event) => {
+          const packet = event.detail;
+          received.push({ message: new TextDecoder().decode(packet.payload), topic: packet.topic, topicAlias: packet.properties?.topicAlias });
+          if (packet.qos === Mqtt.QoS.AT_LEAST_ONCE) {
+            broker.sendPuback('cid', packet.packetId!, Mqtt.ProtocolVersion.MQTT_V5);
+          }
+        });
+
+        // The QoS 1 PUBLISH waits for its packet ID and the session store, the QoS 0 one does not.
+        await Promise.all([
+          client.publish('topicA', new TextEncoder().encode('1st'), { qos: Mqtt.QoS.AT_LEAST_ONCE }),
+          client.publish('topicA', new TextEncoder().encode('2nd'), { qos: Mqtt.QoS.AT_MOST_ONCE }),
+        ]);
+        // A QoS 0 publish() resolves when it is sent, maybe before the broker receives it.
+        while (received.length < 2) {
+          await new Promise((resolve) => setTimeout(resolve, 10));
+        }
+
+        assertAliasRegisteredFirst(received);
+
+        await client.disconnect();
+      } catch (err) {
+        fail(`error occured: ${err}`);
+      } finally {
+        await broker.destroy();
+      }
+    },
+  );
+
+  await context.step(
+    'concurrent QoS 1 publishes to the same topic, the 1st stored slowly, use the topic alias without the Topic Name only after it is registered',
+    async () => {
+      const broker = new TestBroker();
+
+      try {
+        broker.listen();
+
+        // Takes time to store the 1st PUBLISH, but not the 2nd.
+        class SlowStore extends Store.MemoryStore {
+          override async store(packet: MqttPackets.PublishPacket | MqttPackets.PubrelPacket): Promise<void> {
+            if (packet.type === 'publish' && new TextDecoder().decode(packet.payload) === '1st') {
+              await new Promise((resolve) => setTimeout(resolve, 100));
+            }
+            return super.store(packet);
+          }
+        }
+
+        const client = new MqttClient({
+          clientId: 'cid',
+          logger: logger,
+          clean: false, // a custom store is used only without Clean Start
+          connectTimeoutMS: 10000,
+          keepAlive: 10,
+          topicAliasMaximumAboutSend: 10,
+          outgoingStore: new SlowStore(),
+        });
+
+        broker.on('connect', (event) => {
+          const packet = event.detail;
+          broker.sendConnack(packet.clientId, false, packet.protocolVersion, 0, { topicAliasMaximum: 10 });
+        });
+
+        await client.connect();
+
+        // in the order the broker receives them
+        const received: { message: string; topic: string; topicAlias?: number }[] = [];
+        broker.on('publish', (event) => {
+          const packet = event.detail;
+          received.push({ message: new TextDecoder().decode(packet.payload), topic: packet.topic, topicAlias: packet.properties?.topicAlias });
+          broker.sendPuback('cid', packet.packetId!, Mqtt.ProtocolVersion.MQTT_V5);
+        });
+
+        await Promise.all([
+          client.publish('topicA', new TextEncoder().encode('1st'), { qos: Mqtt.QoS.AT_LEAST_ONCE }),
+          client.publish('topicA', new TextEncoder().encode('2nd'), { qos: Mqtt.QoS.AT_LEAST_ONCE }),
+        ]);
+
+        assertAliasRegisteredFirst(received);
+
+        await client.disconnect();
+      } catch (err) {
+        fail(`error occured: ${err}`);
+      } finally {
+        await broker.destroy();
+      }
+    },
+  );
+}); // topic alias, concurrent publishes
