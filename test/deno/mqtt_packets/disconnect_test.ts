@@ -147,6 +147,34 @@ Deno.test('encodeDisconnectPacketMQTT5WithProperties', function () {
   );
 });
 
+// Test DISCONNECT packet encoding with Session Expiry Interval 0 for MQTT v5
+// 0 is encoded: it ends the session, while an absent value keeps the one sent in CONNECT
+Deno.test('encodeDisconnectPacketMQTT5WithSessionExpiryIntervalZero', function () {
+  assertEquals(
+    toBytes({
+      type: 'disconnect',
+      reasonCode: Mqtt.ReasonCode.NormalDisconnection,
+      properties: {
+        sessionExpiryInterval: 0,
+      },
+    }, Mqtt.ProtocolVersion.MQTT_V5),
+    new Uint8Array([
+      // fixedHeader
+      0xe0, // packetType + flags
+      0x07, // remainingLength (7)
+      // variableHeader
+      0x00, // reasonCode = NormalDisconnection (0)
+      // properties
+      0x05, // properties length (5)
+      0x11, // Session Expiry Interval Identifier
+      0x00,
+      0x00,
+      0x00,
+      0x00, // 0 (Session Expiry Interval value)
+    ]),
+  );
+});
+
 // Test DISCONNECT packet encoding with server reference property for MQTT v5
 Deno.test('encodeDisconnectPacketMQTT5WithServerReference', function () {
   assertEquals(
