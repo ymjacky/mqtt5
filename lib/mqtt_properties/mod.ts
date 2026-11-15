@@ -112,8 +112,12 @@ export type PublishProperties = {
   responseTopic?: string;
   /** Data that relates a response message to its request. (id: 0x09) */
   correlationData?: Uint8Array;
-  /** Identifier of the subscription that matched, set by the broker. (id: 0x0B) */
-  subscriptionIdentifier?: number;
+  /**
+   * Identifiers of the subscriptions that matched, set by the broker. (id: 0x0B)
+   *
+   * Holds one identifier for each matching subscription that has one, so it can contain more than one value.
+   */
+  subscriptionIdentifiers?: number[];
   /** A number used in place of the topic name to reduce the packet size. (id: 0x23) */
   topicAlias?: number;
   /** Application-defined key-value pairs. (id: 0x26) */
@@ -132,13 +136,7 @@ export type UserPublishProperties = {
   responseTopic?: string;
   /** Data that relates a response message to its request. (id: 0x09) */
   correlationData?: Uint8Array;
-  /**
-   * Identifier of the subscription. (id: 0x0B)
-   *
-   * @deprecated A client must not send it in PUBLISH (MQTT 5.0 [MQTT-3.3.4-6]); only the broker sets it.
-   */
-  subscriptionIdentifier?: number;
-  // // id: 0x23
+  // id: 0x0B (Subscription Identifier) is not here: a client must not send it in PUBLISH (MQTT 5.0 [MQTT-3.3.4-6]).
   // topicAlias?: number;
   /** Application-defined key-value pairs. (id: 0x26) */
   userProperties?: UserProperties;
@@ -273,8 +271,13 @@ export function propertiesToBytes(properties?: Properties): Uint8Array {
     chunks.push([0x09], numToTwoByteInteger(correlationDataLength), properties.correlationData);
   }
   // id: 0x0B, type: Variable Byte Integer
-  if (properties.subscriptionIdentifier) { // number,
+  if (properties.subscriptionIdentifier) { // number, the single identifier of SUBSCRIBE
     chunks.push([0x0B], numToVariableByteInteger(properties.subscriptionIdentifier));
+  }
+  if (properties.subscriptionIdentifiers) { // number[], one property per identifier (PUBLISH)
+    properties.subscriptionIdentifiers.forEach((id) => {
+      chunks.push([0x0B], numToVariableByteInteger(id));
+    });
   }
   // id: 0x11, type: Four Byte Integer
   if (properties.sessionExpiryInterval) { // number ,
@@ -426,7 +429,13 @@ export function parseMqttProperties(
       case 0x0B: // (11) Subscription Identifier, type: Variable Byte Integer
         {
           const subscriptionIdentifierInfo = variableByteIntegerToNum(buffer, pos);
-          properties.subscriptionIdentifier = subscriptionIdentifierInfo.number;
+          // PUBLISH carries one Subscription Identifier per matching subscription, so keep them all.
+          // SUBSCRIBE carries at most one; subscribe.ts converts the list to its single value.
+          if (properties.subscriptionIdentifiers) {
+            properties.subscriptionIdentifiers.push(subscriptionIdentifierInfo.number);
+          } else {
+            properties.subscriptionIdentifiers = [subscriptionIdentifierInfo.number];
+          }
           pos += subscriptionIdentifierInfo.size;
         }
         break;

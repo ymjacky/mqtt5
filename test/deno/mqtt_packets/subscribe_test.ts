@@ -1,4 +1,4 @@
-import { assertEquals } from 'std/assert/mod.ts';
+import { assertEquals, assertThrows } from 'std/assert/mod.ts';
 import type { SubscribePacket } from '../../../lib/mqtt_packets/packet_types.ts';
 import { parse, toBytes } from '../../../lib/mqtt_packets/subscribe.ts';
 import * as Mqtt from '../../../lib/mqtt/mod.ts';
@@ -443,5 +443,36 @@ Deno.test('decodeSubscribePacketMQTT5WithUserProperties', function () {
         ],
       },
     },
+  );
+});
+
+// Test SUBSCRIBE packet parsing rejects more than one Subscription Identifier for MQTT v5.
+// Only PUBLISH may carry several; in SUBSCRIBE it is a Protocol Error (MQTT 5.0 section 3.8.2.1.2).
+Deno.test('decodeSubscribePacketMQTT5WithMultipleSubscriptionIdentifiers', function () {
+  assertThrows(
+    () =>
+      parse(
+        Uint8Array.from([
+          // variableHeader
+          0, // id MSB
+          42, // id LSB
+          4, // properties length
+          0x0B, // Subscription Identifier
+          1, // value = 1
+          0x0B, // Subscription Identifier
+          2, // value = 2
+          // payload
+          0, // topic filter length MSB
+          3, // topic filter length LSB
+          97, // 'a'
+          47, // '/'
+          98, // 'b'
+          0x00, // subscription options (QoS: 0)
+        ]),
+        12, // remainingLength
+        Mqtt.ProtocolVersion.MQTT_V5,
+      ),
+    Error,
+    'SUBSCRIBE must not include the Subscription Identifier more than once.',
   );
 });

@@ -132,7 +132,7 @@ Deno.test({ name: '@receive publish_qos0', only: false }, async (context) => {
               { key: 'userProp2', val: 'userData3' },
             ],
           );
-          assertEquals(packet.properties?.subscriptionIdentifier, 3);
+          assertEquals(packet.properties?.subscriptionIdentifiers, [3]);
           assertEquals(packet.properties?.contentType, 'application/json');
           resolve();
         });
@@ -148,7 +148,7 @@ Deno.test({ name: '@receive publish_qos0', only: false }, async (context) => {
             { key: 'userProp2', val: 'userData2' },
             { key: 'userProp2', val: 'userData3' },
           ],
-          subscriptionIdentifier: 3,
+          subscriptionIdentifiers: [3],
           contentType: 'application/json',
         };
         broker.sendPublish(
@@ -303,7 +303,7 @@ Deno.test({ name: '@receive publish_qos1', only: false }, async (context) => {
               { key: 'userProp2', val: 'userData3' },
             ],
           );
-          assertEquals(packet.properties?.subscriptionIdentifier, 3);
+          assertEquals(packet.properties?.subscriptionIdentifiers, [3]);
           assertEquals(packet.properties?.contentType, 'application/json');
         });
 
@@ -326,7 +326,7 @@ Deno.test({ name: '@receive publish_qos1', only: false }, async (context) => {
             { key: 'userProp2', val: 'userData2' },
             { key: 'userProp2', val: 'userData3' },
           ],
-          subscriptionIdentifier: 3,
+          subscriptionIdentifiers: [3],
           contentType: 'application/json',
         };
         broker.sendPublish(
@@ -491,7 +491,7 @@ Deno.test({ name: '@receive publish_qos2', only: false }, async (context) => {
               { key: 'userProp2', val: 'userData3' },
             ],
           );
-          assertEquals(packet.properties?.subscriptionIdentifier, 3);
+          assertEquals(packet.properties?.subscriptionIdentifiers, [3]);
           assertEquals(packet.properties?.contentType, 'application/json');
         });
 
@@ -526,7 +526,7 @@ Deno.test({ name: '@receive publish_qos2', only: false }, async (context) => {
             { key: 'userProp2', val: 'userData2' },
             { key: 'userProp2', val: 'userData3' },
           ],
-          subscriptionIdentifier: 3,
+          subscriptionIdentifiers: [3],
           contentType: 'application/json',
         };
         broker.sendPublish(
