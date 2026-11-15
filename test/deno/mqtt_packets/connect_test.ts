@@ -730,3 +730,118 @@ Deno.test('decodeConnectPacketMQTTv5WithUsernameAndPassword', function () {
     },
   );
 });
+
+// Test decoding a CONNECT packet with MQTT v5 properties and Will Properties,
+// each with User Properties that share a key
+Deno.test('decodeConnectPacketMQTTv5WithPropertiesAndWillProperties', function () {
+  assertEquals<ConnectPacket>(
+    parse(
+      Uint8Array.from([
+        // Variable header
+        0x00,
+        0x04, // Protocol name length
+        0x4D,
+        0x51,
+        0x54,
+        0x54, // "MQTT"
+        Mqtt.ProtocolVersion.MQTT_V5, // Protocol version
+        14, // Connect flags (will QoS 1, will flag, clean session)
+        0x00,
+        0x3C, // Keep alive (60 seconds)
+
+        // Properties
+        21, // Properties length
+        0x11,
+        0x00,
+        0x00,
+        0x00,
+        0x3C, // Session expiry interval (60) (ID: 0x11)
+        0x26, // User property ID
+        0x00,
+        0x01,
+        0x6B, // "k"
+        0x00,
+        0x02,
+        0x76,
+        0x31, // "v1"
+        0x26, // User property ID
+        0x00,
+        0x01,
+        0x6B, // "k"
+        0x00,
+        0x02,
+        0x76,
+        0x32, // "v2"
+
+        // Payload - Client ID
+        0x00,
+        0x02, // Client ID length
+        0x69,
+        0x64, // "id"
+
+        // Will Properties
+        19, // Will properties length
+        0x18,
+        0x00,
+        0x00,
+        0x00,
+        0x0A, // Will delay interval (10) (ID: 0x18)
+        0x26, // User property ID
+        0x00,
+        0x01,
+        0x77, // "w"
+        0x00,
+        0x01,
+        0x61, // "a"
+        0x26, // User property ID
+        0x00,
+        0x01,
+        0x77, // "w"
+        0x00,
+        0x01,
+        0x62, // "b"
+
+        // Will Topic
+        0x00,
+        0x01, // Topic length
+        0x74, // "t"
+
+        // Will Payload
+        0x00,
+        0x01, // Payload length
+        0x78, // "x"
+      ]),
+      62, // Remaining length
+    ),
+    {
+      type: 'connect',
+      clientId: 'id',
+      protocolName: 'MQTT',
+      protocolVersion: Mqtt.ProtocolVersion.MQTT_V5,
+      username: undefined,
+      password: undefined,
+      clean: true,
+      keepAlive: 60,
+      properties: {
+        sessionExpiryInterval: 60,
+        userProperties: [
+          { key: 'k', val: 'v1' },
+          { key: 'k', val: 'v2' },
+        ],
+      },
+      will: {
+        retain: false,
+        qos: 1,
+        topic: 't',
+        payload: new Uint8Array([0x78]), // "x"
+        properties: {
+          willDelayInterval: 10,
+          userProperties: [
+            { key: 'w', val: 'a' },
+            { key: 'w', val: 'b' },
+          ],
+        },
+      },
+    },
+  );
+});
