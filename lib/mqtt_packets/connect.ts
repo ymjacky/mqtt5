@@ -17,8 +17,8 @@ export function toBytes(packet: ConnectPacket) {
   const protocolName = stringToUtfEncodedString('MQTT');
   const protocolVersion = packet.protocolVersion;
 
-  const usernameFlag = packet.username ? true : false;
-  const passwordFlag = packet.password ? true : false;
+  const usernameFlag = typeof packet.username !== 'undefined';
+  const passwordFlag = typeof packet.password !== 'undefined';
   const cleanSession = packet.clean || typeof packet.clean === 'undefined';
 
   const willFlag = packet.will ? true : false;
@@ -68,11 +68,11 @@ export function toBytes(packet: ConnectPacket) {
     }
   }
 
-  if (packet.username) {
+  if (typeof packet.username !== 'undefined') {
     payloadChunks.push(stringToUtfEncodedString(packet.username));
   }
 
-  if (packet.password) {
+  if (typeof packet.password !== 'undefined') {
     payloadChunks.push(stringToUtfEncodedString(packet.password));
   }
 
