@@ -1,4 +1,4 @@
-import { Mqtt, MqttClient, MqttProperties } from '../../../deno/mod.ts';
+import { ClientTypes, Mqtt, MqttClient, MqttProperties } from '../../../deno/mod.ts';
 import { TestBroker } from '../broker/test_broker.ts';
 import { assertEquals, fail } from 'std/assert/mod.ts';
 
@@ -345,6 +345,166 @@ Deno.test({ name: '@subscribe', only: false }, async (context) => {
         assertEquals(result.reasons[1], Mqtt.ReasonCode.GrantedQoS1);
         assertEquals(result.reasons[2], Mqtt.ReasonCode.GrantedQoS2);
         assertEquals(result.reasons[3], Mqtt.ReasonCode.UnspecifiedError);
+      } catch (err) {
+        fail(`error occured: ${err}`);
+      } finally {
+        await broker.destroy();
+      }
+    },
+  );
+
+  await context.step(
+    'subscribe qos0 subscription takes precedence over the qos argument',
+    async () => {
+      const broker = new TestBroker();
+      try {
+        broker.listen();
+        broker.on('connect', (event) => {
+          const packet = event.detail;
+          broker.sendConnack(packet.clientId, false, packet.protocolVersion);
+        });
+
+        const client = new MqttClient({
+          clientId: 'cid',
+          logger: logger,
+          clean: true,
+          connectTimeoutMS: 10000,
+          keepAlive: 10,
+        });
+
+        await client.connect();
+
+        // test
+        broker.on('subscribe', (event) => {
+          const packet = event.detail;
+
+          assertEquals(packet.subscriptions[0].topicFilter, 'topicA');
+          assertEquals(packet.subscriptions[0].qos, Mqtt.QoS.AT_MOST_ONCE);
+
+          assertEquals(packet.subscriptions[1].topicFilter, 'topicB');
+          assertEquals(packet.subscriptions[1].qos, Mqtt.QoS.EXACTLY_ONCE);
+
+          broker.sendSuback(
+            'cid',
+            packet.packetId!,
+            Mqtt.ProtocolVersion.MQTT_V5,
+            [Mqtt.ReasonCode.GrantedQoS0, Mqtt.ReasonCode.GrantedQoS2],
+          );
+        });
+
+        const result = await client.subscribe(
+          [
+            { topicFilter: 'topicA', qos: Mqtt.QoS.AT_MOST_ONCE },
+            { topicFilter: 'topicB', qos: Mqtt.QoS.EXACTLY_ONCE },
+          ],
+          Mqtt.QoS.AT_LEAST_ONCE,
+        );
+
+        assertEquals(result.reasons[0], Mqtt.ReasonCode.GrantedQoS0);
+        assertEquals(result.reasons[1], Mqtt.ReasonCode.GrantedQoS2);
+      } catch (err) {
+        fail(`error occured: ${err}`);
+      } finally {
+        await broker.destroy();
+      }
+    },
+  );
+
+  await context.step(
+    'subscribe without subscription qos uses the qos argument',
+    async () => {
+      const broker = new TestBroker();
+      try {
+        broker.listen();
+        broker.on('connect', (event) => {
+          const packet = event.detail;
+          broker.sendConnack(packet.clientId, false, packet.protocolVersion);
+        });
+
+        const client = new MqttClient({
+          clientId: 'cid',
+          logger: logger,
+          clean: true,
+          connectTimeoutMS: 10000,
+          keepAlive: 10,
+        });
+
+        await client.connect();
+
+        // test
+        broker.on('subscribe', (event) => {
+          const packet = event.detail;
+
+          assertEquals(packet.subscriptions[0].topicFilter, 'topicA');
+          assertEquals(packet.subscriptions[0].qos, Mqtt.QoS.AT_LEAST_ONCE);
+
+          broker.sendSuback(
+            'cid',
+            packet.packetId!,
+            Mqtt.ProtocolVersion.MQTT_V5,
+            [Mqtt.ReasonCode.GrantedQoS1],
+          );
+        });
+
+        const result = await client.subscribe(
+          [
+            // qos is required by the type; a JavaScript caller can still omit it.
+            { topicFilter: 'topicA' } as ClientTypes.SubscriptionOption,
+          ],
+          Mqtt.QoS.AT_LEAST_ONCE,
+        );
+
+        assertEquals(result.reasons[0], Mqtt.ReasonCode.GrantedQoS1);
+      } catch (err) {
+        fail(`error occured: ${err}`);
+      } finally {
+        await broker.destroy();
+      }
+    },
+  );
+
+  await context.step(
+    'subscribe without any qos defaults to qos0',
+    async () => {
+      const broker = new TestBroker();
+      try {
+        broker.listen();
+        broker.on('connect', (event) => {
+          const packet = event.detail;
+          broker.sendConnack(packet.clientId, false, packet.protocolVersion);
+        });
+
+        const client = new MqttClient({
+          clientId: 'cid',
+          logger: logger,
+          clean: true,
+          connectTimeoutMS: 10000,
+          keepAlive: 10,
+        });
+
+        await client.connect();
+
+        // test
+        broker.on('subscribe', (event) => {
+          const packet = event.detail;
+
+          assertEquals(packet.subscriptions.length, 1);
+          assertEquals(packet.subscriptions[0].qos, Mqtt.QoS.AT_MOST_ONCE);
+
+          broker.sendSuback(
+            'cid',
+            packet.packetId!,
+            Mqtt.ProtocolVersion.MQTT_V5,
+            [Mqtt.ReasonCode.GrantedQoS0],
+          );
+        });
+
+        // qos is required by the type; a JavaScript caller can still omit it.
+        const objectResult = await client.subscribe({ topicFilter: 'topicA' } as ClientTypes.SubscriptionOption);
+        assertEquals(objectResult.reasons[0], Mqtt.ReasonCode.GrantedQoS0);
+
+        const stringResult = await client.subscribe('topicB');
+        assertEquals(stringResult.reasons[0], Mqtt.ReasonCode.GrantedQoS0);
       } catch (err) {
         fail(`error occured: ${err}`);
       } finally {
