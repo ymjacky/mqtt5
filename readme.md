@@ -420,7 +420,7 @@ await client.subscribe('topicA', Mqtt.QoS.AT_LEAST_ONCE);
 
 ```html
 <script type="module">
-import { Mqtt, WebSocketMqttClient } from 'https://esm.sh/jsr/@ymjacky/mqtt5@0.0.25/browser';
+import { Mqtt, WebSocketMqttClient } from 'https://esm.sh/jsr/@ymjacky/mqtt5@0.1.0/browser';
 
 const client = new WebSocketMqttClient({
   url: new URL('wss://broker.example.com:8081'),
