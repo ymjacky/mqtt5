@@ -2,6 +2,7 @@ import { BaseMqttClient } from './base_mqtt_client.ts';
 import { ClientOptions } from './client_types.ts';
 import * as MqttStream from '../mqtt_stream_utils/mod.ts';
 import { Deferred } from './promise.ts';
+import { ConnectionClosed } from './error.ts';
 
 /**
  * MQTT client that connects over WebSocket (`ws://`) or WebSocket Secure (`wss://`), using the `mqtt` subprotocol.
@@ -39,7 +40,10 @@ export class WebSocketMqttClient extends BaseMqttClient {
     super(options);
   }
 
-  /** Opens the WebSocket connection. */
+  /**
+   * Opens the WebSocket connection. It is not aborted with a signal: close() also stops a WebSocket that is still opening,
+   * and the `close` event then reports it.
+   */
   protected open(): Promise<void> {
     const deferred = new Deferred<void>();
 
@@ -57,6 +61,8 @@ export class WebSocketMqttClient extends BaseMqttClient {
 
     this.conn.onclose = (_e: CloseEvent) => {
       this.detectClosed();
+      // Closed before it opened: it could not be opened, or close() stopped it (connect timeout).
+      deferred.reject(new ConnectionClosed());
     };
 
     this.conn.onmessage = (e: MessageEvent<unknown>) => {

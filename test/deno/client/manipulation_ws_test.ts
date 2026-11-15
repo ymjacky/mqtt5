@@ -1,4 +1,4 @@
-import { ClientErrors, Mqtt, MqttPackets, WebSocketMqttClient } from '../../../deno/mod.ts';
+import { ClientErrors, Mqtt, WebSocketMqttClient } from '../../../deno/mod.ts';
 import { TestWsBroker } from '../broker/test_ws_broker.ts';
 import { assert, assertEquals, assertExists, fail } from 'std/assert/mod.ts';
 
@@ -226,7 +226,7 @@ Deno.test({ name: '@manipulation', only: false }, async (context) => {
           bigData,
           { qos: Mqtt.QoS.AT_LEAST_ONCE },
         ).catch((err: Error) => {
-          assert(err instanceof MqttPackets.MqttPacketsError.MqttPacketSerializeError);
+          assert(err instanceof ClientErrors.PacketTooLargeError);
           resolve();
         });
 

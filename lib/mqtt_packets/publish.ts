@@ -3,7 +3,7 @@ import {
   concatBytes,
   numToQoS,
   numToTwoByteInteger,
-  numToVariableByteInteger,
+  remainingLengthToBytes,
   stringToBytes,
   stringToUtfEncodedString,
   twoByteIntegerToNum,
@@ -44,7 +44,7 @@ export function toBytes(
 
   const fixedHeader = [
     (Mqtt.PacketType.PUBLISH << 4) + flags,
-    ...numToVariableByteInteger(variableHeader.length + payload.length),
+    ...remainingLengthToBytes(variableHeader.length + payload.length),
   ];
 
   return concatBytes([fixedHeader, variableHeader, payload]);

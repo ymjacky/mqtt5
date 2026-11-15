@@ -1,6 +1,6 @@
-import { MqttClient, MqttProperties } from '../../../deno/mod.ts';
+import { Mqtt, MqttClient, MqttPackets, MqttProperties } from '../../../deno/mod.ts';
 import { TestBroker } from '../broker/test_broker.ts';
-import { assertEquals, assertExists, fail } from 'std/assert/mod.ts';
+import { assertEquals, assertExists, assertRejects, fail } from 'std/assert/mod.ts';
 
 function logger(msg: string, ...args: unknown[]): void {
   console.log('[Test Client]', msg, ...args);
@@ -422,3 +422,76 @@ Deno.test({ name: '@closing', only: false }, async (context) => {
     },
   );
 }); // closing
+
+Deno.test({ name: '@closing DISCONNECT that cannot be sent as is', only: false }, async (context) => {
+  await context.step(
+    'leaves out the Reason String and User Properties when they make DISCONNECT larger than the Maximum Packet Size',
+    async () => {
+      const broker = new TestBroker();
+      try {
+        broker.listen();
+        broker.on('connect', (event) => {
+          const packet = event.detail;
+          broker.sendConnack(packet.clientId, false, packet.protocolVersion, Mqtt.ReasonCode.Success, { maximumPacketSize: 64 });
+        });
+        const received: (MqttProperties.DisconnectProperties | undefined)[] = [];
+        broker.on('disconnect', (event) => {
+          received.push(event.detail.properties);
+          broker.closeConnectionFromBroker('cid');
+        });
+
+        const client = new MqttClient({ clientId: 'cid', logger: logger });
+        await client.connect({ properties: { sessionExpiryInterval: 600 } });
+
+        // [MQTT-3.14.2-3], [MQTT-3.14.2-4]
+        await client.disconnect(false, {
+          reasonString: 'a'.repeat(100),
+          userProperties: [{ key: 'k', val: 'v' }],
+          sessionExpiryInterval: 300,
+        });
+        assertEquals(received, [{ sessionExpiryInterval: 300 }]);
+      } catch (err) {
+        fail(`error occured: ${err}`);
+      } finally {
+        await broker.destroy();
+      }
+    },
+  );
+
+  await context.step(
+    'a DISCONNECT that cannot be encoded rejects, and the next disconnect() does not wait for it',
+    async () => {
+      const broker = new TestBroker();
+      try {
+        broker.listen();
+        broker.on('connect', (event) => {
+          const packet = event.detail;
+          broker.sendConnack(packet.clientId, false, packet.protocolVersion);
+        });
+        const received: (MqttProperties.DisconnectProperties | undefined)[] = [];
+        broker.on('disconnect', (event) => {
+          received.push(event.detail.properties);
+          broker.closeConnectionFromBroker('cid');
+        });
+
+        const client = new MqttClient({ clientId: 'cid', logger: logger });
+        await client.connect();
+
+        // A Reason String longer than 65,535 bytes cannot be encoded: its length is a Two Byte Integer.
+        await assertRejects(
+          () => client.disconnect(false, { reasonString: 'a'.repeat(0x10000) }),
+          MqttPackets.MqttPacketsError.MqttPacketSerializeError,
+        );
+        assertEquals(received, []);
+
+        // The connection stayed open: the next disconnect() sends DISCONNECT.
+        await client.disconnect();
+        assertEquals(received, [undefined]);
+      } catch (err) {
+        fail(`error occured: ${err}`);
+      } finally {
+        await broker.destroy();
+      }
+    },
+  );
+}); // @closing DISCONNECT that cannot be sent as is

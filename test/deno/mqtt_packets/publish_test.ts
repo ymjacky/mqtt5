@@ -1,4 +1,5 @@
-import { assertEquals } from 'std/assert/mod.ts';
+import { assertEquals, assertThrows } from 'std/assert/mod.ts';
+import { MqttUtilsError } from '../../../lib/mqtt_utils/mod.ts';
 import type { PublishPacket } from '../../../lib/mqtt_packets/packet_types.ts';
 import { parse, toBytes } from '../../../lib/mqtt_packets/publish.ts';
 import * as Mqtt from '../../../lib/mqtt/mod.ts';
@@ -705,5 +706,17 @@ Deno.test('encodePublishPacketMQTT5WithMultipleSubscriptionIdentifiers', functio
       // payload
       120, // 'x'
     ]),
+  );
+});
+
+Deno.test('encodePublishPacketTooLarge', function () {
+  // With the topic, the Remaining Length is larger than 268,435,455.
+  assertThrows(
+    () =>
+      toBytes(
+        { type: 'publish', topic: 't', payload: new Uint8Array(268_435_455), dup: false, retain: false, qos: 0, packetId: 0 },
+        Mqtt.ProtocolVersion.MQTT_V5,
+      ),
+    MqttUtilsError.RemainingLengthError,
   );
 });

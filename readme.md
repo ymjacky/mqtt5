@@ -253,6 +253,129 @@ await client.disconnect(); // send DISCONNECT, then close
 // await client.disconnect(false, { reasonString: 'bye', sessionExpiryInterval: 300 }); // MQTT 5.0 properties
 ```
 
+[examples/deno/reconnect.ts](https://github.com/ymjacky/mqtt5/blob/main/examples/deno/reconnect.ts) reconnects when the broker closes the connection, keeping
+the session so that QoS 1 / QoS 2 messages in flight are resent.
+
+## Error handling
+
+A call that fails is reported in one of two ways:
+
+- **The promise rejects** when the client cannot carry out the call: an invalid argument, the client is not connected, a timeout, or the connection is closed.
+  When an argument is invalid, nothing is sent. The errors are exported as `ClientErrors`; check them with `instanceof`.
+- **The promise resolves with a reason code** when the broker refuses the request: `reasonCode` (MQTT 5.0) / `returnCode` (MQTT 3.1.1) of CONNACK, `result` of
+  `publish()`, `reasons` of `subscribe()` and `reasonCodes` of `unsubscribe()`. A reason code of 0x80 (128) or more is a failure. In MQTT 3.1.1, a CONNACK
+  return code other than 0 and a SUBACK return code of 0x80 are failures.
+
+A rejected promise that is not awaited does not terminate the process, so await the calls whose failures you want to handle.
+
+### Errors
+
+| Error (`ClientErrors.*`)  | Rejected by                                                        | When                                                                                                                                                         |
+| ------------------------- | ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `ConnectTimeout`          | `connect()`                                                        | CONNACK is not received within `connectTimeoutMS`.                                                                                                           |
+| `StateIsNotOfflineError`  | `connect()`                                                        | The client is already connected or connecting.                                                                                                               |
+| `StateIsNotOnlineError`   | `publish()`, `subscribe()`, `unsubscribe()`                        | The client is not connected.                                                                                                                                 |
+| `InvalidTopicNameError`   | `publish()`, `connect()`                                           | The topic, Response Topic or Will Topic is empty, or contains `+`, `#` or U+0000.                                                                            |
+| `InvalidTopicFilterError` | `subscribe()`, `unsubscribe()`                                     | A topic filter is invalid, e.g. `a/#/b`, `a+` or `$share/group`.                                                                                             |
+| `InvalidArgumentError`    | `connect()`, `publish()`, `subscribe()`, `unsubscribe()`           | Another argument is invalid, e.g. a QoS other than 0, 1 or 2, `dup: true` with QoS 0, an empty list of topic filters, or `noLocal` on a shared subscription. |
+| `InvalidPropertyError`    | `connect()`, `publish()`, `subscribe()`, `unsubscribe()`           | An MQTT 5.0 property is invalid, e.g. out of range (`subscriptionIdentifier: 0`, `receiveMaximum: 0`) or a string that contains U+0000.                      |
+| `PacketTooLargeError`     | `connect()`, `publish()`, `subscribe()`, `unsubscribe()`, `auth()` | The packet is larger than the Maximum Packet Size of the broker (MQTT 5.0) or than MQTT allows.                                                              |
+| `SessionLostError`        | `publish()` (QoS 1 and 2)                                          | The broker did not keep the session when reconnecting. The message may or may not have reached the broker.                                                   |
+| `ConnectionClosed`        | `connect()`, `subscribe()`, `unsubscribe()`                        | The connection is closed before CONNACK / SUBACK / UNSUBACK. For SUBACK / UNSUBACK, the broker may or may not have processed the request.                    |
+| `SendPacketError`         | `auth()`                                                           | The client is not connected.                                                                                                                                 |
+
+Properties are checked only for MQTT 5.0, because MQTT 3.1.1 packets do not carry them. `MqttClient.connect()` also rejects with the errors of opening the
+connection, e.g. `Deno.errors.ConnectionRefused` when the broker is not running; `WebSocketMqttClient.connect()` rejects with `ConnectionClosed` then. When
+`connect()` rejects, the client is offline again, so it can be called again right away.
+
+### Connecting
+
+```ts
+import { ClientErrors, Mqtt, MqttClient } from '@ymjacky/mqtt5';
+
+const client = new MqttClient({ clientId: 'clientA', connectTimeoutMS: 5000 });
+
+try {
+  const connack = await client.connect();
+  // When the broker refuses the connection, connect() still resolves, with the CONNACK.
+  // MQTT 3.1.1: check connack.returnCode against Mqtt.V3_1_1_ConnectReturnCode.ConnectionAccepted instead.
+  if (connack.reasonCode !== Mqtt.ReasonCode.Success) {
+    console.error(`the broker refused the connection: ${connack.reasonCode}`);
+  }
+} catch (err) {
+  if (err instanceof ClientErrors.ConnectTimeout) {
+    console.error('no CONNACK within connectTimeoutMS');
+  } else if (err instanceof Deno.errors.ConnectionRefused) {
+    console.error('the broker is not running');
+  } else {
+    throw err;
+  }
+}
+```
+
+[examples/deno/connect_retry.ts](https://github.com/ymjacky/mqtt5/blob/main/examples/deno/connect_retry.ts) retries `connect()` up to 5 times, 10 seconds apart.
+
+### Publishing
+
+```ts
+import { ClientErrors, Mqtt, MqttClient } from '@ymjacky/mqtt5';
+
+const client = new MqttClient({ clientId: 'clientA' });
+await client.connect();
+
+try {
+  const result = await client.publish('sensors/room1/temperature', '23.5', { qos: Mqtt.QoS.AT_LEAST_ONCE });
+  // QoS 1 and 2: the reason code of PUBACK / PUBREC (MQTT 5.0). 0x10 (NoMatchingSubscribers) is a success.
+  if (result.result >= 0x80) {
+    console.error(`the broker refused the message: ${result.result} ${result.reason ?? ''}`);
+  }
+} catch (err) {
+  if (err instanceof ClientErrors.StateIsNotOnlineError) {
+    console.error('not connected');
+  } else if (err instanceof ClientErrors.InvalidTopicNameError || err instanceof ClientErrors.InvalidArgumentError) {
+    console.error(err.message); // e.g. a topic with a wildcard: 'sensors/+/temperature'
+  } else {
+    throw err;
+  }
+}
+```
+
+### Subscribing and unsubscribing
+
+```ts
+import { ClientErrors, Mqtt, MqttClient } from '@ymjacky/mqtt5';
+
+const client = new MqttClient({ clientId: 'clientA' });
+await client.connect();
+
+const topicFilters = ['sensors/+/temperature', 'logs/#'];
+try {
+  const { reasons } = await client.subscribe(topicFilters, Mqtt.QoS.AT_LEAST_ONCE);
+  // One per topic filter: the granted QoS (0, 1 or 2; it can be lower than requested), or 0x80 or more on failure.
+  reasons.forEach((reason, i) => {
+    if (reason >= 0x80) {
+      console.error(`the broker refused ${topicFilters[i]}: ${reason}`);
+    }
+  });
+
+  const { reasonCodes } = await client.unsubscribe(topicFilters);
+  // MQTT 5.0 only. 0x11 (NoSubscriptionExisted) is a success.
+  reasonCodes?.forEach((reasonCode, i) => {
+    if (reasonCode >= 0x80) {
+      console.error(`the broker refused to unsubscribe from ${topicFilters[i]}: ${reasonCode}`);
+    }
+  });
+} catch (err) {
+  if (err instanceof ClientErrors.InvalidTopicFilterError) {
+    console.error(err.message); // e.g. 'logs/#/error'
+  } else if (err instanceof ClientErrors.ConnectionClosed) {
+    console.error('closed before SUBACK / UNSUBACK: the broker may or may not have processed the request');
+  } else {
+    throw err;
+  }
+}
+```
+
 ## Browser
 
 ### Use `WebSocketMqttClient`
@@ -403,7 +526,8 @@ In-flight QoS 1/2 messages are kept in memory, so they are lost when the process
 - A persistent session store (planned).
 - Specifying CA certificates for WebSocket Secure (`wss://`). The runtime's trust store is used.
 - Disabling TLS certificate verification (`rejectUnauthorized`).
-- Automatic reconnection.
+- Automatic reconnection. Reconnect from the `closed` event, as in
+  [examples/deno/reconnect.ts](https://github.com/ymjacky/mqtt5/blob/main/examples/deno/reconnect.ts).
 
 ## License
 

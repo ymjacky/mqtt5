@@ -1,9 +1,18 @@
-import { Mqtt, MqttPackets, MqttProperties } from '../mod.ts';
+import { Mqtt, MqttPackets, MqttProperties, MqttUtils } from '../mod.ts';
 import { Session } from './session.ts';
 import { TopicAliasManager } from './topic_alias.ts';
 import { ClientOptions, ConnectOptions, PublishOptions, PublishResult, SubscribeResults, SubscriptionOption, UnsubscribeResults } from './client_types.ts';
-import { ConnectTimeout, MalformedPacketError, SendPacketError, StateIsNotOfflineError, StateIsNotOnlineError } from './error.ts';
+import {
+  ConnectionClosed,
+  ConnectTimeout,
+  MalformedPacketError,
+  PacketTooLargeError,
+  SendPacketError,
+  StateIsNotOfflineError,
+  StateIsNotOnlineError,
+} from './error.ts';
 import { Deferred } from './promise.ts';
+import { validateConnect, validatePublish, validateSubscribe, validateUnsubscribe } from './validation.ts';
 import { IncomingMemoryStore, IncomingStore } from '../mqtt_store/mod.ts';
 import { createCustomEvent, CustomEventListener, CustomEventMap } from './events.ts';
 
@@ -40,7 +49,7 @@ function positiveOrDefault(value: number | undefined, defaultValue: number): num
 }
 
 /**
- * Creates the Deferred whose promise publish(), subscribe(), unsubscribe() and auth() return.
+ * Creates the Deferred whose promise connect(), publish(), subscribe(), unsubscribe() and auth() return.
  * A rejection reaches callers that await the promise, but never becomes an unhandled rejection
  * (which terminates the process in Deno) when a caller ignores the promise.
  */
@@ -83,6 +92,8 @@ export abstract class BaseMqttClient {
   private connectionState: ConnectionStates;
   private session: Session;
   private unresolvedConnect?: Deferred<ConnackPacket>;
+  // Why the pending connect() fails when the connection is closed before CONNACK. ConnectionClosed if not set.
+  private connectFailure?: Error;
   private incomingStore: IncomingStore;
   // Tail of the chain that runs received packet handlers one at a time.
   private packetHandling: Promise<void> = Promise.resolve();
@@ -123,6 +134,8 @@ export abstract class BaseMqttClient {
   private topicAliasManagerAboutSend?: TopicAliasManager;
   private topicAliasMaximumAboutReceive?: number;
   private topicAliasMapAboutReceive: Map<number, string>;
+  // Maximum Packet Size of the broker (CONNACK) for the current connection. No limit if undefined.
+  private maximumPacketSizeAboutSend?: number;
   private waitForClose?: Deferred<void>;
 
   /** Creates a client. Use {@link MqttClient} or {@link WebSocketMqttClient}. */
@@ -171,8 +184,48 @@ export abstract class BaseMqttClient {
     this.topicAliasMapAboutReceive = new Map<number, string>();
   }
 
-  /** Encodes and sends a packet, and restarts the keep alive timer. */
-  private async sendPacket(packet: AnyPacket) {
+  /**
+   * Encodes a packet to send. Its Remaining Length must not be larger than the largest MQTT allows, and the packet
+   * must not be larger than the Maximum Packet Size of the broker ([MQTT-3.2.2-15]).
+   * DISCONNECT and AUTH that are too large are encoded again without the Reason String and User Properties, which must not
+   * be sent when they make the packet too large ([MQTT-3.14.2-3], [MQTT-3.14.2-4], [MQTT-3.15.2-2], [MQTT-3.15.2-3]).
+   * @throws {PacketTooLargeError}
+   * @throws {MqttPacketSerializeError} if the packet cannot be encoded for another reason.
+   */
+  private encodePacket(packet: AnyPacket): Uint8Array {
+    const name = packet.type.toUpperCase();
+    let bytes: Uint8Array;
+    try {
+      bytes = MqttPackets.packetToBytes(packet, this.protocolVersion);
+    } catch (err) {
+      // The encoder fails on the Remaining Length when it builds the fixed header, before copying a large payload.
+      if (err instanceof MqttPackets.MqttPacketsError.MqttPacketSerializeError && err.cause instanceof MqttUtils.MqttUtilsError.RemainingLengthError) {
+        throw new PacketTooLargeError(`${name} has a Remaining Length larger than ${MqttUtils.maxVariableByteInteger} bytes, the largest MQTT allows`);
+      }
+      throw err;
+    }
+    const max = this.maximumPacketSizeAboutSend;
+    if (typeof max === 'undefined' || bytes.length <= max) {
+      return bytes;
+    }
+    if (
+      (packet.type === 'disconnect' || packet.type === 'auth') &&
+      (packet.properties?.reasonString !== undefined || packet.properties?.userProperties !== undefined)
+    ) {
+      this.log(`${name} is too large for the broker: sending it without the Reason String and User Properties`);
+      const properties = { ...packet.properties };
+      delete properties.reasonString;
+      delete properties.userProperties;
+      return this.encodePacket({ ...packet, properties });
+    }
+    throw new PacketTooLargeError(`${name} is ${bytes.length} bytes, larger than the Maximum Packet Size ${max} of the broker`);
+  }
+
+  /**
+   * Encodes and sends a packet, and restarts the keep alive timer.
+   * @param bytes the packet already encoded by the caller, if any.
+   */
+  private async sendPacket(packet: AnyPacket, bytes?: Uint8Array) {
     try {
       if (this.connectionState === 'offline') {
         this.log(`can't send packet because offline.`, packet);
@@ -180,9 +233,9 @@ export abstract class BaseMqttClient {
       }
 
       this.log(`sending ${packet.type} packet`, packet);
-      const bytes = MqttPackets.packetToBytes(packet, this.protocolVersion);
+      const data = bytes ?? this.encodePacket(packet);
       this.startKeepAliveTimer();
-      await this.write(bytes);
+      await this.write(data);
     } catch (err) {
       this.log('sendPacket: ', err);
       throw err;
@@ -195,14 +248,18 @@ export abstract class BaseMqttClient {
    * is only logged by sendPacket(); the closed connection itself is detected
    * by the receive side.
    */
-  private sendPacketInBackground(packet: AnyPacket) {
-    this.sendPacket(packet).catch(() => {
+  private sendPacketInBackground(packet: AnyPacket, bytes?: Uint8Array) {
+    this.sendPacket(packet, bytes).catch(() => {
       // already logged in sendPacket()
     });
   }
 
-  /** Opens the transport connection to the broker. */
-  protected abstract open(): Promise<void>;
+  /**
+   * Opens the transport connection to the broker.
+   * @param signal aborted when connect() gives up (connect timeout). Opening that is still in progress then rejects,
+   * and a connection that opens later is closed without being used.
+   */
+  protected abstract open(signal: AbortSignal): Promise<void>;
 
   /**
    * Connects to the broker: opens the connection, sends CONNECT and waits for CONNACK.
@@ -210,11 +267,21 @@ export abstract class BaseMqttClient {
    * The returned promise resolves with the CONNACK packet even when the broker rejects the connection,
    * so check its `reasonCode` (MQTT 5.0) / `returnCode` (MQTT 3.1.1).
    * After the client is closed, it can connect again with this method; it does not reconnect automatically.
+   * When the returned promise rejects, the client is offline again, so this method can be called again right away.
+   * A rejection of an ignored promise does not terminate the process; await the promise to handle failures.
    *
    * @param options CONNECT options: clean start, MQTT 5.0 properties and will message.
    * @returns the received CONNACK packet.
    * @throws {StateIsNotOfflineError} if the client is already connected or connecting.
-   * @throws {ConnectTimeout} if CONNACK is not received within `connectTimeoutMS`.
+   * @throws {InvalidTopicNameError} if the Will Topic or Will Response Topic is not a valid Topic Name. Nothing is sent.
+   * @throws {InvalidArgumentError} if the Will QoS is not 0, 1 or 2, or the Will Payload is longer than 65,535 bytes. Nothing is sent.
+   * @throws {InvalidPropertyError} if a CONNECT or Will property is invalid. Nothing is sent.
+   * @throws {PacketTooLargeError} if CONNECT is larger than MQTT allows. No connection is opened.
+   * @throws {MqttPacketSerializeError} if CONNECT cannot be encoded, e.g. the user name is longer than 65,535 bytes. No connection is opened.
+   * @throws {ConnectTimeout} if CONNACK is not received within `connectTimeoutMS`, including the time to open the connection.
+   * @throws {ConnectionClosed} if the connection is closed before CONNACK is received.
+   * `WebSocketMqttClient` also rejects with it when the connection cannot be opened.
+   * @throws {Error} `MqttClient`: the error of opening the connection, e.g. `Deno.errors.ConnectionRefused` when the broker is not running.
    * @example
    * mqtt
    * ```ts
@@ -261,70 +328,71 @@ export abstract class BaseMqttClient {
    * });
    * ```
    */
-  public async connect(
+  public connect(
     options?: ConnectOptions,
   ): Promise<ConnackPacket> {
+    const deferred = createRequestDeferred<ConnackPacket>();
+    this.startConnect(options, deferred).catch((err) => deferred.reject(err));
+    return deferred.promise;
+  }
+
+  /** Opens the connection and sends CONNECT for connect(). CONNACK, a failure or the connect timeout settles `deferred`. */
+  private async startConnect(options: ConnectOptions | undefined, deferred: Deferred<ConnackPacket>) {
     if (this.connectionState != 'offline') {
-      return Promise.reject(
-        new StateIsNotOfflineError('connect'),
-      );
+      throw new StateIsNotOfflineError('connect');
     }
 
-    if (options) {
-      if (typeof options.clean !== 'undefined') {
-        this.clean = options.clean;
-      }
-      if (options.properties) {
-        // save properties for reconnect
-        this.connectProperties = options.properties;
-      }
-    }
+    validateConnect(options, this.protocolVersion);
 
+    const clean = options?.clean ?? this.clean;
+    // The properties are saved for reconnect.
+    let connectProperties = options?.properties ?? this.connectProperties;
     if (this.topicAliasMaximumAboutReceive) {
       // Tell the broker that you can receive topic alias
-      if (this.connectProperties) {
-        this.connectProperties.topicAliasMaximum = this.topicAliasMaximumAboutReceive;
-      } else {
-        this.connectProperties = { topicAliasMaximum: this.topicAliasMaximumAboutReceive };
-      }
+      connectProperties = { ...connectProperties, topicAliasMaximum: this.topicAliasMaximumAboutReceive };
     }
 
-    this.connectionState = 'connecting';
+    const connectPacket: AnyPacket = {
+      type: 'connect',
+      clientId: this.clientId,
+      username: this.userName,
+      password: this.password,
+      protocolVersion: this.protocolVersion,
+      clean,
+      keepAlive: this.keepAlive,
+      properties: connectProperties,
+      will: options?.will,
+    };
+    // The limit of the previous connection does not apply: the new one comes in CONNACK.
+    this.maximumPacketSizeAboutSend = undefined;
+    // Encode before opening the connection: if it fails, nothing is opened or changed.
+    const bytes = this.encodePacket(connectPacket);
 
-    const deferred = new Deferred<ConnackPacket>();
+    this.clean = clean;
+    this.connectProperties = connectProperties;
+    this.connectionState = 'connecting';
     this.unresolvedConnect = deferred;
+    this.connectFailure = undefined;
+    const opening = new AbortController();
 
     try {
-      this.startConnectTimer();
+      this.startConnectTimer(opening);
       this.log(`opening connection to ${this.url}`);
-      await this.open();
-
-      const connectPacket: AnyPacket = {
-        type: 'connect',
-        clientId: this.clientId,
-        username: this.userName,
-        password: this.password,
-        protocolVersion: this.protocolVersion,
-        clean: this.clean,
-        keepAlive: this.keepAlive,
-        properties: this.connectProperties,
-        will: options?.will,
-      };
+      await this.open(opening.signal);
 
       this.log(`sending ${connectPacket.type} packet`, connectPacket);
-      const bytes = MqttPackets.packetToBytes(connectPacket, this.protocolVersion);
       await this.write(bytes);
     } catch (err) {
-      const e = err instanceof Error ? err : err as Error;
+      const e = err instanceof Error ? err : new Error(String(err));
       this.log(`caught error opening connection: ${e.message}`);
 
-      this.detectClosed();
-      if (this.unresolvedConnect) {
-        this.unresolvedConnect.reject(e);
+      // detectClosed() rejects connect(). Keep the reason of a connect timeout, which aborts the opening.
+      this.connectFailure ??= e;
+      // The transport may have reported the close already.
+      if (this.connectionState === 'connecting') {
+        this.detectClosed();
       }
     }
-
-    return deferred.promise;
   }
 
   /**
@@ -348,6 +416,13 @@ export abstract class BaseMqttClient {
    * @param properties MQTT 5.0 PUBLISH properties.
    * @returns the result of the publish flow.
    * @throws {StateIsNotOnlineError} if the client is not connected.
+   * @throws {InvalidTopicNameError} if `topic` or the Response Topic is not a valid Topic Name. Nothing is sent.
+   * @throws {InvalidArgumentError} if the QoS is not 0, 1 or 2, or `dup` is true with QoS 0. Nothing is sent.
+   * @throws {InvalidPropertyError} if a property is invalid. Nothing is sent.
+   * @throws {PacketTooLargeError} if PUBLISH is larger than the Maximum Packet Size of the broker or than MQTT allows. Nothing is sent.
+   * QoS 1 and 2: also when the message is resent after reconnecting and is larger than the Maximum Packet Size of the new connection;
+   * it is removed from the session.
+   * @throws {MqttPacketSerializeError} if PUBLISH cannot be encoded. Nothing is sent.
    * @throws {SessionLostError} QoS 1 and 2: if the broker did not keep the session when reconnecting before the flow completed.
    * @example
    * ```ts
@@ -402,15 +477,21 @@ export abstract class BaseMqttClient {
     const dup = (options && options.dup) || false;
     const qos = (options && options.qos) || 0;
     const retain = (options && options.retain) || false;
+    // Check the topic given by the caller: with a topic alias, the client itself sends an empty Topic Name.
+    validatePublish(topic, qos, dup, properties, this.protocolVersion);
 
     const buffer: Uint8Array = (typeof payload === 'string') ? new TextEncoder().encode(payload) : payload;
 
     // resolve topic alias
+    const topicAliasManager = this.topicAliasManagerAboutSend;
     let omittedTopic;
+    let registeredAlias = false; // this PUBLISH registers a new topic alias
     let topicId: number = 0; // 0 = not use
-    if (this.topicAliasManagerAboutSend) {
-      const [generated, tid] = await this.topicAliasManagerAboutSend.getTopicId(topic);
-      if (!generated) {
+    if (topicAliasManager) {
+      const [generated, tid] = await topicAliasManager.getTopicId(topic);
+      if (generated) {
+        registeredAlias = true;
+      } else {
         omittedTopic = topic;
         topic = '';
       }
@@ -422,33 +503,39 @@ export abstract class BaseMqttClient {
       ? { ...properties, ...(topicId > 0 && { topicAlias: topicId }) }
       : undefined;
 
+    const packetId = qos === Mqtt.QoS.AT_MOST_ONCE ? 0 : await this.session.acquirePacketId();
+    const packet: PublishPacket = {
+      type: 'publish',
+      topic,
+      payload: buffer,
+      dup,
+      retain,
+      qos,
+      packetId,
+      properties: publishProperties,
+    };
+
+    // Encode before storing the packet in the session: a packet that cannot be encoded or is too large
+    // must not stay there to be resent. Undo the packet ID and the topic alias it took.
+    let bytes: Uint8Array;
+    try {
+      bytes = this.encodePacket(packet);
+    } catch (err) {
+      if (packetId) {
+        this.session.releasePacketId(packetId);
+      }
+      if (registeredAlias && topicAliasManager) {
+        topicAliasManager.releaseTopic(topic);
+      }
+      throw err;
+    }
+
     if (qos === Mqtt.QoS.AT_MOST_ONCE) {
-      const packet: PublishPacket = {
-        type: 'publish',
-        topic,
-        payload: buffer,
-        dup,
-        retain,
-        qos,
-        packetId: 0,
-        properties: publishProperties,
-      };
-      await this.sendPacket(packet);
+      await this.sendPacket(packet, bytes);
       deferred.resolve({ result: 0, reason: '' });
     } else {
-      const packetId = await this.session.acquirePacketId();
-      const packet: PublishPacket = {
-        type: 'publish',
-        topic,
-        payload: buffer,
-        dup,
-        retain,
-        qos,
-        packetId,
-        properties: publishProperties,
-      };
       await this.session.storePublish(packet, deferred, omittedTopic);
-      await this.sendPacket(packet);
+      await this.sendPacket(packet, bytes);
     }
   }
 
@@ -460,6 +547,10 @@ export abstract class BaseMqttClient {
    * @param properties MQTT 5.0 SUBSCRIBE properties.
    * @returns the reason codes of SUBACK.
    * @throws {StateIsNotOnlineError} if the client is not connected.
+   * @throws {InvalidTopicFilterError} if a topic filter is invalid. Nothing is sent.
+   * @throws {InvalidArgumentError} if no topic filter is given, or a QoS, Retain Handling or No Local is invalid. Nothing is sent.
+   * @throws {InvalidPropertyError} if a property, e.g. the Subscription Identifier, is invalid. Nothing is sent.
+   * @throws {PacketTooLargeError} if SUBSCRIBE is larger than the Maximum Packet Size of the broker or than MQTT allows. Nothing is sent.
    * @throws {ConnectionClosed} if the connection is closed before SUBACK is received.
    * @example
    * ```ts
@@ -484,6 +575,10 @@ export abstract class BaseMqttClient {
    * @param properties MQTT 5.0 SUBSCRIBE properties.
    * @returns the reason codes of SUBACK.
    * @throws {StateIsNotOnlineError} if the client is not connected.
+   * @throws {InvalidTopicFilterError} if a topic filter is invalid. Nothing is sent.
+   * @throws {InvalidArgumentError} if no topic filter is given, or a QoS, Retain Handling or No Local is invalid. Nothing is sent.
+   * @throws {InvalidPropertyError} if a property, e.g. the Subscription Identifier, is invalid. Nothing is sent.
+   * @throws {PacketTooLargeError} if SUBSCRIBE is larger than the Maximum Packet Size of the broker or than MQTT allows. Nothing is sent.
    * @throws {ConnectionClosed} if the connection is closed before SUBACK is received.
    * @example
    * ```ts
@@ -508,6 +603,10 @@ export abstract class BaseMqttClient {
    * @param properties MQTT 5.0 SUBSCRIBE properties.
    * @returns the reason codes of SUBACK.
    * @throws {StateIsNotOnlineError} if the client is not connected.
+   * @throws {InvalidTopicFilterError} if a topic filter is invalid. Nothing is sent.
+   * @throws {InvalidArgumentError} if no topic filter is given, or a QoS, Retain Handling or No Local is invalid. Nothing is sent.
+   * @throws {InvalidPropertyError} if a property, e.g. the Subscription Identifier, is invalid. Nothing is sent.
+   * @throws {PacketTooLargeError} if SUBSCRIBE is larger than the Maximum Packet Size of the broker or than MQTT allows. Nothing is sent.
    * @throws {ConnectionClosed} if the connection is closed before SUBACK is received.
    * @example
    * ```ts
@@ -532,6 +631,10 @@ export abstract class BaseMqttClient {
    * @param properties MQTT 5.0 SUBSCRIBE properties.
    * @returns the reason codes of SUBACK.
    * @throws {StateIsNotOnlineError} if the client is not connected.
+   * @throws {InvalidTopicFilterError} if a topic filter is invalid. Nothing is sent.
+   * @throws {InvalidArgumentError} if no topic filter is given, or a QoS, Retain Handling or No Local is invalid. Nothing is sent.
+   * @throws {InvalidPropertyError} if a property, e.g. the Subscription Identifier, is invalid. Nothing is sent.
+   * @throws {PacketTooLargeError} if SUBSCRIBE is larger than the Maximum Packet Size of the broker or than MQTT allows. Nothing is sent.
    * @throws {ConnectionClosed} if the connection is closed before SUBACK is received.
    * @example
    * ```ts
@@ -591,6 +694,7 @@ export abstract class BaseMqttClient {
         }
         : { topicFilter: sub, qos: qos ?? Mqtt.QoS.AT_MOST_ONCE };
     });
+    validateSubscribe(subs, properties, this.protocolVersion);
 
     const packet: SubscribePacket = {
       type: 'subscribe',
@@ -614,6 +718,10 @@ export abstract class BaseMqttClient {
    * @param properties MQTT 5.0 UNSUBSCRIBE properties.
    * @returns the reason codes of UNSUBACK.
    * @throws {StateIsNotOnlineError} if the client is not connected.
+   * @throws {InvalidTopicFilterError} if a topic filter is invalid. Nothing is sent.
+   * @throws {InvalidArgumentError} if no topic filter is given. Nothing is sent.
+   * @throws {InvalidPropertyError} if a property is invalid. Nothing is sent.
+   * @throws {PacketTooLargeError} if UNSUBSCRIBE is larger than the Maximum Packet Size of the broker or than MQTT allows. Nothing is sent.
    * @throws {ConnectionClosed} if the connection is closed before UNSUBACK is received.
    * @example
    * ```ts
@@ -642,6 +750,10 @@ export abstract class BaseMqttClient {
    * @param properties MQTT 5.0 UNSUBSCRIBE properties.
    * @returns the reason codes of UNSUBACK.
    * @throws {StateIsNotOnlineError} if the client is not connected.
+   * @throws {InvalidTopicFilterError} if a topic filter is invalid. Nothing is sent.
+   * @throws {InvalidArgumentError} if no topic filter is given. Nothing is sent.
+   * @throws {InvalidPropertyError} if a property is invalid. Nothing is sent.
+   * @throws {PacketTooLargeError} if UNSUBSCRIBE is larger than the Maximum Packet Size of the broker or than MQTT allows. Nothing is sent.
    * @throws {ConnectionClosed} if the connection is closed before UNSUBACK is received.
    * @example
    * ```ts
@@ -683,6 +795,7 @@ export abstract class BaseMqttClient {
     }
 
     const unsubs = Array.isArray(input) ? input : [input];
+    validateUnsubscribe(unsubs, properties, this.protocolVersion);
 
     const packet: UnsubscribePacket = {
       type: 'unsubscribe',
@@ -708,6 +821,8 @@ export abstract class BaseMqttClient {
    * Resolves immediately if the client is not connected.
    * If a disconnect is already in progress, waits for the same close without sending DISCONNECT again;
    * with `force`, closes the connection now instead of waiting for the broker. `properties` of this call are ignored.
+   * The Reason String and User Properties are left out if they make DISCONNECT larger than the Maximum Packet Size of the broker.
+   * If DISCONNECT cannot be sent, e.g. a property cannot be encoded, the promise rejects and the connection stays open.
    *
    * @param force `true` to close without sending DISCONNECT.
    * @param properties MQTT 5.0 DISCONNECT properties.
@@ -777,7 +892,17 @@ export abstract class BaseMqttClient {
       this.waitForClose = undefined;
       deferred.resolve();
     } else {
-      await this.doDisconnect(force, undefined, properties);
+      try {
+        await this.doDisconnect(force, undefined, properties);
+      } catch (err) {
+        // DISCONNECT was not sent (e.g. a property cannot be encoded), so the connection may stay open.
+        // Do not leave this and later calls waiting for a close that may not come.
+        if (this.waitForClose === deferred) {
+          this.waitForClose = undefined;
+        }
+        deferred.resolve();
+        throw err;
+      }
     }
 
     return deferred.promise;
@@ -810,7 +935,10 @@ export abstract class BaseMqttClient {
    * A rejection of an ignored promise does not terminate the process; await the promise to handle failures.
    * @param reasonCode e.g. `Mqtt.ReasonCode.ContinueAuthentication` or `Mqtt.ReasonCode.ReAuthenticate`.
    * @param properties AUTH properties, such as `authenticationMethod` and `authenticationData`.
+   * The Reason String and User Properties are left out if they make AUTH larger than the Maximum Packet Size of the broker.
    * @throws {SendPacketError} if the client is not connected.
+   * @throws {PacketTooLargeError} if AUTH is larger than the Maximum Packet Size of the broker even without the Reason String
+   * and User Properties. Nothing is sent.
    */
   public auth(
     reasonCode?: Mqtt.ReasonCode,
@@ -913,6 +1041,9 @@ export abstract class BaseMqttClient {
   /** Called by subclasses when the connection is closed: stops the timers and emits the `closed` event. */
   protected detectClosed() {
     this.log('connection closed.');
+    // A connect() waiting for CONNACK fails: CONNACK will not arrive on this connection.
+    const pendingConnect = this.connectionState === 'connecting' ? this.unresolvedConnect : undefined;
+    const connectFailure = this.connectFailure ?? new ConnectionClosed();
     this.connectionState = 'offline';
     this.stopConnectTimer();
     this.stopDisconnectTimer();
@@ -930,6 +1061,9 @@ export abstract class BaseMqttClient {
     this.eventTarget.dispatchEvent(
       createCustomEvent('closed', {}),
     );
+
+    // Rejected after the client is offline, so that connect() can be called again right away.
+    pendingConnect?.reject(connectFailure);
   }
 
   /**
@@ -992,6 +1126,11 @@ export abstract class BaseMqttClient {
    * and resolves `connect()`.
    */
   private async handleConnack(packet: ConnackPacket) {
+    if (this.connectionState !== 'connecting' || this.connectFailure) {
+      // No connect() is waiting for it, e.g. it has timed out and the connection is being closed.
+      this.log('CONNACK is ignored: connect() is not waiting for it', packet);
+      return;
+    }
     this.connectionState = 'online';
 
     this.stopConnectTimer();
@@ -1020,6 +1159,8 @@ export abstract class BaseMqttClient {
         await this.session.clearAllStores(this.clientId);
       }
 
+      this.maximumPacketSizeAboutSend = packet.properties?.maximumPacketSize;
+
       // The Server Keep Alive replaces the Keep Alive sent in CONNECT for this connection, even when it is higher or 0.
       this.currentKeepAlive = packet.properties?.serverKeepAlive ?? this.keepAlive;
 
@@ -1027,10 +1168,7 @@ export abstract class BaseMqttClient {
       const topicAliasMaximum = Math.min(this.topicAliasMaximumAboutSend ?? 0, packet.properties?.topicAliasMaximum ?? 0);
       this.topicAliasManagerAboutSend = topicAliasMaximum > 0 ? new TopicAliasManager(topicAliasMaximum) : undefined;
 
-      // resend publish and pubrel
-      for await (const packet of this.session.resendTargets()) {
-        this.sendPacketInBackground(packet);
-      }
+      await this.resendSessionPackets();
     }
 
     if (this.unresolvedConnect) {
@@ -1044,6 +1182,27 @@ export abstract class BaseMqttClient {
     // The connection may have been closed while awaiting above.
     if (connectionSuceeded && this.connectionState === 'online') {
       this.startKeepAliveTimer();
+    }
+  }
+
+  /**
+   * Resends the PUBLISH and PUBREL packets kept in the session after reconnecting.
+   * A packet that cannot be sent on this connection, e.g. larger than the Maximum Packet Size of the broker,
+   * is removed from the session, and its publish() rejects with the error.
+   */
+  private async resendSessionPackets() {
+    const unsendable: { packetId: number; err: Error }[] = [];
+    for await (const packet of this.session.resendTargets()) {
+      try {
+        this.sendPacketInBackground(packet, this.encodePacket(packet));
+      } catch (err) {
+        this.log(`can't resend ${packet.type} packet, removing it from the session`, packet, err);
+        unsendable.push({ packetId: packet.packetId!, err: err as Error });
+      }
+    }
+    // Removed after the iteration: an OutgoingStore does not have to support removing packets while iterating.
+    for (const { packetId, err } of unsendable) {
+      await this.session.discardPublishFlow(packetId, err);
     }
   }
 
@@ -1285,15 +1444,18 @@ export abstract class BaseMqttClient {
     }
   }
 
-  /** Rejects `connect()` with ConnectTimeout if CONNACK is not received within `connectTimeoutMS`. */
-  private startConnectTimer() {
+  /**
+   * Gives up connect() if CONNACK is not received within `connectTimeoutMS`: aborts the opening of the connection,
+   * or closes the connection. connect() rejects with ConnectTimeout when the client is offline again (detectClosed()).
+   */
+  private startConnectTimer(opening: AbortController) {
     this.startTimer(
       'connect',
       () => {
-        this.close();
-        if (this.unresolvedConnect) {
-          this.unresolvedConnect.reject(new ConnectTimeout());
-        }
+        this.log('CONNACK was not received within connectTimeoutMS');
+        this.connectFailure = new ConnectTimeout();
+        opening.abort(this.connectFailure);
+        this.close().catch((err) => this.log('failed to close the connection:', err));
       },
       this.connectTimeout,
     );

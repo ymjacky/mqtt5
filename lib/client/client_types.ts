@@ -98,7 +98,7 @@ export type ConnectOptions = {
   /** Clean Start (MQTT 5.0) / Clean Session (MQTT 3.1.1). Overrides {@link ClientOptions.clean}. */
   clean?: boolean;
   /** MQTT 5.0 CONNECT properties. They are kept and sent again on reconnect. */
-  properties?: MqttProperties.Properties;
+  properties?: MqttProperties.ConnectProperties;
   /** Will message, published by the broker when the connection is closed without a DISCONNECT. */
   will?: {
     /** Retain flag of the will message. */
@@ -117,7 +117,7 @@ export type ConnectOptions = {
 /** Options for {@link MqttClient.publish} / {@link WebSocketMqttClient.publish}. */
 export type PublishOptions = {
   /**
-   * DUP flag.
+   * DUP flag. Must be false for QoS 0 ([MQTT-3.3.1-2]).
    * @default {false}
    */
   dup?: boolean;

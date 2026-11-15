@@ -1,6 +1,6 @@
-import { Mqtt, MqttClient, MqttProperties } from '../../../deno/mod.ts';
+import { ClientErrors, Mqtt, MqttClient, MqttPackets, MqttProperties } from '../../../deno/mod.ts';
 import { TestBroker } from '../broker/test_broker.ts';
-import { assertEquals, assertExists } from 'std/assert/mod.ts';
+import { assert, assertEquals, assertExists, assertRejects } from 'std/assert/mod.ts';
 
 function logger(msg: string, ...args: unknown[]): void {
   console.log('[Test Client]', msg, ...args);
@@ -347,3 +347,185 @@ Deno.test({ name: '@connect', only: false }, async (context) => {
     },
   );
 }); // connect
+
+Deno.test({ name: '@connect ignored rejection', only: false }, async (context) => {
+  await context.step(
+    'an ignored StateIsNotOfflineError does not become an unhandled rejection',
+    async () => {
+      const broker = new TestBroker();
+      try {
+        broker.listen();
+        broker.on('connect', (event) => {
+          const packet = event.detail;
+          broker.sendConnack(packet.clientId, false, packet.protocolVersion);
+        });
+
+        const client = new MqttClient({ clientId: 'cid', logger: logger });
+        await client.connect();
+
+        client.connect();
+        await assertRejects(() => client.connect(), ClientErrors.StateIsNotOfflineError);
+      } finally {
+        await broker.destroy();
+      }
+    },
+  );
+
+  await context.step(
+    'an ignored ConnectTimeout does not become an unhandled rejection',
+    async () => {
+      const broker = new TestBroker();
+      try {
+        broker.listen();
+        // do not reply CONNACK
+
+        const client = new MqttClient({ clientId: 'cid', logger: logger, connectTimeoutMS: 200 });
+        const { promise: closed, resolve } = Promise.withResolvers<void>();
+        client.on('closed', () => resolve());
+
+        client.connect();
+        await closed;
+      } finally {
+        await broker.destroy();
+      }
+    },
+  );
+}); // @connect ignored rejection
+
+Deno.test({ name: '@connect encoding failure', only: false }, async (context) => {
+  await context.step(
+    'opens no connection when CONNECT cannot be encoded',
+    async () => {
+      const broker = new TestBroker();
+      try {
+        broker.listen();
+        let accepted = 0;
+        broker.on('accept', () => {
+          accepted++;
+        });
+        broker.on('connect', (event) => {
+          const packet = event.detail;
+          broker.sendConnack(packet.clientId, false, packet.protocolVersion);
+        });
+
+        // A User Name longer than 65,535 bytes cannot be encoded: its length is a Two Byte Integer.
+        const client = new MqttClient({ clientId: 'cid', logger: logger, username: 'a'.repeat(0x10000) });
+        await assertRejects(
+          () => client.connect(),
+          MqttPackets.MqttPacketsError.MqttPacketSerializeError,
+        );
+        assertEquals(accepted, 0);
+
+        // The client stayed offline: connect() rejects again for the same reason, not with StateIsNotOfflineError.
+        await assertRejects(
+          () => client.connect(),
+          MqttPackets.MqttPacketsError.MqttPacketSerializeError,
+        );
+        assertEquals(accepted, 0);
+      } finally {
+        await broker.destroy();
+      }
+    },
+  );
+}); // @connect encoding failure
+
+Deno.test({ name: '@connect failure leaves the client offline', only: false }, async (context) => {
+  await context.step(
+    'rejects with ConnectionClosed when the broker closes the connection before CONNACK',
+    async () => {
+      const broker = new TestBroker();
+      try {
+        broker.listen();
+        let connects = 0;
+        broker.on('connect', (event) => {
+          const packet = event.detail;
+          if (++connects === 1) {
+            broker.closeConnectionFromBroker(packet.clientId);
+          } else {
+            broker.sendConnack(packet.clientId, false, packet.protocolVersion);
+          }
+        });
+
+        const client = new MqttClient({ clientId: 'cid', logger: logger, connectTimeoutMS: 10000 });
+        await assertRejects(() => client.connect(), ClientErrors.ConnectionClosed);
+
+        // The client is offline: it can connect again right away.
+        const connack = await client.connect();
+        assertEquals(connack.reasonCode, Mqtt.ReasonCode.Success);
+      } finally {
+        await broker.destroy();
+      }
+    },
+  );
+
+  await context.step(
+    'after ConnectTimeout, the client is offline and can connect again right away',
+    async () => {
+      const broker = new TestBroker();
+      try {
+        broker.listen();
+        let connects = 0;
+        broker.on('connect', (event) => {
+          const packet = event.detail;
+          if (++connects > 1) { // no CONNACK for the first CONNECT
+            broker.sendConnack(packet.clientId, false, packet.protocolVersion);
+          }
+        });
+
+        const client = new MqttClient({ clientId: 'cid', logger: logger, connectTimeoutMS: 200 });
+        let closed = 0;
+        client.on('closed', () => {
+          closed++;
+        });
+
+        await assertRejects(() => client.connect(), ClientErrors.ConnectTimeout);
+        assertEquals(closed, 1); // the connection was closed before connect() rejected
+
+        const connack = await client.connect();
+        assertEquals(connack.reasonCode, Mqtt.ReasonCode.Success);
+      } finally {
+        await broker.destroy();
+      }
+    },
+  );
+
+  await context.step(
+    'ConnectTimeout while the connection is being opened rejects in time, and the connection opened later is closed',
+    async () => {
+      const broker = new TestBroker();
+      const connect = Deno.connect;
+      try {
+        broker.listen();
+        broker.on('connect', (event) => {
+          const packet = event.detail;
+          broker.sendConnack(packet.clientId, false, packet.protocolVersion);
+        });
+
+        // The TCP connection does not open within connectTimeoutMS, e.g. the broker's address does not answer.
+        const { promise: opening, resolve: open } = Promise.withResolvers<Deno.TcpConn>();
+        Deno.connect = (() => opening) as unknown as typeof Deno.connect;
+
+        const client = new MqttClient({ clientId: 'cid', logger: logger, connectTimeoutMS: 200 });
+        const start = Date.now();
+        await assertRejects(() => client.connect(), ClientErrors.ConnectTimeout);
+        const elapsed = Date.now() - start;
+        assert(elapsed < 1000, `rejected after ${elapsed} ms`);
+
+        // The client is offline: it can connect again right away.
+        Deno.connect = connect;
+        const connack = await client.connect();
+        assertEquals(connack.reasonCode, Mqtt.ReasonCode.Success);
+
+        // The first connection opens late: it is closed, and the connected client is not affected.
+        let lateConnectionClosed = false;
+        open({ close: () => lateConnectionClosed = true } as unknown as Deno.TcpConn);
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        assert(lateConnectionClosed);
+        assertEquals(await client.publish('topicA', 'x'), { result: 0, reason: '' });
+      } finally {
+        Deno.connect = connect;
+        await broker.destroy();
+      }
+    },
+  );
+}); // @connect failure leaves the client offline

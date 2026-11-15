@@ -1,7 +1,7 @@
 import * as Mqtt from '../mqtt/mod.ts';
 import * as MqttProperties from '../mqtt_properties/mod.ts';
 import { MqttUtilsError } from '../mqtt_utils/mod.ts';
-import { concatBytes, numToTwoByteInteger, numToVariableByteInteger, twoByteIntegerToNum, variableByteIntegerToNum } from '../mqtt_utils/mod.ts';
+import { concatBytes, numToTwoByteInteger, remainingLengthToBytes, twoByteIntegerToNum, variableByteIntegerToNum } from '../mqtt_utils/mod.ts';
 import type { PubackPacket } from './packet_types.ts';
 
 export function toBytes(
@@ -26,7 +26,7 @@ export function toBytes(
 
   const fixedHeader = [
     (Mqtt.PacketType.PUBACK << 4) + Mqtt.fixedHeaderFlag.PUBACK,
-    ...numToVariableByteInteger(variableHeader.length),
+    ...remainingLengthToBytes(variableHeader.length),
   ];
 
   return concatBytes([fixedHeader, variableHeader]);

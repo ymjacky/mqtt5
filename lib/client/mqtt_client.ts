@@ -18,6 +18,34 @@ const writerFactory: WriterFactory = (
 };
 
 /**
+ * Waits for a connection that is being opened, unless `signal` aborts first: then rejects with the abort reason at once,
+ * and closes the connection if it opens later. `Deno.connect()` / `Deno.connectTls()` cannot be stopped while opening.
+ */
+function openUnlessAborted<T extends Deno.Conn>(opening: Promise<T>, signal: AbortSignal): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const onAbort = () => {
+      reject(signal.reason);
+      opening.then((conn) => conn.close(), () => {});
+    };
+    if (signal.aborted) {
+      onAbort();
+      return;
+    }
+    signal.addEventListener('abort', onAbort, { once: true });
+    opening.then(
+      (conn) => {
+        signal.removeEventListener('abort', onAbort);
+        resolve(conn);
+      },
+      (err) => {
+        signal.removeEventListener('abort', onAbort);
+        reject(err);
+      },
+    );
+  });
+}
+
+/**
  * MQTT client that connects over TCP (`mqtt://`) or TLS (`mqtts://`). Deno only;
  * in the browser, use {@link WebSocketMqttClient}.
  *
@@ -47,8 +75,11 @@ export class MqttClient extends BaseMqttClient {
     super(options);
   }
 
-  /** Opens the TCP or TLS connection and starts the receive loop. */
-  protected async open(): Promise<void> {
+  /**
+   * Opens the TCP or TLS connection and starts the receive loop.
+   * @param signal when it aborts while the connection is being opened, rejects at once; the connection is closed when it opens.
+   */
+  protected async open(signal: AbortSignal): Promise<void> {
     const openSocket = async () => {
       if (this.url.protocol === 'mqtt:') {
         return await Deno.connect({
@@ -79,7 +110,8 @@ export class MqttClient extends BaseMqttClient {
       }
     };
 
-    this.conn = await openSocket();
+    // Nothing of this client is changed until the connection is open: an aborted opening must not affect the next one.
+    this.conn = await openUnlessAborted(openSocket(), signal);
     this.write = writerFactory(this.conn, this.log);
     this.reader = this.conn.readable.getReader();
     // Discard any partial packet left over from a previous connection.

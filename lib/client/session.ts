@@ -61,6 +61,21 @@ export class Session {
     this.inflightUnsubscribe.clear();
   }
 
+  /** Releases a packet ID that was acquired for a packet that is not sent. */
+  public releasePacketId(packetId: number) {
+    this.packetIdProvider.release(packetId);
+  }
+
+  /**
+   * Removes the stored PUBLISH or PUBREL of a flow that cannot be resent, releases its packet ID
+   * and rejects its publish() with `reason`.
+   */
+  public async discardPublishFlow(packetId: number, reason: Error) {
+    await this.outgoingStore.discard(packetId);
+    this.packetIdProvider.release(packetId);
+    this.getPublishDeferred(packetId)?.reject(reason);
+  }
+
   /** Removes a SUBSCRIBE or UNSUBSCRIBE that could not be sent, and releases its packet ID. */
   public discardSubscribeRequest(packetId: number) {
     this.inflightSubscribe.delete(packetId);

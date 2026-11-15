@@ -1,7 +1,10 @@
 import * as UtilsError from './error.ts';
 
+/** The largest Variable Byte Integer. It is also the largest Remaining Length. */
+export const maxVariableByteInteger = 268_435_455;
+
 export function numToVariableByteInteger(num: number): Uint8Array {
-  if (num > 268_435_455 || num < 0) {
+  if (num > maxVariableByteInteger || num < 0) {
     throw new UtilsError.NumIsOutOfRange();
   }
 
@@ -20,6 +23,17 @@ export function numToVariableByteInteger(num: number): Uint8Array {
   } while (num > 0);
 
   return new Uint8Array(array);
+}
+
+/**
+ * Encodes the Remaining Length of a fixed header.
+ * @throws {UtilsError.RemainingLengthError} if it is larger than 268,435,455 bytes, the largest MQTT allows.
+ */
+export function remainingLengthToBytes(remainingLength: number): Uint8Array {
+  if (remainingLength > maxVariableByteInteger) {
+    throw new UtilsError.RemainingLengthError(`${remainingLength} is larger than ${maxVariableByteInteger}, the largest MQTT allows`);
+  }
+  return numToVariableByteInteger(remainingLength);
 }
 
 export function variableByteIntegerToNum(buffer: Uint8Array, offset: number) {

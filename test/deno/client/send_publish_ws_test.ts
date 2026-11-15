@@ -187,7 +187,8 @@ Deno.test({ name: '@publish_qos0 ws', only: false }, async (context) => {
         // test
         broker.on('publish', (event) => {
           const packet = event.detail;
-          assertEquals(packet.qos, Mqtt.QoS.AT_MOST_ONCE);
+          // QoS 1: publish() rejects `dup: true` with QoS 0 ([MQTT-3.3.1-2]).
+          assertEquals(packet.qos, Mqtt.QoS.AT_LEAST_ONCE);
           assertEquals(packet.dup, true);
           assertEquals(packet.retain, true);
 
@@ -195,12 +196,14 @@ Deno.test({ name: '@publish_qos0 ws', only: false }, async (context) => {
           assertEquals(packet.payload, new TextEncoder().encode('payloadA'));
 
           assertEquals(packet.properties, undefined);
+          broker.sendPuback('cid', packet.packetId!, Mqtt.ProtocolVersion.MQTT_V5);
           resolve();
         });
         await client.publish(
           'topicA',
           new TextEncoder().encode('payloadA'), // payload
           {
+            qos: Mqtt.QoS.AT_LEAST_ONCE,
             dup: true,
             retain: true,
           },

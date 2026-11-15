@@ -1,6 +1,6 @@
-import { Mqtt, MqttProperties, WebSocketMqttClient } from '../../../deno/mod.ts';
+import { ClientErrors, Mqtt, MqttProperties, WebSocketMqttClient } from '../../../deno/mod.ts';
 import { TestWsBroker } from '../broker/test_ws_broker.ts';
-import { assertEquals, assertExists } from 'std/assert/mod.ts';
+import { assertEquals, assertExists, assertRejects } from 'std/assert/mod.ts';
 
 function logger(msg: string, ...args: unknown[]): void {
   console.log('[Test Client]', msg, ...args);
@@ -312,3 +312,68 @@ Deno.test({ name: '@connect', only: false }, async (context) => {
     },
   );
 }); // connect
+
+Deno.test({ name: '@connect ws failure leaves the client offline', only: false }, async (context) => {
+  await context.step(
+    'rejects with ConnectionClosed when the broker closes the connection before CONNACK',
+    async () => {
+      const broker = new TestWsBroker();
+      try {
+        broker.listen();
+        let connects = 0;
+        broker.on('connect', (event) => {
+          const packet = event.detail;
+          if (++connects === 1) {
+            broker.closeConnectionFromBroker(packet.clientId);
+          } else {
+            broker.sendConnack(packet.clientId, false, packet.protocolVersion);
+          }
+        });
+
+        const client = new WebSocketMqttClient({ url: new URL('ws://127.0.0.1:3000/'), clientId: 'cid', logger: logger });
+        await assertRejects(() => client.connect(), ClientErrors.ConnectionClosed);
+
+        // The client is offline: it can connect again right away.
+        const connack = await client.connect();
+        assertEquals(connack.reasonCode, Mqtt.ReasonCode.Success);
+        await client.disconnect(true);
+      } finally {
+        await broker.destroy();
+      }
+    },
+  );
+
+  await context.step(
+    'rejects with ConnectionClosed when the connection cannot be opened',
+    async () => {
+      // Nothing listens on this port.
+      const client = new WebSocketMqttClient({ url: new URL('ws://127.0.0.1:3999/'), clientId: 'cid', logger: logger });
+      await assertRejects(() => client.connect(), ClientErrors.ConnectionClosed);
+      await assertRejects(() => client.connect(), ClientErrors.ConnectionClosed);
+    },
+  );
+
+  await context.step(
+    'ConnectTimeout while the WebSocket is being opened leaves the client offline',
+    async () => {
+      // Accepts TCP connections but never answers the WebSocket handshake.
+      const listener = Deno.listen({ port: 3998 });
+      const conns: Deno.Conn[] = [];
+      const accepting = (async () => {
+        for await (const conn of listener) {
+          conns.push(conn);
+        }
+      })();
+      try {
+        const client = new WebSocketMqttClient({ url: new URL('ws://127.0.0.1:3998/'), clientId: 'cid', logger: logger, connectTimeoutMS: 200 });
+        await assertRejects(() => client.connect(), ClientErrors.ConnectTimeout);
+        // Not StateIsNotOfflineError: the client is offline again.
+        await assertRejects(() => client.connect(), ClientErrors.ConnectTimeout);
+      } finally {
+        listener.close();
+        await accepting.catch(() => {});
+        conns.forEach((conn) => conn.close());
+      }
+    },
+  );
+}); // @connect ws failure leaves the client offline
