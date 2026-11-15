@@ -116,27 +116,16 @@ export class Session {
     }
   }
 
+  /**
+   * Stores PUBLISH to resend it after reconnecting, and the deferred of its flow.
+   * @param packet PUBLISH with its Topic Name and without a topic alias, which is valid only on the current connection.
+   */
   public async storePublish(
     packet: MqttPackets.PublishPacket,
     deferred: Deferred<PublishResult>,
-    omittedTopic?: string,
   ) {
     this.inflightPublish.set(packet.packetId!, deferred);
-
-    // Topic aliases are valid only on the current connection, so the packet is stored
-    // for resending with its topic name and without the topic alias.
-    if (packet.properties?.topicAlias) {
-      const copiedPacket = { ...packet, properties: { ...packet.properties } };
-      delete copiedPacket.properties.topicAlias;
-
-      // Restore omitted topics and then register them
-      if (omittedTopic) {
-        copiedPacket.topic = omittedTopic;
-      }
-      return await this.outgoingStore.store(copiedPacket);
-    } else {
-      return await this.outgoingStore.store(packet);
-    }
+    return await this.outgoingStore.store(packet);
   }
 
   public async storePubrel(packet: MqttPackets.PubrelPacket) {

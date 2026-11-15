@@ -420,8 +420,9 @@ export abstract class BaseMqttClient {
    * @throws {InvalidArgumentError} if the QoS is not 0, 1 or 2, or `dup` is true with QoS 0. Nothing is sent.
    * @throws {InvalidPropertyError} if a property is invalid. Nothing is sent.
    * @throws {PacketTooLargeError} if PUBLISH is larger than the Maximum Packet Size of the broker or than MQTT allows. Nothing is sent.
-   * QoS 1 and 2: also when the message is resent after reconnecting and is larger than the Maximum Packet Size of the new connection;
-   * it is removed from the session.
+   * QoS 1 and 2 are checked with the Topic Name even when a topic alias would make them smaller: they are kept in the session
+   * with it, to be resent after reconnecting. They are also rejected when resent after reconnecting and larger than
+   * the Maximum Packet Size of the new connection; the message is removed from the session.
    * @throws {MqttPacketSerializeError} if PUBLISH cannot be encoded. Nothing is sent.
    * @throws {SessionLostError} QoS 1 and 2: if the broker did not keep the session when reconnecting before the flow completed.
    * @example
@@ -482,28 +483,8 @@ export abstract class BaseMqttClient {
 
     const buffer: Uint8Array = (typeof payload === 'string') ? new TextEncoder().encode(payload) : payload;
 
-    // resolve topic alias
-    const topicAliasManager = this.topicAliasManagerAboutSend;
-    let omittedTopic;
-    let registeredAlias = false; // this PUBLISH registers a new topic alias
-    let topicId: number = 0; // 0 = not use
-    if (topicAliasManager) {
-      const [generated, tid] = await topicAliasManager.getTopicId(topic);
-      if (generated) {
-        registeredAlias = true;
-      } else {
-        omittedTopic = topic;
-        topic = '';
-      }
-      topicId = tid;
-    }
-
-    // Set the topic alias on a copy: the caller's object may be shared by other publishes, possibly running concurrently.
-    const publishProperties: MqttProperties.PublishProperties | undefined = (properties || topicId)
-      ? { ...properties, ...(topicId > 0 && { topicAlias: topicId }) }
-      : undefined;
-
     const packetId = qos === Mqtt.QoS.AT_MOST_ONCE ? 0 : await this.session.acquirePacketId();
+    // Without a topic alias: it is set right before writing.
     const packet: PublishPacket = {
       type: 'publish',
       topic,
@@ -512,31 +493,71 @@ export abstract class BaseMqttClient {
       retain,
       qos,
       packetId,
-      properties: publishProperties,
+      // a copy: the caller may change or reuse the object while the packet is kept in the session
+      properties: properties && { ...properties },
     };
 
-    // Encode before storing the packet in the session: a packet that cannot be encoded or is too large
-    // must not stay there to be resent. Undo the packet ID and the topic alias it took.
-    let bytes: Uint8Array;
-    try {
-      bytes = this.encodePacket(packet);
-    } catch (err) {
-      if (packetId) {
+    let bytes: Uint8Array | undefined;
+    if (qos !== Mqtt.QoS.AT_MOST_ONCE) {
+      // The session keeps the packet with its Topic Name and without a topic alias, which is valid only on the current
+      // connection, to resend it after reconnecting. Encode it in that form before storing it: a packet that cannot be
+      // encoded or is too large must not stay there to be resent.
+      try {
+        bytes = this.encodePacket(packet);
+      } catch (err) {
         this.session.releasePacketId(packetId);
+        throw err;
       }
-      if (registeredAlias && topicAliasManager) {
-        topicAliasManager.releaseTopic(topic);
-      }
-      throw err;
+      await this.session.storePublish(packet, deferred);
     }
 
+    // No await from here until the packet is written (see encodePublishToWrite()).
+    const [sending, sendingBytes] = this.encodePublishToWrite(packet, bytes);
+    await this.sendPacket(sending, sendingBytes);
     if (qos === Mqtt.QoS.AT_MOST_ONCE) {
-      await this.sendPacket(packet, bytes);
       deferred.resolve({ result: 0, reason: '' });
-    } else {
-      await this.session.storePublish(packet, deferred, omittedTopic);
-      await this.sendPacket(packet, bytes);
     }
+  }
+
+  /**
+   * Sets the topic alias of the connection, if topic aliases are used, and encodes PUBLISH to write it.
+   *
+   * Call it right before writing, with no await in between: PUBLISH packets can be written in another order than
+   * publish() was called, e.g. a QoS 0 PUBLISH does not wait for the session store. A topic alias is resolved here
+   * in the order the packets are written, so it is sent without the Topic Name only after the PUBLISH that registers it
+   * (Topic Name and Topic Alias) has been written.
+   *
+   * A PUBLISH that is too large only because it registers a new alias is sent without the alias,
+   * and the alias is released: the broker never receives it.
+   * @param packet PUBLISH with its Topic Name and without a topic alias.
+   * @param bytes `packet` already encoded, if any.
+   * @returns the packet to write and its bytes.
+   * @throws {PacketTooLargeError}
+   * @throws {MqttPacketSerializeError} if the packet cannot be encoded for another reason.
+   */
+  private encodePublishToWrite(packet: PublishPacket, bytes?: Uint8Array): [PublishPacket, Uint8Array] {
+    const topicAliasManager = this.topicAliasManagerAboutSend;
+    if (topicAliasManager) {
+      const [generated, topicAlias] = topicAliasManager.getTopicId(packet.topic);
+      const aliased: PublishPacket = {
+        ...packet,
+        topic: generated ? packet.topic : '',
+        properties: { ...packet.properties, topicAlias },
+      };
+      try {
+        return [aliased, this.encodePacket(aliased)];
+      } catch (err) {
+        if (generated) {
+          topicAliasManager.releaseTopic(packet.topic);
+        }
+        // An alias already registered makes the packet smaller, with an empty Topic Name: it does not fit without the alias either.
+        if (!generated || !(err instanceof PacketTooLargeError)) {
+          throw err;
+        }
+        this.log('PUBLISH is too large with a new topic alias, sending it without the alias', err);
+      }
+    }
+    return [packet, bytes ?? this.encodePacket(packet)];
   }
 
   /**

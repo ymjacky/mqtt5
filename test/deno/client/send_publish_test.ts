@@ -1407,4 +1407,59 @@ Deno.test({ name: '@publish too large', only: false }, async (context) => {
       }
     },
   );
+
+  await context.step(
+    'a packet too large only with a new topic alias is sent without the alias',
+    async () => {
+      const broker = new TestBroker();
+      try {
+        broker.listen();
+        broker.on('connect', (event) => {
+          const packet = event.detail;
+          broker.sendConnack(packet.clientId, false, packet.protocolVersion, Mqtt.ReasonCode.Success, {
+            topicAliasMaximum: 10,
+            maximumPacketSize: 64,
+          });
+        });
+
+        const client = new MqttClient({ clientId: 'cid', logger: logger, topicAliasMaximumAboutSend: 10 });
+        await client.connect();
+
+        const received: { topic: string; topicAlias?: number; size: number }[] = [];
+        broker.on('publish', (event) => {
+          const packet = event.detail;
+          received.push({ topic: packet.topic, topicAlias: packet.properties?.topicAlias, size: packet.payload.length });
+          if (packet.qos === Mqtt.QoS.AT_LEAST_ONCE) {
+            broker.sendPuback('cid', packet.packetId!, Mqtt.ProtocolVersion.MQTT_V5);
+          }
+        });
+
+        // A new alias adds 3 bytes. QoS 0: 63 bytes without it, 66 bytes with it.
+        await client.publish('topicA', new Uint8Array(52));
+        // QoS 1 adds the 2-byte packet ID: 63 bytes without the alias, 66 bytes with it.
+        await client.publish('topicA', new Uint8Array(50), { qos: Mqtt.QoS.AT_LEAST_ONCE });
+        // The broker never received the alias, so the next PUBLISH that fits with it registers it.
+        await client.publish('topicA', new Uint8Array(10));
+        // An alias already registered makes the packet smaller, with an empty Topic Name: 60 bytes.
+        await client.publish('topicA', new Uint8Array(52));
+        // A QoS 0 publish() resolves when it is sent, maybe before the broker receives it.
+        while (received.length < 4) {
+          await new Promise((resolve) => setTimeout(resolve, 10));
+        }
+
+        assertEquals(received, [
+          { topic: 'topicA', topicAlias: undefined, size: 52 },
+          { topic: 'topicA', topicAlias: undefined, size: 50 },
+          { topic: 'topicA', topicAlias: 1, size: 10 },
+          { topic: '', topicAlias: 1, size: 52 },
+        ]);
+
+        await client.disconnect();
+      } catch (err) {
+        fail(`error occured: ${err}`);
+      } finally {
+        await broker.destroy();
+      }
+    },
+  );
 }); // @publish too large
