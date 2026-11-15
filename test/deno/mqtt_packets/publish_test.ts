@@ -636,3 +636,74 @@ Deno.test('encodeAndDecodePublishPacketWithLargePayload', function () {
   assertEquals(decoded.topic, 'a/b');
   assertEquals(decoded.payload, largePayload);
 });
+
+// Test PUBLISH packet parsing with multiple Subscription Identifiers for MQTT v5 (issue #53).
+// A PUBLISH matching more than one subscription carries one Subscription Identifier per match
+// (MQTT 5.0 section 3.3.2.3.8), so every one of them must be kept.
+Deno.test('decodePublishPacketMQTT5WithMultipleSubscriptionIdentifiers', function () {
+  const packet = parse(
+    0b0000, // packetFlag
+    Uint8Array.from([
+      // variableHeader
+      0, // topicLength MSB
+      3, // topicLength LSB
+      97, // 'a'
+      47, // '/'
+      98, // 'b'
+      // properties
+      4, // properties length
+      0x0B, // Subscription Identifier
+      1, // value = 1
+      0x0B, // Subscription Identifier
+      42, // value = 42
+      // payload
+      120, // 'x'
+    ]),
+    11, // remainingLength
+    Mqtt.ProtocolVersion.MQTT_V5,
+  );
+
+  assertEquals(packet.properties, { subscriptionIdentifiers: [1, 42] });
+  assertEquals(packet.payload, Uint8Array.from([120]));
+});
+
+// Test PUBLISH packet encoding with multiple Subscription Identifiers for MQTT v5.
+// Each identifier is written as its own property, in the given order.
+Deno.test('encodePublishPacketMQTT5WithMultipleSubscriptionIdentifiers', function () {
+  assertEquals(
+    toBytes(
+      {
+        type: 'publish',
+        topic: 'a/b',
+        payload: new TextEncoder().encode('x'),
+        dup: false,
+        retain: false,
+        qos: 0,
+        packetId: 0,
+        properties: {
+          subscriptionIdentifiers: [1, 42],
+        },
+      },
+      Mqtt.ProtocolVersion.MQTT_V5,
+    ),
+    Uint8Array.from([
+      // fixedHeader
+      48, // packetType + flags
+      11, // remainingLength
+      // variableHeader
+      0, // topicLength MSB
+      3, // topicLength LSB
+      97, // 'a'
+      47, // '/'
+      98, // 'b'
+      // properties
+      4, // properties length
+      0x0B, // Subscription Identifier
+      1, // value = 1
+      0x0B, // Subscription Identifier
+      42, // value = 42
+      // payload
+      120, // 'x'
+    ]),
+  );
+});

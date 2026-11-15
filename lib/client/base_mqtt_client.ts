@@ -371,7 +371,6 @@ export abstract class BaseMqttClient {
    *     { key: 'userProp2', val: 'userData2' },
    *     { key: 'userProp2', val: 'userData3' },
    *   ],
-   *   subscriptionIdentifier: 3,
    *   contentType: 'application/json',
    * };
    * await client.publish('topicA', 'payload', { qos: Mqtt.QoS.AT_MOST_ONCE }, pubProperties);

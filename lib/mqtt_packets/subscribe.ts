@@ -67,9 +67,16 @@ export function parse(
       const { number: length, size: consumedBytesSize } = variableByteIntegerToNum(buffer, pos);
       pos += consumedBytesSize;
       if (length > 0) {
-        const props = MqttProperties.parseMqttProperties(buffer, pos, length);
+        const { subscriptionIdentifiers, ...props } = MqttProperties.parseMqttProperties(buffer, pos, length);
         pos += length;
-        return props;
+        if (typeof subscriptionIdentifiers === 'undefined') {
+          return props;
+        }
+        // Unlike PUBLISH, SUBSCRIBE must not carry more than one Subscription Identifier (MQTT 5.0 section 3.8.2.1.2).
+        if (subscriptionIdentifiers.length > 1) {
+          throw new Error('SUBSCRIBE must not include the Subscription Identifier more than once.');
+        }
+        return { ...props, subscriptionIdentifier: subscriptionIdentifiers[0] };
       } else {
         return {}; // Return empty object if no properties
       }
