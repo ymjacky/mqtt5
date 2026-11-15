@@ -1,6 +1,6 @@
-import { ClientTypes, Mqtt, MqttClient, MqttProperties } from '../../../deno/mod.ts';
+import { ClientErrors, ClientTypes, Mqtt, MqttClient, MqttProperties } from '../../../deno/mod.ts';
 import { TestBroker } from '../broker/test_broker.ts';
-import { assertEquals, fail } from 'std/assert/mod.ts';
+import { assertEquals, assertRejects, fail } from 'std/assert/mod.ts';
 
 function logger(msg: string, ...args: unknown[]): void {
   console.log('[Test Client]', msg, ...args);
@@ -952,3 +952,118 @@ Deno.test({ name: '@receive malformed suback', only: false }, async (context) =>
     },
   );
 }); // @receive malformed suback
+
+Deno.test({ name: '@subscribe invalid arguments', only: false }, async (context) => {
+  await context.step(
+    'rejects invalid topic filters, options and properties and sends nothing',
+    async () => {
+      const broker = new TestBroker();
+      try {
+        broker.listen();
+        broker.on('connect', (event) => {
+          const packet = event.detail;
+          broker.sendConnack(packet.clientId, false, packet.protocolVersion);
+        });
+
+        const client = new MqttClient({
+          clientId: 'cid',
+          logger: logger,
+          clean: true,
+          connectTimeoutMS: 10000,
+          keepAlive: 10,
+        });
+
+        await client.connect();
+
+        const received: { packetId: number; topicFilters: string[] }[] = [];
+        broker.on('subscribe', (event) => {
+          const packet = event.detail;
+          received.push({ packetId: packet.packetId, topicFilters: packet.subscriptions.map((sub) => sub.topicFilter) });
+          broker.sendSuback('cid', packet.packetId, Mqtt.ProtocolVersion.MQTT_V5, [Mqtt.ReasonCode.GrantedQoS0]);
+        });
+
+        // topic filters
+        for (
+          const topicFilter of ['', 'a/#/b', 'a#', 'a/b+', '+a', 'a\u0000', '$share/', '$share/g', '$share//a', '$share/g/', '$share/g+/a', '$share/g\u0000x/a']
+        ) {
+          await assertRejects(() => client.subscribe(topicFilter), ClientErrors.InvalidTopicFilterError);
+        }
+        await assertRejects(() => client.subscribe(['topicA', 'a/#/b']), ClientErrors.InvalidTopicFilterError);
+
+        // other arguments and options
+        await assertRejects(() => client.subscribe([]), ClientErrors.InvalidArgumentError);
+        await assertRejects(() => client.subscribe('topicA', 3 as Mqtt.QoS), ClientErrors.InvalidArgumentError);
+        await assertRejects(() => client.subscribe({ topicFilter: 'topicA', qos: -1 as Mqtt.QoS }), ClientErrors.InvalidArgumentError);
+        await assertRejects(
+          () => client.subscribe({ topicFilter: 'topicA', qos: Mqtt.QoS.AT_MOST_ONCE, retainHandling: 3 as Mqtt.RetainHandling }),
+          ClientErrors.InvalidArgumentError,
+        );
+        await assertRejects(
+          () => client.subscribe({ topicFilter: '$share/group/topicA', qos: Mqtt.QoS.AT_MOST_ONCE, noLocal: true }),
+          ClientErrors.InvalidArgumentError,
+        );
+
+        // properties
+        await assertRejects(() => client.subscribe('topicA', Mqtt.QoS.AT_MOST_ONCE, { subscriptionIdentifier: 0 }), ClientErrors.InvalidPropertyError);
+        await assertRejects(
+          () => client.subscribe('topicA', Mqtt.QoS.AT_MOST_ONCE, { userProperties: [{ key: 'k', val: 'v\u0000' }] }),
+          ClientErrors.InvalidPropertyError,
+        );
+        // An ignored rejection does not become an unhandled rejection.
+        client.subscribe('a/#/b');
+
+        // Nothing was sent and no packet ID was acquired: the next valid subscribe is the first SUBSCRIBE, with packet ID 1.
+        await client.subscribe('$share/group/topicA');
+        assertEquals(received, [{ packetId: 1, topicFilters: ['$share/group/topicA'] }]);
+      } catch (err) {
+        fail(`error occured: ${err}`);
+      } finally {
+        await broker.destroy();
+      }
+    },
+  );
+}); // @subscribe invalid arguments
+
+Deno.test({ name: '@subscribe too large', only: false }, async (context) => {
+  await context.step(
+    'a packet larger than the Maximum Packet Size of the broker is rejected, and its packet ID is released',
+    async () => {
+      const broker = new TestBroker();
+      try {
+        broker.listen();
+        broker.on('connect', (event) => {
+          const packet = event.detail;
+          broker.sendConnack(packet.clientId, false, packet.protocolVersion, Mqtt.ReasonCode.Success, { maximumPacketSize: 32 });
+        });
+
+        const client = new MqttClient({ clientId: 'cid', logger: logger });
+        await client.connect();
+
+        const packetIds: number[] = [];
+        broker.on('subscribe', (event) => {
+          const packet = event.detail;
+          packetIds.push(packet.packetId);
+          broker.sendSuback('cid', packet.packetId, Mqtt.ProtocolVersion.MQTT_V5, [Mqtt.ReasonCode.GrantedQoS0]);
+        });
+        broker.on('unsubscribe', (event) => {
+          const packet = event.detail;
+          packetIds.push(packet.packetId);
+          broker.sendUnsuback('cid', packet.packetId, Mqtt.ProtocolVersion.MQTT_V5, [Mqtt.ReasonCode.Success]);
+        });
+
+        const longFilter = 'a'.repeat(40);
+        await assertRejects(() => client.subscribe(longFilter), ClientErrors.PacketTooLargeError, 'SUBSCRIBE');
+        await assertRejects(() => client.unsubscribe(longFilter), ClientErrors.PacketTooLargeError, 'UNSUBSCRIBE');
+
+        // Nothing was sent and the packet IDs were released.
+        await client.subscribe('topicA');
+        await client.unsubscribe('topicA');
+        assertEquals(packetIds, [1, 1]);
+      } catch (err) {
+        fail(`error occured: ${err}`);
+      } finally {
+        await broker.destroy();
+      }
+    },
+  );
+}); // @subscribe too large

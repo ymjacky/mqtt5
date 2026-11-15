@@ -2,7 +2,7 @@ import * as Mqtt from '../mqtt/mod.ts';
 import {
   concatBytes,
   numToTwoByteInteger,
-  numToVariableByteInteger,
+  remainingLengthToBytes,
   stringToUtfEncodedString,
   utfEncodedStringToString,
   variableByteIntegerToNum,
@@ -34,7 +34,7 @@ export function toBytes(
 
   const fixedHeader = [
     (Mqtt.PacketType.UNSUBSCRIBE << 4) + Mqtt.fixedHeaderFlag.UNSUBSCRIBE,
-    ...numToVariableByteInteger(variableHeader.length + payload.length),
+    ...remainingLengthToBytes(variableHeader.length + payload.length),
   ];
 
   return concatBytes([fixedHeader, variableHeader, payload]);

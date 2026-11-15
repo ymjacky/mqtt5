@@ -1,6 +1,6 @@
-import { Mqtt, MqttClient } from '../../../deno/mod.ts';
+import { ClientErrors, Mqtt, MqttClient } from '../../../deno/mod.ts';
 import { TestBroker } from '../broker/test_broker.ts';
-import { assertEquals, fail } from 'std/assert/mod.ts';
+import { assertEquals, assertRejects, fail } from 'std/assert/mod.ts';
 
 function logger(msg: string, ...args: unknown[]): void {
   console.log('[Test Client]', msg, ...args);
@@ -154,3 +154,65 @@ Deno.test({ name: '@will', only: false }, async (context) => {
     },
   );
 }); // will
+
+Deno.test({ name: '@will invalid', only: false }, async (context) => {
+  await context.step(
+    'connect rejects an invalid will and opens no connection',
+    async () => {
+      const broker = new TestBroker();
+      try {
+        broker.listen();
+
+        const willTopics: (string | undefined)[] = [];
+        broker.on('connect', (event) => {
+          const packet = event.detail;
+          willTopics.push(packet.will?.topic);
+          broker.sendConnack(packet.clientId, false, packet.protocolVersion);
+        });
+
+        const client = new MqttClient({
+          clientId: 'cid',
+          logger: logger,
+          clean: true,
+          connectTimeoutMS: 10000,
+          keepAlive: 10,
+        });
+
+        const payload = new TextEncoder().encode('will-message');
+        for (const topic of ['', 'a/+', 'a/#', 'a\u0000b']) {
+          await assertRejects(() => client.connect({ will: { topic, payload } }), ClientErrors.InvalidTopicNameError);
+        }
+        await assertRejects(
+          () => client.connect({ will: { topic: 'topicA', payload, properties: { responseTopic: 'response/#' } } }),
+          ClientErrors.InvalidTopicNameError,
+        );
+        await assertRejects(
+          () => client.connect({ will: { topic: 'topicA', qos: 3 as Mqtt.QoS, payload } }),
+          ClientErrors.InvalidArgumentError,
+        );
+        await assertRejects(
+          () => client.connect({ will: { topic: 'topicA', payload: new Uint8Array(65_536) } }),
+          ClientErrors.InvalidArgumentError,
+        );
+        await assertRejects(
+          () => client.connect({ will: { topic: 'topicA', payload, properties: { willDelayInterval: -1 } } }),
+          ClientErrors.InvalidPropertyError,
+        );
+        await assertRejects(
+          () => client.connect({ properties: { receiveMaximum: 0 }, will: { topic: 'topicA', payload } }),
+          ClientErrors.InvalidPropertyError,
+        );
+        // An ignored rejection does not become an unhandled rejection.
+        client.connect({ will: { topic: 'a/#', payload } });
+
+        // The client stayed offline and sent nothing: the next valid connect is the first CONNECT.
+        await client.connect({ will: { topic: 'topicA', payload } });
+        assertEquals(willTopics, ['topicA']);
+      } catch (err) {
+        fail(`error occured: ${err}`);
+      } finally {
+        await broker.destroy();
+      }
+    },
+  );
+}); // @will invalid

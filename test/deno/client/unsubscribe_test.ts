@@ -1,6 +1,6 @@
-import { Mqtt, MqttClient, MqttProperties } from '../../../deno/mod.ts';
+import { ClientErrors, Mqtt, MqttClient, MqttProperties } from '../../../deno/mod.ts';
 import { TestBroker } from '../broker/test_broker.ts';
-import { assertEquals, assertExists, fail } from 'std/assert/mod.ts';
+import { assertEquals, assertExists, assertRejects, fail } from 'std/assert/mod.ts';
 
 function logger(msg: string, ...args: unknown[]): void {
   console.log('[Test Client]', msg, ...args);
@@ -438,3 +438,56 @@ Deno.test({ name: '@receive malformed unsuback', only: false }, async (context) 
     },
   );
 }); // @receive malformed unsuback
+
+Deno.test({ name: '@unsubscribe invalid arguments', only: false }, async (context) => {
+  await context.step(
+    'rejects invalid topic filters, an empty list and invalid properties and sends nothing',
+    async () => {
+      const broker = new TestBroker();
+      try {
+        broker.listen();
+        broker.on('connect', (event) => {
+          const packet = event.detail;
+          broker.sendConnack(packet.clientId, false, packet.protocolVersion);
+        });
+
+        const client = new MqttClient({
+          clientId: 'cid',
+          logger: logger,
+          clean: true,
+          connectTimeoutMS: 10000,
+          keepAlive: 10,
+        });
+
+        await client.connect();
+
+        const received: { packetId: number; topicFilters: string[] }[] = [];
+        broker.on('unsubscribe', (event) => {
+          const packet = event.detail;
+          received.push({ packetId: packet.packetId, topicFilters: packet.topicFilters });
+          broker.sendUnsuback('cid', packet.packetId, Mqtt.ProtocolVersion.MQTT_V5, [Mqtt.ReasonCode.Success]);
+        });
+
+        await assertRejects(() => client.unsubscribe([]), ClientErrors.InvalidArgumentError);
+        for (const topicFilter of ['', 'a/#/b', 'a+', '$share/g']) {
+          await assertRejects(() => client.unsubscribe(topicFilter), ClientErrors.InvalidTopicFilterError);
+        }
+        await assertRejects(() => client.unsubscribe(['topicA', 'a/#/b']), ClientErrors.InvalidTopicFilterError);
+        await assertRejects(
+          () => client.unsubscribe('topicA', { userProperties: [{ key: 'k\u0000', val: 'v' }] }),
+          ClientErrors.InvalidPropertyError,
+        );
+        // An ignored rejection does not become an unhandled rejection.
+        client.unsubscribe([]);
+
+        // Nothing was sent and no packet ID was acquired: the next valid unsubscribe is the first UNSUBSCRIBE, with packet ID 1.
+        await client.unsubscribe('topicA');
+        assertEquals(received, [{ packetId: 1, topicFilters: ['topicA'] }]);
+      } catch (err) {
+        fail(`error occured: ${err}`);
+      } finally {
+        await broker.destroy();
+      }
+    },
+  );
+}); // @unsubscribe invalid arguments

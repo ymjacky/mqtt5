@@ -1,5 +1,5 @@
 import { assertEquals, assertThrows } from 'std/assert/mod.ts';
-import { numToVariableByteInteger, variableByteIntegerToNum } from '../../../lib/mqtt_utils/mod.ts';
+import { MqttUtilsError, numToVariableByteInteger, remainingLengthToBytes, variableByteIntegerToNum } from '../../../lib/mqtt_utils/mod.ts';
 
 Deno.test('numToVariableByteInteger', () => {
   assertEquals(numToVariableByteInteger(0), new Uint8Array([0x00]));
@@ -97,4 +97,10 @@ Deno.test('variableByteIntegerToNum', () => {
     },
   );
   assertThrows(() => variableByteIntegerToNum(Uint8Array.from([0xFF, 0xFF, 0xFF, 0xFF, 0x7F]), 0));
+});
+
+Deno.test('remainingLengthToBytes', () => {
+  assertEquals(remainingLengthToBytes(0), new Uint8Array([0x00]));
+  assertEquals(remainingLengthToBytes(268_435_455), new Uint8Array([0xFF, 0xFF, 0xFF, 0x7F]));
+  assertThrows(() => remainingLengthToBytes(268_435_456), MqttUtilsError.RemainingLengthError, '268435456 is larger than 268435455');
 });

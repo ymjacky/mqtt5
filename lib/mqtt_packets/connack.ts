@@ -1,6 +1,6 @@
 import * as Mqtt from '../mqtt/mod.ts';
 import * as MqttProperties from '../mqtt_properties/mod.ts';
-import { concatBytes, numToVariableByteInteger, variableByteIntegerToNum } from '../mqtt_utils/mod.ts';
+import { concatBytes, remainingLengthToBytes, variableByteIntegerToNum } from '../mqtt_utils/mod.ts';
 import type { ConnackPacket } from './packet_types.ts';
 
 export function toBytes(
@@ -21,7 +21,7 @@ export function toBytes(
 
   const fixedHeader = [
     (Mqtt.PacketType.CONNACK << 4) + Mqtt.fixedHeaderFlag.CONNACK,
-    ...numToVariableByteInteger(variableHeader.length),
+    ...remainingLengthToBytes(variableHeader.length),
   ];
 
   return concatBytes([fixedHeader, variableHeader]);

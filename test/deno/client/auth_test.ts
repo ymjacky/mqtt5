@@ -171,3 +171,48 @@ Deno.test({ name: '@receive malformed auth', only: false }, async (context) => {
     },
   );
 }); // @receive malformed auth
+
+Deno.test({ name: '@auth too large', only: false }, async (context) => {
+  await context.step(
+    'leaves out the Reason String and User Properties when they make AUTH larger than the Maximum Packet Size',
+    async () => {
+      const broker = new TestBroker();
+      try {
+        broker.listen();
+        broker.on('connect', (event) => {
+          const packet = event.detail;
+          broker.sendConnack(packet.clientId, false, packet.protocolVersion, Mqtt.ReasonCode.Success, { maximumPacketSize: 64 });
+        });
+        const { promise, resolve } = Promise.withResolvers<void>();
+        const received: (MqttProperties.AuthProperties | undefined)[] = [];
+        broker.on('auth', (event) => {
+          received.push(event.detail.properties);
+          resolve();
+        });
+
+        const client = new MqttClient({ clientId: 'cid', logger: logger });
+        await client.connect();
+
+        // Still too large without them: nothing is sent.
+        await assertRejects(
+          () => client.auth(Mqtt.ReasonCode.ReAuthenticate, { authenticationMethod: 'M', authenticationData: new Uint8Array(100) }),
+          ClientErrors.PacketTooLargeError,
+          'Maximum Packet Size 64',
+        );
+
+        // [MQTT-3.15.2-2], [MQTT-3.15.2-3]
+        await client.auth(Mqtt.ReasonCode.ReAuthenticate, {
+          authenticationMethod: 'M',
+          reasonString: 'a'.repeat(100),
+          userProperties: [{ key: 'k', val: 'v' }],
+        });
+        await promise;
+        assertEquals(received, [{ authenticationMethod: 'M' }]);
+      } catch (err) {
+        fail(`error occured: ${err}`);
+      } finally {
+        await broker.destroy();
+      }
+    },
+  );
+}); // @auth too large

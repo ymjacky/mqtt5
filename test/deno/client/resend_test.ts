@@ -1,6 +1,6 @@
-import { ClientTypes, Mqtt, MqttClient, MqttProperties } from '../../../deno/mod.ts';
+import { ClientErrors, ClientTypes, Mqtt, MqttClient, MqttProperties } from '../../../deno/mod.ts';
 import { TestBroker } from '../broker/test_broker.ts';
-import { assertEquals, assertExists, assertFalse, fail } from 'std/assert/mod.ts';
+import { assertEquals, assertExists, assertFalse, assertRejects, fail } from 'std/assert/mod.ts';
 
 function logger(msg: string, ...args: unknown[]): void {
   console.log('[Test Client]', msg, ...args);
@@ -957,3 +957,64 @@ Deno.test({ name: '@resend from MemoryStore', only: false }, async (context) => 
     },
   );
 }); // @resend from MemoryStore
+
+Deno.test({ name: '@resend too large', only: false }, async (context) => {
+  await context.step(
+    'a stored PUBLISH larger than the Maximum Packet Size of the new connection is removed, and its publish() rejects',
+    async () => {
+      const broker = new TestBroker();
+      try {
+        broker.listen();
+        let reconnected = false;
+        broker.on('connect', (event) => {
+          const packet = event.detail;
+          // After reconnecting, the broker keeps the session but accepts packets of at most 64 bytes.
+          const properties = reconnected ? { maximumPacketSize: 64 } : undefined;
+          broker.sendConnack(packet.clientId, reconnected, packet.protocolVersion, Mqtt.ReasonCode.Success, properties);
+        });
+
+        const client = new MqttClient({ clientId: 'cid', logger: logger, clean: false });
+        await client.connect();
+
+        const { promise: bothReceived, resolve } = Promise.withResolvers<void>();
+        const received: { packetId?: number; size: number; dup: boolean }[] = [];
+        broker.on('publish', (event) => {
+          const packet = event.detail;
+          received.push({ packetId: packet.packetId, size: packet.payload.length, dup: packet.dup });
+          if (reconnected) {
+            broker.sendPuback('cid', packet.packetId!, Mqtt.ProtocolVersion.MQTT_V5);
+          } else if (received.length === 2) {
+            resolve();
+          }
+        });
+
+        // Not acknowledged before the connection is closed.
+        const large = client.publish('topicA', new Uint8Array(100), { qos: Mqtt.QoS.AT_LEAST_ONCE });
+        const small = client.publish('topicA', new Uint8Array(10), { qos: Mqtt.QoS.AT_LEAST_ONCE });
+        await bothReceived;
+        await client.disconnect(true);
+
+        reconnected = true;
+        await client.connect();
+
+        await assertRejects(() => large, ClientErrors.PacketTooLargeError, 'Maximum Packet Size 64');
+        assertEquals((await small).result, Mqtt.ReasonCode.Success);
+        assertEquals(await client.publishInflightCount(), 0);
+        // Only the small PUBLISH was resent.
+        assertEquals(received, [
+          { packetId: 1, size: 100, dup: false },
+          { packetId: 2, size: 10, dup: false },
+          { packetId: 2, size: 10, dup: true },
+        ]);
+
+        // The packet ID of the removed PUBLISH was released.
+        await client.publish('topicA', 'x', { qos: Mqtt.QoS.AT_LEAST_ONCE });
+        assertEquals(received.at(-1), { packetId: 1, size: 1, dup: false });
+      } catch (err) {
+        fail(`error occured: ${err}`);
+      } finally {
+        await broker.destroy();
+      }
+    },
+  );
+}); // @resend too large
