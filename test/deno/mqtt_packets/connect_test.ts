@@ -845,3 +845,118 @@ Deno.test('decodeConnectPacketMQTTv5WithPropertiesAndWillProperties', function (
     },
   );
 });
+
+// A zero-length User Name / Password is a present value, not an absent one.
+Deno.test('encodeConnectPacketWithEmptyUsernameAndPassword', function () {
+  assertEquals(
+    toBytes(
+      {
+        type: 'connect',
+        clientId: 'id',
+        protocolVersion: 4,
+        username: '',
+        password: '',
+      },
+    ),
+    new Uint8Array([
+      // fixedHeader
+      16, // packetType + flags
+      18, // remainingLength
+      // variableHeader
+      0, // protocolNameLength MSB
+      4, // protocolNameLength LSB
+      77, // 'M'
+      81, // 'Q'
+      84, // 'T'
+      84, // 'T'
+      Mqtt.ProtocolVersion.MQTT_V3_1_1, // ProtocolVersion
+      194, // connectFlags (usernameFlag, passwordFlag, cleanSession)
+      0, // keepAlive MSB
+      0, // keepAlive LSB
+      // payload
+      // clientId
+      0, // length MSB
+      2, // length LSB
+      105, // 'i'
+      100, // 'd'
+      // username
+      0, // length MSB
+      0, // length LSB
+      // password
+      0, // length MSB
+      0, // length LSB
+    ]),
+  );
+});
+
+Deno.test('encodeConnectPacketWithEmptyUsernameOnly', function () {
+  assertEquals(
+    toBytes(
+      {
+        type: 'connect',
+        clientId: 'id',
+        protocolVersion: 4,
+        username: '',
+      },
+    ),
+    new Uint8Array([
+      16, // packetType + flags
+      16, // remainingLength
+      0, // protocolNameLength MSB
+      4, // protocolNameLength LSB
+      77, // 'M'
+      81, // 'Q'
+      84, // 'T'
+      84, // 'T'
+      Mqtt.ProtocolVersion.MQTT_V3_1_1, // ProtocolVersion
+      130, // connectFlags (usernameFlag, cleanSession)
+      0, // keepAlive MSB
+      0, // keepAlive LSB
+      0, // clientId length MSB
+      2, // clientId length LSB
+      105, // 'i'
+      100, // 'd'
+      0, // username length MSB
+      0, // username length LSB
+    ]),
+  );
+});
+
+Deno.test('decodeConnectPacketWithEmptyUsernameAndPassword', function () {
+  assertEquals<ConnectPacket>(
+    parse(
+      Uint8Array.from([
+        0, // protocolNameLength MSB
+        4, // protocolNameLength LSB
+        77, // 'M'
+        81, // 'Q'
+        84, // 'T'
+        84, // 'T'
+        Mqtt.ProtocolVersion.MQTT_V3_1_1, // ProtocolVersion
+        194, // connectFlags (usernameFlag, passwordFlag, cleanSession)
+        0, // keepAlive MSB
+        0, // keepAlive LSB
+        0, // clientId length MSB
+        2, // clientId length LSB
+        105, // 'i'
+        100, // 'd'
+        0, // username length MSB
+        0, // username length LSB
+        0, // password length MSB
+        0, // password length LSB
+      ]),
+      18, // remainingLength
+    ),
+    {
+      type: 'connect',
+      clientId: 'id',
+      protocolName: 'MQTT',
+      protocolVersion: 4,
+      username: '',
+      password: '',
+      will: undefined,
+      clean: true,
+      keepAlive: 0,
+    },
+  );
+});
