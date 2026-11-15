@@ -87,21 +87,19 @@ export class Session {
     return await this.packetIdProvider.inUse(packetId);
   }
 
-  public async discard(
-    packet:
-      | MqttPackets.PubackPacket
-      | MqttPackets.PubrecPacket
-      | MqttPackets.PubcompPacket
-      | MqttPackets.SubackPacket
-      | MqttPackets.UnsubackPacket,
-  ) {
-    await this.packetIdProvider.release(packet.packetId);
-    if (
-      packet.type === 'puback' || packet.type === 'pubrec' ||
-      packet.type === 'pubcomp'
-    ) {
-      await this.outgoingStore.discard(packet.packetId);
-    }
+  /**
+   * Ends the flow of a sent PUBLISH (PUBACK, PUBCOMP, or PUBREC with an error Reason Code): removes its packet from
+   * the store, then releases the packet ID.
+   * The ID is released last: until then no publish() can get it, so this flow cannot remove the packet of another
+   * publish() from the store, nor take its deferred.
+   * If the store fails, nothing changes, as if the acknowledgment had not been received.
+   * @returns the deferred of the publish() of the flow, if it is waiting.
+   */
+  public async endPublishFlow(packetId: number): Promise<Deferred<PublishResult> | undefined> {
+    await this.outgoingStore.discard(packetId);
+    const deferred = this.getPublishDeferred(packetId);
+    this.packetIdProvider.release(packetId);
+    return deferred;
   }
 
   public async *resendTargets(): AsyncIterable<MqttPackets.PublishPacket | MqttPackets.PubrelPacket> {
@@ -118,6 +116,7 @@ export class Session {
 
   /**
    * Stores PUBLISH to resend it after reconnecting, and the deferred of its flow.
+   * If the store fails, the deferred is not kept; the caller still has to release the packet ID.
    * @param packet PUBLISH with its Topic Name and without a topic alias, which is valid only on the current connection.
    */
   public async storePublish(
@@ -125,7 +124,12 @@ export class Session {
     deferred: Deferred<PublishResult>,
   ) {
     this.inflightPublish.set(packet.packetId!, deferred);
-    return await this.outgoingStore.store(packet);
+    try {
+      await this.outgoingStore.store(packet);
+    } catch (err) {
+      this.inflightPublish.delete(packet.packetId!);
+      throw err;
+    }
   }
 
   public async storePubrel(packet: MqttPackets.PubrelPacket) {
