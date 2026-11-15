@@ -25,11 +25,6 @@ export class UnsupportedPacketError extends Error {
   }
 }
 
-/** @deprecated Use {@link UnsupportedPacketError} instead. */
-export const UnsuportedPacketError: typeof UnsupportedPacketError = UnsupportedPacketError;
-/** @deprecated Use {@link UnsupportedPacketError} instead. */
-export type UnsuportedPacketError = UnsupportedPacketError;
-
 /** The protocol version is not supported. */
 export class InvalidProtocolVersionError extends Error {
   readonly #className = 'InvalidProtocolVersionError';

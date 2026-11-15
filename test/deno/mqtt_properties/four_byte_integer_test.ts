@@ -5,7 +5,7 @@ testPropertyCases([
   // id: 0x02 (messageExpiryInterval)
   { name: 'messageExpiryInterval', encode: { messageExpiryInterval: 0x01020304 }, bytes: [0x02, 0x01, 0x02, 0x03, 0x04] },
   { name: 'messageExpiryInterval 0xFFFFFFFF', encode: { messageExpiryInterval: 0xFFFFFFFF }, bytes: [0x02, 0xFF, 0xFF, 0xFF, 0xFF] },
-  { name: 'messageExpiryInterval 0', decode: { messageExpiryInterval: 0 }, bytes: [0x02, 0x00, 0x00, 0x00, 0x00] },
+  { name: 'messageExpiryInterval 0', encode: { messageExpiryInterval: 0 }, bytes: [0x02, 0x00, 0x00, 0x00, 0x00] },
 
   // id: 0x11 (sessionExpiryInterval)
   { name: 'sessionExpiryInterval', encode: { sessionExpiryInterval: 3600 }, bytes: [0x11, 0x00, 0x00, 0x0E, 0x10] },

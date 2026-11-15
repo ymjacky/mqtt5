@@ -584,12 +584,12 @@ export abstract class BaseMqttClient {
       return (typeof sub === 'object')
         ? {
           topicFilter: sub.topicFilter,
-          qos: sub.qos || qos || Mqtt.QoS.AT_MOST_ONCE,
+          qos: sub.qos ?? qos ?? Mqtt.QoS.AT_MOST_ONCE,
           retainHandling: sub.retainHandling,
           retainAsPublished: sub.retainAsPublished,
           noLocal: sub.noLocal,
         }
-        : { topicFilter: sub, qos: qos || Mqtt.QoS.AT_MOST_ONCE };
+        : { topicFilter: sub, qos: qos ?? Mqtt.QoS.AT_MOST_ONCE };
     });
 
     const packet: SubscribePacket = {
