@@ -68,7 +68,6 @@ export class MqttClient extends BaseMqttClient {
    */
   protected conn?: Deno.Conn;
   private reader?: ReadableStreamDefaultReader<Uint8Array>;
-  private frameBuffer = new MqttStream.MqttFrameBuffer();
 
   /**
    * Creates a client. It does not connect until {@link MqttClient.connect} is called.
@@ -96,6 +95,7 @@ export class MqttClient extends BaseMqttClient {
           port: Number(this.url.port),
           caCerts: this.caCerts,
         };
+        let conn: Deno.TlsConn;
         if (this.privateKey && this.cert) {
           type TlsType = Deno.ConnectTlsOptions & Deno.TlsCertifiedKeyPem;
           const tls: TlsType = {
@@ -105,10 +105,19 @@ export class MqttClient extends BaseMqttClient {
             cert: this.cert,
             key: this.privateKey,
           };
-          return await Deno.connectTls(tls);
+          conn = await Deno.connectTls(tls);
         } else {
-          return await Deno.connectTls(tlsOpt);
+          conn = await Deno.connectTls(tlsOpt);
         }
+        // Deno does the TLS handshake on the first read or write. Do it here: a failure, e.g. a certificate that is not
+        // trusted, is then an error of opening the connection, and connect() rejects with it.
+        try {
+          await conn.handshake();
+        } catch (err) {
+          conn.close();
+          throw err;
+        }
+        return conn;
       } else {
         throw new UnexpectedUrlProtocol(`${this.url.protocol.slice(0, -1)}`);
       }
@@ -117,23 +126,27 @@ export class MqttClient extends BaseMqttClient {
     // Nothing of this client is changed until the connection is open: an aborted opening must not affect the next one.
     this.conn = await openUnlessAborted(openSocket(), signal);
     this.write = writerFactory(this.conn, this.log);
-    this.reader = this.conn.readable.getReader();
-    // Discard any partial packet left over from a previous connection.
-    this.frameBuffer = new MqttStream.MqttFrameBuffer();
+    // The receive loop reads this connection only, and reports its close only while it is the connection of the client:
+    // a loop that outlives its connection must not touch the next one.
+    const reader = this.conn.readable.getReader();
+    this.reader = reader;
+    // Not shared with a previous connection, which may have left a partial packet.
+    const frameBuffer = new MqttStream.MqttFrameBuffer();
+    const reportClosed = () => {
+      if (this.reader === reader) {
+        this.detectClosed();
+      }
+    };
 
     (async () => {
       while (true) {
         try {
-          if (!this.reader) {
-            break;
-          }
-
-          this.frameBuffer.append(await MqttStream.readChunk(this.reader));
+          frameBuffer.append(await MqttStream.readChunk(reader));
 
           while (true) {
             let receiveBytes: Uint8Array | undefined;
             try {
-              receiveBytes = this.frameBuffer.takePacket();
+              receiveBytes = frameBuffer.takePacket();
             } catch (streamError) {
               // Rethrows non-framing errors.
               await this.handleFramingError(streamError);
@@ -141,9 +154,9 @@ export class MqttClient extends BaseMqttClient {
               // We can no longer safely read further packets on this
               // connection, so tear it down ourselves; the disconnect timer
               // started by handleMalformedPacket() won't help here because
-              // nothing else awaits `this.reader` once we stop this loop.
-              await this.close();
-              this.detectClosed();
+              // nothing else awaits `reader` once we stop this loop.
+              await reader.cancel();
+              reportClosed();
               return; // stop the receive loop
             }
             if (!receiveBytes) {
@@ -153,7 +166,7 @@ export class MqttClient extends BaseMqttClient {
             await this.handleReceivedBytes(receiveBytes);
           }
         } catch (e) {
-          this.detectClosed();
+          reportClosed();
           if (e instanceof ConnectionClosed) {
             break; // while
           } else if (e instanceof ConnectionReset) {

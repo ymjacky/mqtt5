@@ -98,9 +98,13 @@ export abstract class BaseMqttClient {
   private disconnectTimeout: number;
   private connectionState: ConnectionStates;
   private session: Session;
+  // The deferred of the connect() that has not settled yet. It also identifies the connection attempt: what is still
+  // running for an earlier attempt (startConnect(), handleConnack()) sees another value and leaves this one alone.
   private unresolvedConnect?: Deferred<ConnackPacket>;
-  // Why the pending connect() fails when the connection is closed before CONNACK. ConnectionClosed if not set.
+  // Why the pending connect() fails when the connection is closed. ConnectionClosed if not set.
   private connectFailure?: Error;
+  // The CONNACK with which the broker refused the connection: the pending connect() resolves with it when the connection is closed.
+  private refusedConnack?: ConnackPacket;
   private incomingStore: IncomingStore;
   // Tail of the chain that runs received packet handlers one at a time.
   private packetHandling: Promise<void> = Promise.resolve();
@@ -289,8 +293,11 @@ export abstract class BaseMqttClient {
    *
    * The returned promise resolves with the CONNACK packet even when the broker rejects the connection,
    * so check its `reasonCode` (MQTT 5.0) / `returnCode` (MQTT 3.1.1).
+   * When the broker rejects the connection, the client does not become online: it closes the connection, and the promise
+   * resolves when the connection is closed.
    * After the client is closed, it can connect again with this method; it does not reconnect automatically.
-   * When the returned promise rejects, the client is offline again, so this method can be called again right away.
+   * When the returned promise rejects, or resolves with a CONNACK that rejects the connection, the client is offline again,
+   * so this method can be called again right away.
    * A rejection of an ignored promise does not terminate the process; await the promise to handle failures.
    *
    * @param options {@link ConnectOptions}: clean start, MQTT 5.0 properties ({@link MqttProperties.ConnectProperties}) and will message.
@@ -305,7 +312,9 @@ export abstract class BaseMqttClient {
    * @throws {ConnectTimeout} if CONNACK is not received within `connectTimeoutMS`, including the time to open the connection.
    * @throws {ConnectionClosed} if the connection is closed before CONNACK is received.
    * `WebSocketMqttClient` also rejects with it when the connection cannot be opened.
-   * @throws {Error} `MqttClient`: the error of opening the connection, e.g. `Deno.errors.ConnectionRefused` when the broker is not running.
+   * @throws {Error} `MqttClient`: the error of opening the connection, e.g. `Deno.errors.ConnectionRefused` when the broker is not running,
+   * or `Deno.errors.InvalidData` when the certificate of the broker is not trusted (`mqtts:`).
+   * @throws {Error} the error of the session store (`outgoingStore`), if it fails when CONNACK is received. The connection is closed.
    * @example
    * mqtt
    * ```ts
@@ -397,12 +406,15 @@ export abstract class BaseMqttClient {
     this.connectionState = 'connecting';
     this.unresolvedConnect = deferred;
     this.connectFailure = undefined;
+    this.refusedConnack = undefined;
     const opening = new AbortController();
 
+    let opened = false;
     try {
       this.startConnectTimer(opening);
       this.log(`opening connection to ${this.url}`);
       await this.open(opening.signal);
+      opened = true;
 
       this.log(`sending ${connectPacket.type} packet`, connectPacket);
       await this.write(bytes);
@@ -410,10 +422,16 @@ export abstract class BaseMqttClient {
       const e = err instanceof Error ? err : new Error(String(err));
       this.log(`caught error opening connection: ${e.message}`);
 
+      // The transport may have reported the close already, and connect() may even have been called again.
+      if (this.unresolvedConnect !== deferred) {
+        return;
+      }
       // detectClosed() rejects connect(). Keep the reason of a connect timeout, which aborts the opening.
       this.connectFailure ??= e;
-      // The transport may have reported the close already.
-      if (this.connectionState === 'connecting') {
+      if (opened) {
+        // CONNECT could not be written: close the connection that was opened. The transport then reports the close.
+        await this.close();
+      } else {
         this.detectClosed();
       }
     }
@@ -1146,9 +1164,13 @@ export abstract class BaseMqttClient {
    */
   protected detectClosed() {
     this.log('connection closed.');
-    // A connect() waiting for CONNACK fails: CONNACK will not arrive on this connection.
-    const pendingConnect = this.connectionState === 'connecting' ? this.unresolvedConnect : undefined;
+    // A connect() that has not settled yet ends with this connection. Taken before the `closed` event is emitted:
+    // a listener may call connect() again.
+    const pendingConnect = this.unresolvedConnect;
+    const refusedConnack = this.refusedConnack;
     const connectFailure = this.connectFailure ?? new ConnectionClosed();
+    this.unresolvedConnect = undefined;
+    this.refusedConnack = undefined;
     this.connectionState = 'offline';
     this.stopConnectTimer();
     this.stopDisconnectTimer();
@@ -1167,8 +1189,12 @@ export abstract class BaseMqttClient {
       createCustomEvent('closed', {}),
     );
 
-    // Rejected after the client is offline, so that connect() can be called again right away.
-    pendingConnect?.reject(connectFailure);
+    // Settled after the client is offline, so that connect() can be called again right away.
+    if (refusedConnack) {
+      pendingConnect?.resolve(refusedConnack);
+    } else {
+      pendingConnect?.reject(connectFailure);
+    }
   }
 
   /**
@@ -1235,89 +1261,126 @@ export abstract class BaseMqttClient {
    * and resolves `connect()`.
    */
   private async handleConnack(packet: ConnackPacket) {
-    if (this.connectionState !== 'connecting' || this.connectFailure) {
+    const pendingConnect = this.unresolvedConnect;
+    if (this.connectionState !== 'connecting' || this.connectFailure || !pendingConnect) {
       // No connect() is waiting for it, e.g. it has timed out and the connection is being closed.
       this.log('CONNACK is ignored: connect() is not waiting for it', packet);
       return;
     }
+    this.stopConnectTimer();
+
+    const accepted = this.protocolVersion > Mqtt.ProtocolVersion.MQTT_V3_1_1
+      ? packet.reasonCode === Mqtt.ReasonCode.Success
+      : packet.returnCode === Mqtt.V3_1_1_ConnectReturnCode.ConnectionAccepted;
+    if (!accepted) {
+      this.log(`connection refused by the broker. reasonCode:${packet.reasonCode} returnCode:${packet.returnCode}`);
+      // The client does not become online, and does not wait for the broker to close the connection.
+      // connect() resolves with this CONNACK when the connection is closed (detectClosed()): the client is offline then,
+      // so connect() can be called again right away.
+      this.refusedConnack = packet;
+      this.eventTarget.dispatchEvent(
+        createCustomEvent('connack', { detail: packet }),
+      );
+      await this.close();
+      return;
+    }
+
     this.connectionState = 'online';
     // publish() can be called from now on. Take a turn in the publish queue before any await: the calls wait until
     // the session and the settings of the connection are updated and the packets kept in the session are resent.
     // Otherwise a new PUBLISH could be written before the resent ones, or get the packet ID of a stored packet
     // that is not registered yet, when the store has packets of a previous process.
     const publishTurn = this.waitForPublishTurn();
+    // False once the connection has been closed, which settles connect(): then nothing is done for this CONNACK any more,
+    // as connect() may have been called again.
+    const connectPending = () => this.unresolvedConnect === pendingConnect;
 
-    this.stopConnectTimer();
-
-    let connectionSuceeded = false;
-    if (this.protocolVersion > Mqtt.ProtocolVersion.MQTT_V3_1_1) {
-      if (packet.reasonCode === Mqtt.ReasonCode.Success) {
-        connectionSuceeded = true;
-      } else {
-        this.log(`connection failed. reasonCode:${packet.reasonCode}`);
-      }
-    } else {
-      if (packet.returnCode === Mqtt.V3_1_1_ConnectReturnCode.ConnectionAccepted) {
-        connectionSuceeded = true;
-      } else {
-        this.log(`connection failed. returnCode:${packet.returnCode}`);
-      }
-    }
-
+    let sessionStarted = false;
     const publishTurnFinished = await publishTurn;
     try {
-      if (connectionSuceeded) {
-        // server generates clientId
-        if (packet.properties?.assignedClientIdentifier) {
-          this.clientId = packet.properties.assignedClientIdentifier;
-        }
-        if (!packet.sessionPresent) {
-          await this.session.clearAllStores(this.clientId);
-        }
-
-        this.maximumPacketSizeAboutSend = packet.properties?.maximumPacketSize;
-
-        // The Server Keep Alive replaces the Keep Alive sent in CONNECT for this connection, even when it is higher or 0.
-        this.currentKeepAlive = packet.properties?.serverKeepAlive ?? this.keepAlive;
-
-        // Topic aliases are valid per connection, and an absent Topic Alias Maximum means 0 (no aliases allowed).
-        const topicAliasMaximum = Math.min(this.topicAliasMaximumAboutSend ?? 0, packet.properties?.topicAliasMaximum ?? 0);
-        this.topicAliasManagerAboutSend = topicAliasMaximum > 0 ? new TopicAliasManager(topicAliasMaximum) : undefined;
-
-        await this.resendSessionPackets();
+      sessionStarted = await this.startSession(packet, connectPending);
+    } catch (err) {
+      if (connectPending()) {
+        // The session cannot be used as it is, e.g. the store could not be cleared: do not go on with this connection.
+        // connect() rejects with the error when the connection is closed (detectClosed()).
+        this.log('cannot update the session on CONNACK, ending the connection', err);
+        this.connectFailure = err instanceof Error ? err : new Error(String(err));
+        await this.disconnectWithError(Mqtt.ReasonCode.UnspecifiedError);
+      } else {
+        this.log('error after the connection of the CONNACK was closed:', err);
       }
     } finally {
       publishTurnFinished();
     }
-
-    if (this.unresolvedConnect) {
-      this.unresolvedConnect.resolve(packet);
+    if (!sessionStarted) {
+      return;
     }
+
+    this.unresolvedConnect = undefined;
+    pendingConnect.resolve(packet);
 
     this.eventTarget.dispatchEvent(
       createCustomEvent('connack', { detail: packet }),
     );
 
-    // The connection may have been closed while awaiting above.
-    if (connectionSuceeded && this.connectionState === 'online') {
-      this.startKeepAliveTimer();
+    this.startKeepAliveTimer();
+  }
+
+  /**
+   * Updates the session and the settings of the connection from a CONNACK that accepts the connection,
+   * and resends the packets kept in the session.
+   * @param connectPending whether connect() is still waiting: false once the connection has been closed.
+   * @returns false if the connection was closed meanwhile.
+   */
+  private async startSession(packet: ConnackPacket, connectPending: () => boolean): Promise<boolean> {
+    if (!connectPending()) {
+      return false;
     }
+    // server generates clientId
+    if (packet.properties?.assignedClientIdentifier) {
+      this.clientId = packet.properties.assignedClientIdentifier;
+    }
+    if (!packet.sessionPresent) {
+      await this.session.clearAllStores(this.clientId);
+      if (!connectPending()) {
+        return false;
+      }
+    }
+
+    this.maximumPacketSizeAboutSend = packet.properties?.maximumPacketSize;
+
+    // The Server Keep Alive replaces the Keep Alive sent in CONNECT for this connection, even when it is higher or 0.
+    this.currentKeepAlive = packet.properties?.serverKeepAlive ?? this.keepAlive;
+
+    // Topic aliases are valid per connection, and an absent Topic Alias Maximum means 0 (no aliases allowed).
+    const topicAliasMaximum = Math.min(this.topicAliasMaximumAboutSend ?? 0, packet.properties?.topicAliasMaximum ?? 0);
+    this.topicAliasManagerAboutSend = topicAliasMaximum > 0 ? new TopicAliasManager(topicAliasMaximum) : undefined;
+
+    await this.resendSessionPackets(connectPending);
+    return connectPending();
   }
 
   /**
    * Resends the PUBLISH and PUBREL packets kept in the session after reconnecting.
    * A packet that cannot be sent on this connection, e.g. larger than the Maximum Packet Size of the broker,
    * is removed from the session, and its publish() rejects with the error.
+   * @param connectPending whether the connection is still the one to resend on: false once it has been closed.
    */
-  private async resendSessionPackets() {
+  private async resendSessionPackets(connectPending: () => boolean) {
     const unsendable: { packetId: number; err: Error }[] = [];
     for await (const packet of this.session.resendTargets()) {
+      if (!connectPending()) {
+        return;
+      }
       try {
         this.sendPacketInBackground(packet, this.encodePacket(packet));
       } catch (err) {
         this.log(`can't resend ${packet.type} packet, removing it from the session`, packet, err);
         unsendable.push({ packetId: packet.packetId!, err: err as Error });
       }
+    }
+    if (!connectPending()) {
+      return;
     }
     // Removed after the iteration: an OutgoingStore does not have to support removing packets while iterating.
     for (const { packetId, err } of unsendable) {
