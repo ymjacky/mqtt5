@@ -23,12 +23,16 @@ export type KvOutgoingStoreOptions = {
   logger?: (msg: string, ...args: unknown[]) => void;
 };
 
-// Deno KV keeps values of up to 65,536 bytes: an entry with 65,499 bytes fits, with 65,500 it does not.
+// Deno KV keeps values of up to 65,536 bytes at present (checked with Deno 2.3.1 and 2.9.8): an entry with 65,499 bytes
+// fits, with 65,500 it does not. A test stores a packet of the largest size, to notice when Deno KV changes.
 const maximumEntryBytes = 65499;
 
 /**
  * An {@link OutgoingStore} that keeps the packets in {@link https://docs.deno.com/deploy/kv/ | Deno KV}, so that
  * QoS 1 and QoS 2 messages in flight are resent after the process restarts. Deno only; Deno KV needs `--unstable-kv`.
+ *
+ * Deno KV is an unstable API: Deno may change it in a future version, and this store, its size limit and the format
+ * of the stored messages may change with it.
  *
  * The session of the broker is found by the Client Identifier, so the client needs a fixed one: a client without
  * `clientId` cannot be created with this store. The store keeps the packets under the Client Identifier of its client.
@@ -57,7 +61,8 @@ const maximumEntryBytes = 65499;
  */
 export class KvOutgoingStore implements OutgoingStore {
   /**
-   * The size in bytes of the largest packet the store can keep, from the size of the values Deno KV accepts.
+   * The size in bytes of the largest packet the store can keep, from the size of the values Deno KV accepts at present.
+   * It is a fixed value and does not follow a change of Deno KV.
    * A packet of this size fits whatever the protocol version of the client.
    */
   static readonly maximumPacketSize: number = maximumEntryBytes - 1; // MQTT 3.1.1 PUBLISH is one byte longer as MQTT 5.0

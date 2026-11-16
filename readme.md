@@ -526,6 +526,10 @@ lost when the process exits.
 
 > **Deno only.** The persistent store below, `KvOutgoingStore`, uses [Deno KV](https://docs.deno.com/deploy/kv/). It is exported by `@ymjacky/mqtt5` only, not
 > by `@ymjacky/mqtt5/browser`, and does not work in the browser. Deno KV needs the `--unstable-kv` flag.
+>
+> **Deno KV is an unstable (preview) API.** Deno may change it or remove it in a future version, without the usual compatibility of a stable API. When
+> that happens, `KvOutgoingStore`, its size limit and the format of the stored messages may change too, or it may stop working until this library
+> follows. Check it with your Deno version before relying on it.
 
 [Deno KV](https://docs.deno.com/deploy/kv/) is the key-value database built into the Deno runtime, so nothing has to be installed:
 
@@ -561,9 +565,10 @@ kv.close(); // after the client has disconnected
   when CONNACK has Session Present, in the order they were published. Otherwise the session is new, and they are removed from the store.
 - **`publish()` waits while the messages are resent.** The messages of a previous process are resent first, right after CONNACK, and `connect()` resolves after
   that. A `publish()` called meanwhile is not rejected: it waits, and its message is sent after the resent ones.
-- **Size limit**: a QoS 1 / QoS 2 PUBLISH packet larger than 65,498 bytes (`KvOutgoingStore.maximumPacketSize`) cannot be kept in Deno KV, and `publish()`
-  rejects with `PacketTooLargeError`. The lower of this limit and the Maximum Packet Size of the broker applies. QoS 0 is not stored, so it is not limited by
-  the store.
+- **Size limit**: a QoS 1 / QoS 2 PUBLISH packet larger than 65,498 bytes (`KvOutgoingStore.maximumPacketSize`) cannot be kept, and `publish()` rejects
+  with `PacketTooLargeError`. The lower of this limit and the Maximum Packet Size of the broker applies. QoS 0 is not stored, so it is not limited by the
+  store. The limit comes from Deno KV, which at present (checked with Deno 2.3.1 and 2.9.8) keeps values of up to 65,536 bytes; it is a fixed value in
+  this library and does not follow a change of Deno KV.
 - **One process per database, one client per Client Identifier.** Use a database file of its own for each process: processes that share a file wait
   for each other on every write. Never use the same Client Identifier from more than one client at the same time: the stored messages and their
   order get mixed up. Clients with different Client Identifiers in the same process can share the database.

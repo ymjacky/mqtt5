@@ -201,9 +201,8 @@ Deno.test({ name: '@session in Deno KV: after the process restarts', only: false
       await waitFor(() => b.received.length === 2, 'PUBREL');
       assertEquals(b.received, ['PUBLISH 1 A dup', 'PUBREL 1']);
       b.broker.sendPubcomp('cid', 1, v5);
-      await delay(50);
+      await waitFor(async () => (await keys(kv)).length === 0, 'PUBCOMP');
       assertEquals(await second.publishInflightCount(), 0);
-      assertEquals(await keys(kv), []);
       await second.disconnect();
     } finally {
       await b.broker.destroy();
@@ -230,9 +229,8 @@ Deno.test({ name: '@session in Deno KV: after the process restarts', only: false
       await waitFor(() => b.received.length === 1, 'the resent PUBREL');
       assertEquals(b.received, ['PUBREL 1']);
       b.broker.sendPubcomp('cid', 1, v5);
-      await delay(50);
+      await waitFor(async () => (await keys(kv)).length === 0, 'PUBCOMP');
       assertEquals(await second.publishInflightCount(), 0);
-      assertEquals(await keys(kv), []);
       await second.disconnect();
     } finally {
       await b.broker.destroy();
@@ -286,8 +284,7 @@ Deno.test({ name: '@session in Deno KV: after the process restarts', only: false
       await waitFor(() => b.received.length === 1, 'the resent PUBLISH');
       assertEquals(b.received, ['PUBLISH 1 A dup']);
       b.broker.sendPuback('cid', 1, v311);
-      await delay(50);
-      assertEquals(await keys(kv), []);
+      await waitFor(async () => (await keys(kv)).length === 0, 'PUBACK');
       await second.disconnect();
     } finally {
       await b.broker.destroy();
