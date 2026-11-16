@@ -39,9 +39,26 @@ export class IncomingMemoryStore implements IncomingStore {
 /**
  * Keeps sent PUBLISH (QoS 1 and 2) and PUBREL packets until they are acknowledged, to resend them on reconnection.
  * Used internally by the client. Custom implementations are not supported.
+ *
+ * The packets are resent in the order they were first stored. Storing a packet with the packet ID of a stored one
+ * (PUBREL for the PUBLISH of its flow) replaces it and keeps its position.
  */
 export interface OutgoingStore {
-  /** Stores a packet by its packet ID. */
+  /**
+   * Tells the store the Client Identifier of the client that uses it, for a store that keeps the packets by it.
+   * Called when the client is created, before any other method.
+   * @throws {Error} if the store cannot be used with the Client Identifier.
+   */
+  setClientId?(clientId: string): void;
+
+  /**
+   * The size in bytes of the largest packet the store can keep, for a store with a limit.
+   * A QoS 1 or QoS 2 `publish()` whose PUBLISH is larger rejects with `PacketTooLargeError`, as for the
+   * Maximum Packet Size of the broker: the lower of the two applies.
+   */
+  readonly maximumPacketSize?: number;
+
+  /** Stores a packet by its packet ID. A packet with the packet ID of a stored one replaces it and keeps its position. */
   store(
     packet: MqttPackets.PublishPacket | MqttPackets.PubrelPacket,
   ): Promise<void>;

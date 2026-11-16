@@ -1,4 +1,4 @@
-import { ClientErrors, ClientTypes, Mqtt, MqttClient, MqttProperties } from '../../../deno/mod.ts';
+import { ClientErrors, ClientTypes, Mqtt, MqttClient, MqttPackets, MqttProperties, Store } from '../../../deno/mod.ts';
 import { TestBroker } from '../broker/test_broker.ts';
 import { assertEquals, assertExists, assertFalse, assertRejects, fail } from 'std/assert/mod.ts';
 
@@ -1018,3 +1018,71 @@ Deno.test({ name: '@resend too large', only: false }, async (context) => {
     },
   );
 }); // @resend too large
+
+Deno.test({ name: '@resend from a store with packets of a previous process', only: false }, async (context) => {
+  await context.step(
+    'a publish() called while the stored packets are resent waits for them and does not reuse their packet IDs',
+    async () => {
+      // Reading the stored packets takes time, as with a database.
+      const resendStarted = Promise.withResolvers<void>();
+      class RestoredStore extends Store.MemoryStore {
+        override async *resendIterator(): AsyncIterableIterator<MqttPackets.PublishPacket | MqttPackets.PubrelPacket> {
+          resendStarted.resolve();
+          for (const packet of [...this.packets.values()]) {
+            await new Promise((resolve) => setTimeout(resolve, 20));
+            yield packet;
+          }
+        }
+      }
+      // The store as a previous process left it: two QoS 1 messages waiting for PUBACK.
+      const store = new RestoredStore();
+      for (const [packetId, payload] of [[1, 'old1'], [2, 'old2']] as const) {
+        await store.store({
+          type: 'publish',
+          topic: 'topicA',
+          payload: new TextEncoder().encode(payload),
+          dup: false,
+          retain: false,
+          qos: Mqtt.QoS.AT_LEAST_ONCE,
+          packetId,
+        });
+      }
+
+      const broker = new TestBroker();
+      try {
+        broker.listen();
+        broker.on('connect', (event) => {
+          const packet = event.detail;
+          broker.sendConnack(packet.clientId, true, packet.protocolVersion); // the broker has the session
+        });
+        const received: { payload: string; packetId?: number; dup: boolean }[] = [];
+        broker.on('publish', (event) => {
+          const packet = event.detail;
+          received.push({ payload: new TextDecoder().decode(packet.payload), packetId: packet.packetId, dup: packet.dup });
+          broker.sendPuback('cid', packet.packetId!, Mqtt.ProtocolVersion.MQTT_V5);
+        });
+
+        const client = new MqttClient({ clientId: 'cid', logger: logger, clean: false, outgoingStore: store });
+        const connecting = client.connect();
+        // The application does not wait for connect(): the client is online, but the stored packets are still being resent.
+        await resendStarted.promise;
+        const publishing = client.publish('topicA', 'new', { qos: Mqtt.QoS.AT_LEAST_ONCE });
+
+        await connecting;
+        assertEquals((await publishing).result, Mqtt.ReasonCode.Success);
+        assertEquals(received, [
+          { payload: 'old1', packetId: 1, dup: true },
+          { payload: 'old2', packetId: 2, dup: true },
+          { payload: 'new', packetId: 3, dup: false },
+        ]);
+        assertEquals(await client.publishInflightCount(), 0);
+
+        await client.disconnect();
+      } catch (err) {
+        fail(`error occured: ${err}`);
+      } finally {
+        await broker.destroy();
+      }
+    },
+  );
+}); // @resend from a store with packets of a previous process

@@ -1555,7 +1555,7 @@ Deno.test({ name: '@publish order', only: false }, async (context) => {
           const packet = event.detail;
           broker.sendConnack(packet.clientId, false, packet.protocolVersion, Mqtt.ReasonCode.Success);
         });
-        // a custom store is used only without Clean Start
+
         const client = new MqttClient({ clientId: 'cid', logger: logger, clean: false, outgoingStore: new SlowStore() });
         await client.connect();
         const received = recordPackets(broker);

@@ -53,6 +53,11 @@ export type ClientOptions = {
    */
   protocolVersion?: Mqtt.ProtocolVersion;
   incomingStore?: IncomingStore;
+  /**
+   * The store of the QoS 1 and QoS 2 messages in flight, which are resent after reconnecting.
+   * By default they are kept in memory and lost when the process exits; `KvOutgoingStore` keeps them in Deno KV,
+   * and requires `clientId`.
+   */
   outgoingStore?: OutgoingStore;
   /** Called with debug logs. */
   logger?: (msg: string, ...args: unknown[]) => void;

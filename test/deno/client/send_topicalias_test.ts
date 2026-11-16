@@ -472,7 +472,7 @@ Deno.test({ name: '@send topic alias, concurrent publishes', only: false }, asyn
         const client = new MqttClient({
           clientId: 'cid',
           logger: logger,
-          clean: false, // a custom store is used only without Clean Start
+          clean: false,
           connectTimeoutMS: 10000,
           keepAlive: 10,
           topicAliasMaximumAboutSend: 10,

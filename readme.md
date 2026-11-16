@@ -12,6 +12,7 @@ API reference: [jsr.io/@ymjacky/mqtt5/doc](https://jsr.io/@ymjacky/mqtt5/doc)
 ## Requirements
 
 - Deno 2.3.1 or later
+- To use `KvOutgoingStore`, the persistent [session store](#session-store): run Deno with `--unstable-kv`
 - For the browser: a browser that supports ES modules and WebSocket
 - To build `mqtt5.mjs` yourself (`deno task build_ems`): Deno 2.4 or later
 
@@ -77,6 +78,7 @@ All options are optional.
 | `cert` / `privateKey`           | -                              | Client certificate and private key (PEM) for TLS client authentication (`MqttClient` only).                                           |
 | `topicAliasMaximumAboutSend`    | -                              | MQTT 5.0: topic alias maximum for outgoing PUBLISH packets. See [Topic aliases](#topic-aliases).                                      |
 | `topicAliasMaximumAboutReceive` | -                              | MQTT 5.0: topic alias maximum sent to the broker in CONNECT. See [Topic aliases](#topic-aliases).                                     |
+| `outgoingStore`                 | in memory                      | Where QoS 1 / QoS 2 messages in flight are kept. See [Session store](#session-store).                                                 |
 | `logger`                        | -                              | `(msg: string, ...args: unknown[]) => void`, called with debug logs.                                                                  |
 
 ### MQTT 3.1.1
@@ -420,7 +422,7 @@ await client.subscribe('topicA', Mqtt.QoS.AT_LEAST_ONCE);
 
 ```html
 <script type="module">
-import { Mqtt, WebSocketMqttClient } from 'https://esm.sh/jsr/@ymjacky/mqtt5@0.1.0/browser';
+import { Mqtt, WebSocketMqttClient } from 'https://esm.sh/jsr/@ymjacky/mqtt5@0.2.0/browser';
 
 const client = new WebSocketMqttClient({
   url: new URL('wss://broker.example.com:8081'),
@@ -519,11 +521,85 @@ Request Response Information with the `requestResponseInformation` CONNECT prope
 
 ### Session store
 
-In-flight QoS 1/2 messages are kept in memory, so they are lost when the process exits. A persistent session store is planned.
+QoS 1 / QoS 2 messages in flight are kept until the broker acknowledges them, and are resent after reconnecting. By default they are kept in memory, so they are
+lost when the process exits.
+
+> **Deno only.** The persistent store below, `KvOutgoingStore`, uses [Deno KV](https://docs.deno.com/deploy/kv/). It is exported by `@ymjacky/mqtt5` only, not
+> by `@ymjacky/mqtt5/browser`, and does not work in the browser. Deno KV needs the `--unstable-kv` flag.
+>
+> **Deno KV is an unstable (preview) API.** Deno may change it or remove it in a future version, without the usual compatibility of a stable API. When
+> that happens, `KvOutgoingStore`, its size limit and the format of the stored messages may change too, or it may stop working until this library
+> follows. Check it with your Deno version before relying on it.
+
+[Deno KV](https://docs.deno.com/deploy/kv/) is the key-value database built into the Deno runtime, so nothing has to be installed:
+
+- `await Deno.openKv()` opens the database, and `kv.close()` closes it.
+- On your machine the data is kept in an SQLite file. `Deno.openKv('./session.sqlite')` chooses the file; without a path Deno chooses one for the script.
+- It is still an unstable API of Deno: run the program with `--unstable-kv`, e.g. `deno run --unstable-kv --allow-net main.ts`. `Deno.openKv` does not exist
+  without the flag.
+
+With `KvOutgoingStore` the messages are kept in Deno KV, and a new process resends the messages the previous one left:
+
+```ts
+import { KvOutgoingStore, Mqtt, MqttClient } from '@ymjacky/mqtt5';
+
+const kv = await Deno.openKv();
+
+const client = new MqttClient({
+  clientId: 'clientA', // required with the store
+  clean: false,
+  outgoingStore: new KvOutgoingStore(kv),
+});
+
+// resolves after the messages of a previous process have been resent
+await client.connect({ properties: { sessionExpiryInterval: 3600 } });
+await client.publish('topicA', 'payload', { qos: Mqtt.QoS.AT_LEAST_ONCE });
+
+await client.disconnect();
+kv.close(); // after the client has disconnected
+```
+
+- **A fixed Client Identifier is required.** The broker finds the session by it, so a Client Identifier assigned by the broker cannot be used: a client without
+  `clientId` cannot be created with the store. The messages are kept under it; the keys are `['mqtt5', clientId, 'outgoing', packetId]`.
+- **The broker has to keep the session**: connect without Clean Start (`clean: false`) and with a Session Expiry Interval (MQTT 5.0). The messages are resent
+  when CONNACK has Session Present, in the order they were published. Otherwise the session is new, and they are removed from the store.
+- **`publish()` waits while the messages are resent.** The messages of a previous process are resent first, right after CONNACK, and `connect()` resolves after
+  that. A `publish()` called meanwhile is not rejected: it waits, and its message is sent after the resent ones.
+- **Size limit**: a QoS 1 / QoS 2 PUBLISH packet larger than 65,498 bytes (`KvOutgoingStore.maximumPacketSize`) cannot be kept, and `publish()` rejects
+  with `PacketTooLargeError`. The lower of this limit and the Maximum Packet Size of the broker applies. QoS 0 is not stored, so it is not limited by the
+  store. The limit comes from Deno KV, which at present (checked with Deno 2.3.1 and 2.9.8) keeps values of up to 65,536 bytes; it is a fixed value in
+  this library and does not follow a change of Deno KV.
+- **One process per database, one client per Client Identifier.** Use a database file of its own for each process: processes that share a file wait
+  for each other on every write. Never use the same Client Identifier from more than one client at the same time: the stored messages and their
+  order get mixed up. Clients with different Client Identifiers in the same process can share the database.
+- The application opens and closes the database. Close it after the client has disconnected.
+- The promise of a `publish()` is gone with its process: the next process resends the message and completes the flow, but nothing reports it.
+- Received QoS 2 messages are not kept: a message that was being received when the process exited can be delivered again.
+
+See [examples/deno/session_store_kv.ts](https://github.com/ymjacky/mqtt5/blob/main/examples/deno/session_store_kv.ts).
+
+#### Removing the stored messages
+
+A message is removed from the store when the broker acknowledges it. To remove the messages that are left, use one of the following:
+
+- **Start a new session**: connect with Clean Start, `await client.connect({ clean: true })`. The broker discards its session too, and the client removes the
+  messages of its Client Identifier from the store.
+- **Delete the keys** of the Client Identifier, while no client uses them:
+
+  ```ts
+  const kv = await Deno.openKv();
+  for await (const entry of kv.list({ prefix: ['mqtt5', 'clientA'] })) {
+    await kv.delete(entry.key);
+  }
+  kv.close();
+  ```
+
+- **Delete the database file**, while it is not open. This removes everything in the database, not only the messages. With a path,
+  `Deno.openKv('./session.sqlite')`, delete that file and the `-shm` and `-wal` files next to it. Without a path, the database is under the "Origin storage"
+  directory that `deno info` shows.
 
 ## Not supported
 
-- A persistent session store (planned).
 - Specifying CA certificates for WebSocket Secure (`wss://`). The runtime's trust store is used.
 - Disabling TLS certificate verification (`rejectUnauthorized`).
 - Automatic reconnection. Reconnect from the `closed` event, as in
