@@ -293,8 +293,9 @@ export abstract class BaseMqttClient {
    * When the returned promise rejects, the client is offline again, so this method can be called again right away.
    * A rejection of an ignored promise does not terminate the process; await the promise to handle failures.
    *
-   * @param options CONNECT options: clean start, MQTT 5.0 properties and will message.
-   * @returns the received CONNACK packet.
+   * @param options {@link ConnectOptions}: clean start, MQTT 5.0 properties ({@link MqttProperties.ConnectProperties}) and will message.
+   * @returns the received CONNACK packet ({@link MqttPackets.ConnackPacket}). Check its `reasonCode` (MQTT 5.0) or `returnCode` (MQTT 3.1.1):
+   * the promise resolves even when the broker refuses the connection.
    * @throws {StateIsNotOfflineError} if the client is already connected or connecting.
    * @throws {InvalidTopicNameError} if the Will Topic or Will Response Topic is not a valid Topic Name. Nothing is sent.
    * @throws {InvalidArgumentError} if the Will QoS is not 0, 1 or 2, or the Will Payload is longer than 65,535 bytes. Nothing is sent.
@@ -438,9 +439,9 @@ export abstract class BaseMqttClient {
    *
    * @param topic topic name
    * @param payload payload. A string is encoded as UTF-8.
-   * @param options QoS, retain and DUP flags. QoS defaults to `Mqtt.QoS.AT_MOST_ONCE`.
-   * @param properties MQTT 5.0 PUBLISH properties.
-   * @returns the result of the publish flow.
+   * @param options {@link PublishOptions}: QoS, retain and DUP flags. QoS defaults to `Mqtt.QoS.AT_MOST_ONCE`.
+   * @param properties MQTT 5.0 PUBLISH properties ({@link MqttProperties.UserPublishProperties}).
+   * @returns the result of the publish flow ({@link PublishResult}). Its `result` is the reason code; 0x80 (128) or more is a failure.
    * @throws {StateIsNotOnlineError} if the client is not connected.
    * @throws {InvalidTopicNameError} if `topic` or the Response Topic is not a valid Topic Name. Nothing is sent.
    * @throws {InvalidArgumentError} if the QoS is not 0, 1 or 2, or `dup` is true with QoS 0. Nothing is sent.
@@ -620,8 +621,8 @@ export abstract class BaseMqttClient {
    * A rejection of an ignored promise does not terminate the process; await the promise to handle failures.
    * @param topicFilter topic name or topic filter
    * @param qos QoS level. Defaults to `Mqtt.QoS.AT_MOST_ONCE`.
-   * @param properties MQTT 5.0 SUBSCRIBE properties.
-   * @returns the reason codes of SUBACK.
+   * @param properties MQTT 5.0 SUBSCRIBE properties ({@link MqttProperties.SubscribeProperties}).
+   * @returns the reason codes of SUBACK ({@link SubscribeResults}).
    * @throws {StateIsNotOnlineError} if the client is not connected.
    * @throws {InvalidTopicFilterError} if a topic filter is invalid. Nothing is sent.
    * @throws {InvalidArgumentError} if no topic filter is given, or a QoS, Retain Handling or No Local is invalid. Nothing is sent.
@@ -648,8 +649,8 @@ export abstract class BaseMqttClient {
    * A rejection of an ignored promise does not terminate the process; await the promise to handle failures.
    * @param topicFilters topic names or topic filters
    * @param qos QoS level. Defaults to `Mqtt.QoS.AT_MOST_ONCE`.
-   * @param properties MQTT 5.0 SUBSCRIBE properties.
-   * @returns the reason codes of SUBACK.
+   * @param properties MQTT 5.0 SUBSCRIBE properties ({@link MqttProperties.SubscribeProperties}).
+   * @returns the reason codes of SUBACK ({@link SubscribeResults}).
    * @throws {StateIsNotOnlineError} if the client is not connected.
    * @throws {InvalidTopicFilterError} if a topic filter is invalid. Nothing is sent.
    * @throws {InvalidArgumentError} if no topic filter is given, or a QoS, Retain Handling or No Local is invalid. Nothing is sent.
@@ -674,10 +675,10 @@ export abstract class BaseMqttClient {
   /**
    * Subscribes to a topic filter with MQTT 5.0 subscription options and waits for SUBACK.
    * A rejection of an ignored promise does not terminate the process; await the promise to handle failures.
-   * @param subscription topic filter and subscription options. Its `qos` takes precedence over the `qos` argument.
+   * @param subscription topic filter and subscription options ({@link SubscriptionOption}). Its `qos` takes precedence over the `qos` argument.
    * @param qos QoS level. Defaults to `Mqtt.QoS.AT_MOST_ONCE`.
-   * @param properties MQTT 5.0 SUBSCRIBE properties.
-   * @returns the reason codes of SUBACK.
+   * @param properties MQTT 5.0 SUBSCRIBE properties ({@link MqttProperties.SubscribeProperties}).
+   * @returns the reason codes of SUBACK ({@link SubscribeResults}).
    * @throws {StateIsNotOnlineError} if the client is not connected.
    * @throws {InvalidTopicFilterError} if a topic filter is invalid. Nothing is sent.
    * @throws {InvalidArgumentError} if no topic filter is given, or a QoS, Retain Handling or No Local is invalid. Nothing is sent.
@@ -702,10 +703,10 @@ export abstract class BaseMqttClient {
   /**
    * Subscribes to multiple topic filters with subscription options with one SUBSCRIBE packet and waits for SUBACK.
    * A rejection of an ignored promise does not terminate the process; await the promise to handle failures.
-   * @param subscriptions topic filters and subscription options. Their `qos` takes precedence over the `qos` argument.
+   * @param subscriptions topic filters and subscription options ({@link SubscriptionOption}). Their `qos` takes precedence over the `qos` argument.
    * @param qos QoS level. Defaults to `Mqtt.QoS.AT_MOST_ONCE`.
-   * @param properties MQTT 5.0 SUBSCRIBE properties.
-   * @returns the reason codes of SUBACK.
+   * @param properties MQTT 5.0 SUBSCRIBE properties ({@link MqttProperties.SubscribeProperties}).
+   * @returns the reason codes of SUBACK ({@link SubscribeResults}).
    * @throws {StateIsNotOnlineError} if the client is not connected.
    * @throws {InvalidTopicFilterError} if a topic filter is invalid. Nothing is sent.
    * @throws {InvalidArgumentError} if no topic filter is given, or a QoS, Retain Handling or No Local is invalid. Nothing is sent.
@@ -791,8 +792,8 @@ export abstract class BaseMqttClient {
    * Unsubscribes from a topic filter and waits for UNSUBACK.
    * A rejection of an ignored promise does not terminate the process; await the promise to handle failures.
    * @param topicFilter topic name or topic filter
-   * @param properties MQTT 5.0 UNSUBSCRIBE properties.
-   * @returns the reason codes of UNSUBACK.
+   * @param properties MQTT 5.0 UNSUBSCRIBE properties ({@link MqttProperties.UnsubscribeProperties}).
+   * @returns the reason codes of UNSUBACK ({@link UnsubscribeResults}).
    * @throws {StateIsNotOnlineError} if the client is not connected.
    * @throws {InvalidTopicFilterError} if a topic filter is invalid. Nothing is sent.
    * @throws {InvalidArgumentError} if no topic filter is given. Nothing is sent.
@@ -823,8 +824,8 @@ export abstract class BaseMqttClient {
    * Unsubscribes from multiple topic filters with one UNSUBSCRIBE packet and waits for UNSUBACK.
    * A rejection of an ignored promise does not terminate the process; await the promise to handle failures.
    * @param topicFilters topic names or topic filters
-   * @param properties MQTT 5.0 UNSUBSCRIBE properties.
-   * @returns the reason codes of UNSUBACK.
+   * @param properties MQTT 5.0 UNSUBSCRIBE properties ({@link MqttProperties.UnsubscribeProperties}).
+   * @returns the reason codes of UNSUBACK ({@link UnsubscribeResults}).
    * @throws {StateIsNotOnlineError} if the client is not connected.
    * @throws {InvalidTopicFilterError} if a topic filter is invalid. Nothing is sent.
    * @throws {InvalidArgumentError} if no topic filter is given. Nothing is sent.
@@ -903,7 +904,7 @@ export abstract class BaseMqttClient {
    * If DISCONNECT cannot be sent, e.g. a property cannot be encoded, the promise rejects and the connection stays open.
    *
    * @param force `true` to close without sending DISCONNECT.
-   * @param properties MQTT 5.0 DISCONNECT properties.
+   * @param properties MQTT 5.0 DISCONNECT properties ({@link MqttProperties.DisconnectProperties}).
    * @example
    * normal disconnection
    * ```ts
@@ -1018,8 +1019,8 @@ export abstract class BaseMqttClient {
    * Sends AUTH (MQTT 5.0 enhanced authentication). Receive AUTH from the broker with the `auth` event.
    * The returned promise resolves when AUTH is sent.
    * A rejection of an ignored promise does not terminate the process; await the promise to handle failures.
-   * @param reasonCode e.g. `Mqtt.ReasonCode.ContinueAuthentication` or `Mqtt.ReasonCode.ReAuthenticate`.
-   * @param properties AUTH properties, such as `authenticationMethod` and `authenticationData`.
+   * @param reasonCode a {@link Mqtt.ReasonCode}, e.g. `Mqtt.ReasonCode.ContinueAuthentication` or `Mqtt.ReasonCode.ReAuthenticate`.
+   * @param properties AUTH properties ({@link MqttProperties.AuthProperties}), such as `authenticationMethod` and `authenticationData`.
    * The Reason String and User Properties are left out if they make AUTH larger than the Maximum Packet Size of the broker.
    * @throws {SendPacketError} if the client is not connected.
    * @throws {PacketTooLargeError} if AUTH is larger than the Maximum Packet Size of the broker even without the Reason String

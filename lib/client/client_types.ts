@@ -138,7 +138,10 @@ export type PublishOptions = {
   retain?: boolean;
 };
 
-/** A subscription with options, passed to {@link MqttClient.subscribe} / {@link WebSocketMqttClient.subscribe}. */
+/**
+ * A topic filter with its subscription options, passed to {@link MqttClient.subscribe} / {@link WebSocketMqttClient.subscribe}.
+ * It is the same type as {@link MqttPackets.Subscription}, which describes each field.
+ */
 export type SubscriptionOption = Subscription;
 
 /** Writes bytes to the connection. Used internally by the clients. */
