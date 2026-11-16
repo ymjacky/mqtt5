@@ -82,12 +82,20 @@ export type SubscribePacket = {
   properties?: MqttProperties.SubscribeProperties;
 };
 
-/** A topic filter and its subscription options in SUBSCRIBE. */
+/**
+ * A topic filter and its subscription options in SUBSCRIBE.
+ * `retainHandling`, `retainAsPublished` and `noLocal` are MQTT 5.0 subscription options.
+ */
 export type Subscription = {
+  /** Topic filter, e.g. `sensors/+/temperature`, `logs/#` or `$share/group1/topicA`. */
   topicFilter: string;
+  /** Maximum QoS the broker may use to send messages for this subscription. */
   qos: Mqtt.QoS;
+  /** Whether retained messages are sent when subscribing. See {@link Mqtt.RetainHandling}. */
   retainHandling?: Mqtt.RetainHandling;
+  /** When true, the broker keeps the retain flag of the messages as they were published. */
   retainAsPublished?: boolean;
+  /** When true, the broker does not send the client its own messages. Not allowed for a shared subscription. */
   noLocal?: boolean;
 };
 

@@ -62,7 +62,10 @@ function openUnlessAborted<T extends Deno.Conn>(opening: Promise<T>, signal: Abo
  * ```
  */
 export class MqttClient extends BaseMqttClient {
-  /** The underlying TCP or TLS connection. */
+  /**
+   * The underlying TCP or TLS connection.
+   * @ignore
+   */
   protected conn?: Deno.Conn;
   private reader?: ReadableStreamDefaultReader<Uint8Array>;
   private frameBuffer = new MqttStream.MqttFrameBuffer();
@@ -78,6 +81,7 @@ export class MqttClient extends BaseMqttClient {
   /**
    * Opens the TCP or TLS connection and starts the receive loop.
    * @param signal when it aborts while the connection is being opened, rejects at once; the connection is closed when it opens.
+   * @ignore
    */
   protected async open(signal: AbortSignal): Promise<void> {
     const openSocket = async () => {
@@ -168,7 +172,10 @@ export class MqttClient extends BaseMqttClient {
     });
   }
 
-  /** Closes the connection. */
+  /**
+   * Closes the connection.
+   * @ignore
+   */
   protected async close(): Promise<void> {
     if (this.conn) {
       if (this.reader) {

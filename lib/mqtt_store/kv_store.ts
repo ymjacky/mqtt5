@@ -172,6 +172,7 @@ export class KvOutgoingStore implements OutgoingStore {
     return [...this.prefix, this.clientId, 'outgoing'];
   }
 
+  /** The key of the stored packet with the packet ID. */
   private key(packetId: number): Deno.KvKey {
     return [...this.keyPrefix(), packetId];
   }
