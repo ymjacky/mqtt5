@@ -418,11 +418,12 @@ await client.subscribe('topicA', Mqtt.QoS.AT_LEAST_ONCE);
 
 ### From a CDN (no build step)
 
-[esm.sh](https://esm.sh) serves JSR packages as JavaScript modules. Specify the version:
+[esm.sh](https://esm.sh) serves JSR packages as JavaScript modules. Without a version, the URL follows the latest release. To pin a version, which is safer for
+production, write it after the package name, e.g. `https://esm.sh/jsr/@ymjacky/mqtt5@x.y.z/browser`.
 
 ```html
 <script type="module">
-import { Mqtt, WebSocketMqttClient } from 'https://esm.sh/jsr/@ymjacky/mqtt5@0.2.0/browser';
+import { Mqtt, WebSocketMqttClient } from 'https://esm.sh/jsr/@ymjacky/mqtt5/browser';
 
 const client = new WebSocketMqttClient({
   url: new URL('wss://broker.example.com:8081'),

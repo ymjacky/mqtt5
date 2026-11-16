@@ -24,7 +24,10 @@ import { ConnectionClosed } from './error.ts';
  * ```
  */
 export class WebSocketMqttClient extends BaseMqttClient {
-  /** The underlying WebSocket. */
+  /**
+   * The underlying WebSocket.
+   * @ignore
+   */
   protected conn?: WebSocket;
   private frameBuffer = new MqttStream.MqttFrameBuffer();
 
@@ -43,6 +46,7 @@ export class WebSocketMqttClient extends BaseMqttClient {
   /**
    * Opens the WebSocket connection. It is not aborted with a signal: close() also stops a WebSocket that is still opening,
    * and the `close` event then reports it.
+   * @ignore
    */
   protected open(): Promise<void> {
     const deferred = new Deferred<void>();
@@ -105,7 +109,10 @@ export class WebSocketMqttClient extends BaseMqttClient {
     return deferred.promise;
   }
 
-  /** Closes the connection. */
+  /**
+   * Closes the connection.
+   * @ignore
+   */
   protected async close(): Promise<void> {
     if (this.conn) {
       await this.conn.close();
