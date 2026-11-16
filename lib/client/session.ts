@@ -27,6 +27,11 @@ export class Session {
     return this.sessionId;
   }
 
+  /** The size in bytes of the largest packet the store can keep, if it has a limit. */
+  public get maximumStoredPacketSize(): number | undefined {
+    return this.outgoingStore.maximumPacketSize;
+  }
+
   public async acquirePacketId() {
     return await this.packetIdProvider.acquire();
   }

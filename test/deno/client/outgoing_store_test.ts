@@ -83,7 +83,6 @@ Deno.test({ name: '@slow outgoing store', only: false }, async (context) => {
             broker.sendPubcomp('cid', event.detail.packetId, Mqtt.ProtocolVersion.MQTT_V5);
           });
 
-          // a custom store is used only without Clean Start
           const client = new MqttClient({ clientId: 'cid', logger: logger, clean: false, outgoingStore: store });
           await client.connect();
 

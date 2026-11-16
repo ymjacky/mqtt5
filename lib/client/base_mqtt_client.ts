@@ -5,6 +5,7 @@ import { ClientOptions, ConnectOptions, PublishOptions, PublishResult, Subscribe
 import {
   ConnectionClosed,
   ConnectTimeout,
+  InvalidArgumentError,
   MalformedPacketError,
   PacketTooLargeError,
   SendPacketError,
@@ -162,11 +163,15 @@ export abstract class BaseMqttClient {
     this.connectionState = 'offline';
     this.incomingStore = options?.incomingStore || new IncomingMemoryStore();
 
-    if (this.clean) {
-      this.session = new Session(this.clientId);
-    } else {
-      this.session = new Session(this.clientId, options?.outgoingStore);
+    // The store is used whatever `clean` is: the session lasts for the Session Expiry Interval (MQTT 5.0), and
+    // the broker tells in CONNACK (Session Present) whether the stored packets are resent or removed.
+    const outgoingStore = options?.outgoingStore;
+    try {
+      outgoingStore?.setClientId?.(this.clientId);
+    } catch (err) {
+      throw new InvalidArgumentError(`the outgoingStore cannot be used with the clientId '${this.clientId}': ${(err as Error).message}`);
     }
+    this.session = new Session(this.clientId, outgoingStore);
 
     this.caCerts = options?.caCerts;
     this.cert = options?.cert;
@@ -424,7 +429,8 @@ export abstract class BaseMqttClient {
    * @throws {InvalidTopicNameError} if `topic` or the Response Topic is not a valid Topic Name. Nothing is sent.
    * @throws {InvalidArgumentError} if the QoS is not 0, 1 or 2, or `dup` is true with QoS 0. Nothing is sent.
    * @throws {InvalidPropertyError} if a property is invalid. Nothing is sent.
-   * @throws {PacketTooLargeError} if PUBLISH is larger than the Maximum Packet Size of the broker or than MQTT allows. Nothing is sent.
+   * @throws {PacketTooLargeError} if PUBLISH is larger than the Maximum Packet Size of the broker or than MQTT allows,
+   * or QoS 1 and 2: than the session store can keep. Nothing is sent.
    * QoS 1 and 2 are checked with the Topic Name even when a topic alias would make them smaller: they are kept in the session
    * with it, to be resent after reconnecting. They are also rejected when resent after reconnecting and larger than
    * the Maximum Packet Size of the new connection; the message is removed from the session.
@@ -516,6 +522,10 @@ export abstract class BaseMqttClient {
         // encoded or is too large must not stay there to be resent.
         try {
           bytes = this.encodePacket(packet);
+          const storeMaximum = this.session.maximumStoredPacketSize;
+          if (storeMaximum !== undefined && bytes.length > storeMaximum) {
+            throw new PacketTooLargeError(`PUBLISH is ${bytes.length} bytes, larger than the ${storeMaximum} bytes the session store can keep`);
+          }
           await this.session.storePublish(packet, deferred);
         } catch (err) {
           // Not stored, so not sent either.
