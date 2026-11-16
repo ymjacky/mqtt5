@@ -1177,7 +1177,8 @@ export abstract class BaseMqttClient {
    * Handlers run one at a time in the order packets were received, so a
    * handler awaiting e.g. a store never lets a later packet overtake it. A
    * failure inside a handler is logged instead of becoming an unhandled
-   * rejection. An unsupported packet type is thrown synchronously.
+   * rejection. A packet that a broker must not send is a protocol error,
+   * which ends the connection.
    * @ignore
    */
   protected packetReceived(packet: AnyPacket) {
@@ -1217,7 +1218,9 @@ export abstract class BaseMqttClient {
         handle = () => this.handleAuth(packet);
         break;
       default:
-        throw new MqttPackets.MqttPacketsError.UnsupportedPacketError('unknown');
+        // CONNECT, SUBSCRIBE, UNSUBSCRIBE and PINGREQ are sent by a client only.
+        handle = () => this.handleUnexpectedPacket(packet);
+        break;
     }
 
     this.packetHandling = this.packetHandling
@@ -1552,6 +1555,15 @@ export abstract class BaseMqttClient {
     );
   }
 
+  /**
+   * Handles a packet that only a client sends (CONNECT, SUBSCRIBE, UNSUBSCRIBE, PINGREQ): a protocol error.
+   * Ends the connection as for a malformed packet, with the ProtocolError reason code (MQTT 5.0).
+   */
+  private async handleUnexpectedPacket(packet: AnyPacket) {
+    this.log(`${packet.type} packet must not be sent by a broker, ending the connection`, packet);
+    await this.disconnectWithError(Mqtt.ReasonCode.ProtocolError);
+  }
+
   /** Closes the connection if the broker does not close it within `disconnectTimeoutMS` after DISCONNECT. */
   private startDisconnectTimer() {
     this.startTimer(
@@ -1614,8 +1626,15 @@ export abstract class BaseMqttClient {
     }
   }
 
-  /** Disconnects if PINGRESP is not received within `pingrespTimeoutMS`. */
+  /**
+   * Disconnects if PINGRESP is not received within `pingrespTimeoutMS`.
+   * The timer of an earlier PINGREQ that is not answered yet keeps running: restarted on every PINGREQ, it would never
+   * expire when `pingrespTimeoutMS` is not shorter than the keep alive interval.
+   */
   private startPingrespTimer() {
+    if (this.timerExists('pingrespTimeout')) {
+      return;
+    }
     this.startTimer('pingrespTimeout', async () => {
       await this.disconnect(true);
     }, this.pingrespTimeoutMs);
