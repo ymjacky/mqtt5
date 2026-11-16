@@ -3,7 +3,7 @@ import { TestWsBroker } from '../broker/test_ws_broker.ts';
 import { acceptWebSocket, connackBytes, RawServer, waitUntil, webSocketFrame } from '../broker/raw_server.ts';
 import { assert, assertEquals, assertRejects } from 'std/assert/mod.ts';
 
-// How the client behaves when the connection is lost or has to be ended.
+// How the client behaves when the connection is refused, is lost or has to be ended.
 
 function logger(msg: string, ...args: unknown[]): void {
   console.log('[Test Client]', msg, ...args);
@@ -116,6 +116,46 @@ Deno.test({ name: '@connection state ws: DISCONNECT from the broker', only: fals
     },
   );
 }); // @connection state ws: DISCONNECT from the broker
+
+Deno.test({ name: '@connection state ws: connection refused by the broker', only: false }, async (context) => {
+  await context.step(
+    'after a CONNACK that refuses the connection, the client is offline and connect() can be called again right away',
+    async () => {
+      const broker = new TestWsBroker();
+      const client = new WebSocketMqttClient({ url: new URL('ws://127.0.0.1:3000/'), clientId: 'cid', logger: logger });
+      try {
+        broker.listen();
+        // Refuses the first time, and does not close the connection (a broker has to, but may be slow to).
+        let connects = 0;
+        broker.on('connect', (event) => {
+          const packet = event.detail;
+          const reasonCode = ++connects === 1 ? Mqtt.ReasonCode.NotAuthorized : Mqtt.ReasonCode.Success;
+          broker.sendConnack(packet.clientId, false, packet.protocolVersion, reasonCode);
+        });
+        const events: string[] = [];
+        client.on('connack', () => {
+          events.push('connack');
+        });
+        client.on('closed', () => {
+          events.push('closed');
+        });
+
+        const refused = await settleWithin(client.connect(), 'connect()');
+        events.push('connect() resolved');
+        assertEquals(refused.reasonCode, Mqtt.ReasonCode.NotAuthorized);
+        assertEquals(events, ['connack', 'closed', 'connect() resolved']);
+        await assertRejects(() => client.publish('topicA', 'x'), ClientErrors.StateIsNotOnlineError);
+
+        const connack = await settleWithin(client.connect(), 'the second connect()');
+        assertEquals(connack.reasonCode, Mqtt.ReasonCode.Success);
+        assertEquals(await client.publish('topicA', 'x'), { result: 0, reason: '' });
+      } finally {
+        await client.disconnect(true);
+        await broker.destroy();
+      }
+    },
+  );
+}); // @connection state ws: connection refused by the broker
 
 // The peer has become unreachable while the TCP connection is still open: it answers nothing, not even the Close frame
 // of the WebSocket closing handshake.
