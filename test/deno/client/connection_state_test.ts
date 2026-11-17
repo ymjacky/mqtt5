@@ -756,3 +756,208 @@ Deno.test({ name: '@connection state: QoS 2 PUBLISH sent again by the broker', o
     },
   );
 }); // @connection state: QoS 2 PUBLISH sent again by the broker
+
+Deno.test({ name: '@connection state: keep alive, PINGREQ cannot be written', only: false }, async (context) => {
+  await context.step(
+    'the connection is closed, without an unhandled rejection',
+    async () => {
+      // The connection does not work any more, and the client has not noticed it yet.
+      class WriteFailingClient extends MqttClient {
+        failWrites() {
+          this.write = () => {
+            throw new Error('write failed');
+          };
+        }
+      }
+
+      const broker = new TestBroker();
+      const client = new WriteFailingClient({ clientId: 'cid', logger: logger, keepAlive: 1 });
+      // Nobody awaits the keep alive timer: a rejection there would be unhandled, which terminates the process.
+      const unhandled: string[] = [];
+      const onUnhandledRejection = (event: PromiseRejectionEvent) => {
+        event.preventDefault();
+        unhandled.push(String(event.reason));
+      };
+      globalThis.addEventListener('unhandledrejection', onUnhandledRejection);
+      try {
+        broker.listen();
+        broker.on('connect', (event) => {
+          const packet = event.detail;
+          broker.sendConnack(packet.clientId, false, packet.protocolVersion);
+        });
+        const closed = Promise.withResolvers<void>();
+        client.on('closed', () => closed.resolve());
+
+        await client.connect();
+        client.failWrites();
+
+        // PINGREQ after 1 s.
+        const result = await settleWithin(closed.promise, "the 'closed' event", 2000).catch((err) => err);
+        assertEquals(unhandled, []);
+        assertEquals(result, undefined);
+      } finally {
+        globalThis.removeEventListener('unhandledrejection', onUnhandledRejection);
+        await client.disconnect(true);
+        await broker.destroy();
+      }
+    },
+  );
+}); // @connection state: keep alive, PINGREQ cannot be written
+
+Deno.test({ name: '@connection state: topic aliases of the broker', only: false }, async (context) => {
+  await context.step(
+    'a topic alias registered on a previous connection is not used on the next connection',
+    async () => {
+      const broker = new TestBroker();
+      const client = new MqttClient({ clientId: 'cid', logger: logger, topicAliasMaximumAboutReceive: 10, disconnectTimeoutMS: 100 });
+      try {
+        broker.listen();
+        broker.on('connect', (event) => {
+          const packet = event.detail;
+          broker.sendConnack(packet.clientId, false, packet.protocolVersion);
+        });
+        const messages: string[] = [];
+        client.on('publish', (event) => {
+          messages.push(`${event.detail.topic}:${new TextDecoder().decode(event.detail.payload)}`);
+        });
+        const send = (topic: string, payload: string) =>
+          broker.sendPublish('cid', 0, topic, Mqtt.ProtocolVersion.MQTT_V5, new TextEncoder().encode(payload), Mqtt.QoS.AT_MOST_ONCE, false, false, {
+            topicAlias: 1,
+          });
+
+        await client.connect();
+        await send('topicA', '1st'); // registers the alias
+        await send('', '2nd');
+        await waitUntil(() => messages.length === 2, 'the messages on the first connection');
+        await client.disconnect();
+
+        // A topic alias is valid on one connection only. The broker of this test uses it without registering it again.
+        await client.connect();
+        await send('', '3rd'); // dropped, as any alias that is not registered
+        await send('topicB', '4th');
+        await send('', '5th');
+        await waitUntil(() => messages.some((message) => message.endsWith('5th')), 'the messages on the second connection');
+        assertEquals(messages, ['topicA:1st', 'topicA:2nd', 'topicB:4th', 'topicB:5th']);
+      } finally {
+        await client.disconnect(true);
+        await broker.destroy();
+      }
+    },
+  );
+}); // @connection state: topic aliases of the broker
+
+Deno.test({ name: '@connection state: disconnect() while connecting', only: false }, async (context) => {
+  await context.step(
+    'disconnect(true) gives up a connect() that waits for CONNACK at once, and resolves',
+    async () => {
+      // Accepts the connection and never answers CONNECT.
+      const server = new RawServer({ port: 1883 });
+      const client = new MqttClient({ clientId: 'cid', logger: logger, connectTimeoutMS: 5000 });
+      try {
+        const events: string[] = [];
+        client.on('closed', () => {
+          events.push('closed');
+        });
+
+        const connecting = client.connect();
+        const first = await server.connection(0);
+        await waitUntil(() => first.received.length > 0, 'CONNECT');
+
+        // Not after connectTimeoutMS, and not rejected with the error of connect().
+        await settleWithin(client.disconnect(true), 'disconnect(true)', 500);
+        events.push('disconnect(true) resolved');
+
+        // connect() fails, the connection is closed, and the client is offline.
+        await assertRejects(() => settleWithin(connecting, 'connect()'), ClientErrors.ConnectionClosed);
+        assertEquals(events, ['closed', 'disconnect(true) resolved']);
+        await settleWithin(first.closed, 'the connection');
+
+        // It can connect again right away.
+        const reconnecting = client.connect();
+        const second = await server.connection(1);
+        await waitUntil(() => second.received.length > 0, 'CONNECT on the second connection');
+        await second.send(connackBytes());
+        assertEquals((await settleWithin(reconnecting, 'the second connect()')).reasonCode, Mqtt.ReasonCode.Success);
+      } finally {
+        await client.disconnect(true);
+        await server.close();
+      }
+    },
+  );
+
+  await context.step(
+    'disconnect(true) gives up a connect() whose connection is still being opened at once, and resolves',
+    async () => {
+      const connect = Deno.connect;
+      try {
+        // The TCP connection does not open, e.g. the broker's address does not answer.
+        const { promise: opening, resolve: open } = Promise.withResolvers<Deno.TcpConn>();
+        Deno.connect = (() => opening) as unknown as typeof Deno.connect;
+
+        const client = new MqttClient({ clientId: 'cid', logger: logger, connectTimeoutMS: 5000 });
+        const connecting = client.connect();
+        await delay(50);
+
+        await settleWithin(client.disconnect(true), 'disconnect(true)', 500);
+        await assertRejects(() => settleWithin(connecting, 'connect()'), ClientErrors.ConnectionClosed);
+
+        // The connection that opens later is closed.
+        let lateConnectionClosed = false;
+        open({ close: () => lateConnectionClosed = true } as unknown as Deno.TcpConn);
+        await delay(0);
+        assert(lateConnectionClosed);
+      } finally {
+        Deno.connect = connect;
+      }
+    },
+  );
+
+  await context.step(
+    'disconnect() waits for connect(), and disconnect(true) called meanwhile gives up connect(): both resolve',
+    async () => {
+      // Accepts the connection and never answers CONNECT.
+      const server = new RawServer({ port: 1883 });
+      const client = new MqttClient({ clientId: 'cid', logger: logger, connectTimeoutMS: 5000 });
+      try {
+        const connecting = client.connect();
+        const connection = await server.connection(0);
+        await waitUntil(() => connection.received.length > 0, 'CONNECT');
+
+        const disconnecting = client.disconnect();
+        assertEquals(await stateOf(disconnecting, 100), 'pending');
+
+        await settleWithin(client.disconnect(true), 'disconnect(true)', 500);
+        await settleWithin(disconnecting, 'disconnect()', 500);
+        await assertRejects(() => settleWithin(connecting, 'connect()'), ClientErrors.ConnectionClosed);
+        // Nothing was sent after CONNECT.
+        const connectLength = connection.received.length;
+        await settleWithin(connection.closed, 'the connection');
+        assertEquals(connection.received.length, connectLength);
+      } finally {
+        await client.disconnect(true);
+        await server.close();
+      }
+    },
+  );
+
+  await context.step(
+    'disconnect() resolves when the connect() it waits for fails',
+    async () => {
+      // Accepts the connection and never answers CONNECT.
+      const server = new RawServer({ port: 1883 });
+      const client = new MqttClient({ clientId: 'cid', logger: logger, connectTimeoutMS: 300 });
+      try {
+        const connecting = client.connect();
+        const connection = await server.connection(0);
+        await waitUntil(() => connection.received.length > 0, 'CONNECT');
+
+        // Not rejected with ConnectTimeout: the client is offline, which is what disconnect() is for.
+        await settleWithin(client.disconnect(), 'disconnect()');
+        await assertRejects(() => connecting, ClientErrors.ConnectTimeout);
+      } finally {
+        await client.disconnect(true);
+        await server.close();
+      }
+    },
+  );
+}); // @connection state: disconnect() while connecting

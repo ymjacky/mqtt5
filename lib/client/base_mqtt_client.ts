@@ -107,6 +107,8 @@ export abstract class BaseMqttClient {
   private connectFailure?: Error;
   // The CONNACK with which the broker refused the connection: the pending connect() resolves with it when the connection is closed.
   private refusedConnack?: ConnackPacket;
+  // Gives up the connect() in progress: it rejects with `reason` when the client is offline again. Set while connecting.
+  private abortConnect?: (reason: Error) => void;
   private incomingStore: IncomingStore;
   // Tail of the chain that runs received packet handlers one at a time.
   private packetHandling: Promise<void> = Promise.resolve();
@@ -319,7 +321,7 @@ export abstract class BaseMqttClient {
    * @throws {PacketTooLargeError} if CONNECT is larger than MQTT allows. No connection is opened.
    * @throws {MqttPacketSerializeError} if CONNECT cannot be encoded, e.g. the user name is longer than 65,535 bytes. No connection is opened.
    * @throws {ConnectTimeout} if CONNACK is not received within `connectTimeoutMS`, including the time to open the connection.
-   * @throws {ConnectionClosed} if the connection is closed before CONNACK is received.
+   * @throws {ConnectionClosed} if the connection is closed before CONNACK is received, e.g. by `disconnect(true)`.
    * `WebSocketMqttClient` also rejects with it when the connection cannot be opened.
    * @throws {Error} `MqttClient`: the error of opening the connection, e.g. `Deno.errors.ConnectionRefused` when the broker is not running,
    * or `Deno.errors.InvalidData` when the certificate of the broker is not trusted (`mqtts:`).
@@ -407,6 +409,8 @@ export abstract class BaseMqttClient {
     };
     // The limit of the previous connection does not apply: the new one comes in CONNACK.
     this.maximumPacketSizeAboutSend = undefined;
+    // Nor do the topic aliases of the broker: they are valid on one connection only.
+    this.topicAliasMapAboutReceive.clear();
     // Encode before opening the connection: if it fails, nothing is opened or changed.
     const bytes = this.encodePacket(connectPacket);
 
@@ -417,10 +421,17 @@ export abstract class BaseMqttClient {
     this.connectFailure = undefined;
     this.refusedConnack = undefined;
     const opening = new AbortController();
+    // Aborts the opening of the connection, or closes the connection. detectClosed() then rejects connect() with `reason`.
+    const abortConnect = (reason: Error) => {
+      this.connectFailure = reason;
+      opening.abort(reason);
+      this.close().catch((err) => this.log('failed to close the connection:', err));
+    };
+    this.abortConnect = abortConnect;
 
     let opened = false;
     try {
-      this.startConnectTimer(opening);
+      this.startConnectTimer(abortConnect);
       this.log(`opening connection to ${this.url}`);
       await this.open(opening.signal);
       opened = true;
@@ -928,6 +939,8 @@ export abstract class BaseMqttClient {
    * (the broker sends QoS 1 and 2 messages again after reconnecting, if it keeps the session).
    * With `force`, closes the connection without sending DISCONNECT, so the broker publishes the will message.
    * Resolves immediately if the client is not connected.
+   * While connect() is in progress, waits for it and then disconnects; if connect() fails, resolves, as the client is
+   * offline then. With `force`, gives up connect() at once instead: connect() rejects with `ConnectionClosed`.
    * If a disconnect is already in progress, waits for the same close without sending DISCONNECT again;
    * with `force`, closes the connection now instead of waiting for the broker. `properties` of this call are ignored.
    * The Reason String and User Properties are left out if they make DISCONNECT larger than the Maximum Packet Size of the broker.
@@ -976,6 +989,9 @@ export abstract class BaseMqttClient {
       if (force && (this.connectionState === 'online' || this.connectionState === 'disconnecting')) {
         // Do not wait for the broker or disconnectTimeoutMS to close the connection.
         await this.close();
+      } else if (force && this.connectionState === 'connecting') {
+        // Do not wait for the connect() in progress.
+        this.abortConnect?.(new ConnectionClosed());
       }
       return waitForClose.promise;
     }
@@ -984,21 +1000,25 @@ export abstract class BaseMqttClient {
     this.waitForClose = deferred;
 
     if (this.connectionState === 'connecting') {
-      this.log('A disconnect request was accepted while connected');
-      if (this.unresolvedConnect) {
-        try {
-          await this.unresolvedConnect.promise;
-        } catch (err) {
-          // connect() failed, so there is no connection to close. Release the calls waiting for it.
-          this.waitForClose = undefined;
-          deferred.resolve();
-          throw err;
-        }
+      if (force) {
+        // Give up the connect() in progress: it rejects with ConnectionClosed, and detectClosed() resolves this call.
+        this.log('A disconnect request was accepted while connecting: giving up connect()');
+        this.abortConnect?.(new ConnectionClosed());
+        return deferred.promise;
+      }
+      this.log('A disconnect request was accepted while connecting: waiting for connect()');
+      try {
+        await this.unresolvedConnect?.promise;
+      } catch {
+        // connect() failed: there is no connection to close, and the client is offline, which is what was asked for.
+        // The error is reported by connect().
       }
     }
 
     if (this.connectionState === 'offline') {
-      this.waitForClose = undefined;
+      if (this.waitForClose === deferred) {
+        this.waitForClose = undefined;
+      }
       deferred.resolve();
     } else {
       try {
@@ -1209,6 +1229,7 @@ export abstract class BaseMqttClient {
     const connectFailure = this.connectFailure ?? new ConnectionClosed();
     this.unresolvedConnect = undefined;
     this.refusedConnack = undefined;
+    this.abortConnect = undefined;
     this.connectionState = 'offline';
     this.stopConnectTimer();
     this.stopDisconnectTimer();
@@ -1693,14 +1714,12 @@ export abstract class BaseMqttClient {
    * Gives up connect() if CONNACK is not received within `connectTimeoutMS`: aborts the opening of the connection,
    * or closes the connection. connect() rejects with ConnectTimeout when the client is offline again (detectClosed()).
    */
-  private startConnectTimer(opening: AbortController) {
+  private startConnectTimer(abortConnect: (reason: Error) => void) {
     this.startTimer(
       'connect',
       () => {
         this.log('CONNACK was not received within connectTimeoutMS');
-        this.connectFailure = new ConnectTimeout();
-        opening.abort(this.connectFailure);
-        this.close().catch((err) => this.log('failed to close the connection:', err));
+        abortConnect(new ConnectTimeout());
       },
       this.connectTimeout,
     );
@@ -1721,8 +1740,19 @@ export abstract class BaseMqttClient {
     this.startTimer(
       'keepAlive',
       async () => {
-        await this.sendPacket({ type: 'pingreq' });
-        this.startPingrespTimer();
+        try {
+          await this.sendPacket({ type: 'pingreq' });
+        } catch (err) {
+          // Nobody awaits this callback: a rejection would be unhandled, which terminates the process.
+          // The connection does not work any more, so close it instead of waiting for PINGRESP.
+          this.log('PINGREQ could not be sent, closing the connection', err);
+          await this.close().catch((closeError) => this.log('failed to close the connection:', closeError));
+          return;
+        }
+        // The connection may have been closed while PINGREQ was written.
+        if (this.connectionState === 'online') {
+          this.startPingrespTimer();
+        }
       },
       this.currentKeepAlive * 1000,
     );
@@ -1743,8 +1773,10 @@ export abstract class BaseMqttClient {
     if (this.timerExists('pingrespTimeout')) {
       return;
     }
-    this.startTimer('pingrespTimeout', async () => {
-      await this.disconnect(true);
+    this.startTimer('pingrespTimeout', () => {
+      this.log('PINGRESP was not received within pingrespTimeoutMS');
+      // Nobody awaits this callback: a rejection must not be left unhandled.
+      this.disconnect(true).catch((err) => this.log('failed to close the connection:', err));
     }, this.pingrespTimeoutMs);
   }
   /** Stops the timer started by startPingrespTimer(). */

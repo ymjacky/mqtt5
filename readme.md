@@ -258,6 +258,9 @@ await client.disconnect(); // send DISCONNECT, then close
 `disconnect()` sends DISCONNECT after the messages of the `publish()` calls made before it. Nothing is sent after DISCONNECT: until the connection is closed,
 `publish()`, `subscribe()` and `unsubscribe()` reject with `StateIsNotOnlineError`.
 
+While `connect()` is in progress, `disconnect()` waits for it and then disconnects; it resolves also when `connect()` fails. `disconnect(true)` gives up
+`connect()` at once: `connect()` rejects with `ConnectionClosed`.
+
 [examples/deno/reconnect.ts](https://github.com/ymjacky/mqtt5/blob/main/examples/deno/reconnect.ts) reconnects when the broker closes the connection, keeping
 the session so that QoS 1 / QoS 2 messages in flight are resent.
 

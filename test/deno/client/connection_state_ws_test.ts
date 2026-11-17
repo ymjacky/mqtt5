@@ -157,6 +157,33 @@ Deno.test({ name: '@connection state ws: connection refused by the broker', only
   );
 }); // @connection state ws: connection refused by the broker
 
+Deno.test({ name: '@connection state ws: disconnect() while connecting', only: false }, async (context) => {
+  await context.step(
+    'disconnect(true) gives up a connect() that waits for CONNACK at once, and resolves',
+    async () => {
+      const broker = new TestWsBroker();
+      const client = new WebSocketMqttClient({ url: new URL('ws://127.0.0.1:3000/'), clientId: 'cid', logger: logger, connectTimeoutMS: 5000 });
+      try {
+        broker.listen();
+        // The broker never answers CONNECT.
+        const connectReceived = Promise.withResolvers<void>();
+        broker.on('connect', () => connectReceived.resolve());
+
+        const connecting = client.connect();
+        await settleWithin(connectReceived.promise, 'CONNECT');
+
+        // Not after connectTimeoutMS, and not rejected with the error of connect().
+        await settleWithin(client.disconnect(true), 'disconnect(true)', 500);
+        await assertRejects(() => settleWithin(connecting, 'connect()'), ClientErrors.ConnectionClosed);
+        await assertRejects(() => client.publish('topicA', 'x'), ClientErrors.StateIsNotOnlineError);
+      } finally {
+        await client.disconnect(true);
+        await broker.destroy();
+      }
+    },
+  );
+}); // @connection state ws: disconnect() while connecting
+
 // The peer has become unreachable while the TCP connection is still open: it answers nothing, not even the Close frame
 // of the WebSocket closing handshake.
 Deno.test({ name: '@connection state ws: a peer that does not answer', only: false }, async (context) => {
