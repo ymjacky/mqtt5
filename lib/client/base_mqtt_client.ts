@@ -37,7 +37,9 @@ import {
 type ConnectionStates =
   | 'offline'
   | 'connecting'
-  | 'online';
+  | 'online'
+  // The client has sent DISCONNECT and waits for the connection to close. Nothing may be sent any more [MQTT-3.14.4-1].
+  | 'disconnecting';
 
 const defaultKeepAlive = 10; // 10 sec
 const defaultConnectTimeout = 10 * 1000;
@@ -257,10 +259,17 @@ export abstract class BaseMqttClient {
         this.log(`can't send packet because offline.`, packet);
         throw new SendPacketError();
       }
+      if (this.connectionState === 'disconnecting' && packet.type !== 'disconnect') {
+        this.log(`can't send packet because DISCONNECT has been sent.`, packet);
+        throw new SendPacketError();
+      }
 
       this.log(`sending ${packet.type} packet`, packet);
       const data = bytes ?? this.encodePacket(packet);
-      this.startKeepAliveTimer();
+      // No PINGREQ after DISCONNECT.
+      if (packet.type !== 'disconnect') {
+        this.startKeepAliveTimer();
+      }
       await this.write(data);
     } catch (err) {
       this.log('sendPacket: ', err);
@@ -914,12 +923,15 @@ export abstract class BaseMqttClient {
    * Normally sends DISCONNECT and waits for the connection to close (closes it after `disconnectTimeoutMS`).
    * DISCONNECT is sent after the PUBLISH packets of the publish() calls made before, so they are not lost;
    * their QoS 1 and 2 flows may not complete before the connection closes.
+   * Nothing is sent after DISCONNECT: until the connection is closed, publish(), subscribe() and unsubscribe() reject with
+   * `StateIsNotOnlineError` as when the client is not connected, and received messages are not acknowledged
+   * (the broker sends QoS 1 and 2 messages again after reconnecting, if it keeps the session).
    * With `force`, closes the connection without sending DISCONNECT, so the broker publishes the will message.
    * Resolves immediately if the client is not connected.
    * If a disconnect is already in progress, waits for the same close without sending DISCONNECT again;
    * with `force`, closes the connection now instead of waiting for the broker. `properties` of this call are ignored.
    * The Reason String and User Properties are left out if they make DISCONNECT larger than the Maximum Packet Size of the broker.
-   * If DISCONNECT cannot be sent, e.g. a property cannot be encoded, the promise rejects and the connection stays open.
+   * If DISCONNECT cannot be encoded, e.g. a property is invalid, the promise rejects, nothing is sent and the connection stays open.
    *
    * @param force `true` to close without sending DISCONNECT.
    * @param properties MQTT 5.0 DISCONNECT properties ({@link MqttProperties.DisconnectProperties}).
@@ -961,7 +973,7 @@ export abstract class BaseMqttClient {
     // A disconnect is already in progress: wait for the same close instead of sending DISCONNECT again.
     if (this.waitForClose) {
       const waitForClose = this.waitForClose;
-      if (force && this.connectionState === 'online') {
+      if (force && (this.connectionState === 'online' || this.connectionState === 'disconnecting')) {
         // Do not wait for the broker or disconnectTimeoutMS to close the connection.
         await this.close();
       }
@@ -990,11 +1002,18 @@ export abstract class BaseMqttClient {
       deferred.resolve();
     } else {
       try {
-        if (!force) {
-          // Send the messages of the publish() calls made before: nothing may be sent after DISCONNECT [MQTT-3.14.4-1].
-          await this.publishQueue;
+        if (force) {
+          await this.doDisconnect(true);
+        } else {
+          // Nothing may be sent after DISCONNECT [MQTT-3.14.4-1]. Take a turn in the publish queue: the messages of the
+          // publish() calls made before are sent first, and the calls made after wait until DISCONNECT is sent, and reject.
+          const publishTurnFinished = await this.waitForPublishTurn();
+          try {
+            await this.doDisconnect(false, undefined, properties);
+          } finally {
+            publishTurnFinished();
+          }
         }
-        await this.doDisconnect(force, undefined, properties);
       } catch (err) {
         // DISCONNECT was not sent (e.g. a property cannot be encoded), so the connection may stay open.
         // Do not leave this and later calls waiting for a close that may not come.
@@ -1011,6 +1030,8 @@ export abstract class BaseMqttClient {
 
   /**
    * Closes the connection when `force` is true, otherwise sends DISCONNECT and waits for the broker to close it.
+   * From DISCONNECT on, the client is `disconnecting`: it sends nothing more, and publish(), subscribe() and unsubscribe() reject.
+   * @throws if DISCONNECT cannot be encoded. Nothing is sent then, and the client stays online.
    * @ignore
    */
   protected async doDisconnect(
@@ -1018,18 +1039,35 @@ export abstract class BaseMqttClient {
     reasonCode?: Mqtt.ReasonCode,
     properties?: MqttProperties.Properties,
   ) {
-    if (this.connectionState === 'online') {
-      if (force) {
+    if (force) {
+      if (this.connectionState === 'online' || this.connectionState === 'disconnecting') {
         await this.close();
-      } else {
-        const disconnectPacket: DisconnectPacket = {
-          type: 'disconnect',
-          ...(reasonCode !== undefined && { reasonCode }),
-          ...(properties && { properties }),
-        };
-        await this.sendPacket(disconnectPacket);
-        this.startDisconnectTimer();
       }
+      return;
+    }
+    if (this.connectionState !== 'online') {
+      // Not connected, or DISCONNECT has been sent already.
+      return;
+    }
+
+    const disconnectPacket: DisconnectPacket = {
+      type: 'disconnect',
+      ...(reasonCode !== undefined && { reasonCode }),
+      ...(properties && { properties }),
+    };
+    const bytes = this.encodePacket(disconnectPacket);
+
+    this.connectionState = 'disconnecting';
+    this.stopKeepAliveTimer();
+    this.stopPingrespTimer();
+    // Started before writing: the connection is closed in time also when the write does not complete.
+    this.startDisconnectTimer();
+    try {
+      await this.sendPacket(disconnectPacket, bytes);
+    } catch (err) {
+      // The connection does not work any more: close it instead of waiting for the broker to do it.
+      this.log('DISCONNECT could not be written, closing the connection', err);
+      await this.close();
     }
   }
 
@@ -1422,19 +1460,23 @@ export abstract class BaseMqttClient {
         createCustomEvent('publish', { detail: packet }),
       );
     } else if (packet.qos === Mqtt.QoS.EXACTLY_ONCE) {
+      // A PUBLISH with DUP whose packet ID is stored is a message that has been emitted already: the broker sends it
+      // again when it has not received PUBREC, e.g. the connection was closed. It is answered again, and not emitted again.
       const emitMessage = !packet.dup ||
         !(await this.incomingStore.has(packet.packetId!));
 
       if (emitMessage) {
         await this.incomingStore.store(packet.packetId!);
+      }
 
-        this.sendPacketInBackground(
-          {
-            type: 'pubrec',
-            packetId: packet.packetId!,
-          },
-        );
+      this.sendPacketInBackground(
+        {
+          type: 'pubrec',
+          packetId: packet.packetId!,
+        },
+      );
 
+      if (emitMessage) {
         this.eventTarget.dispatchEvent(
           createCustomEvent('publish', { detail: packet }),
         );
@@ -1603,12 +1645,15 @@ export abstract class BaseMqttClient {
     this.stopPingrespTimer();
   }
 
-  /** Handles DISCONNECT from the broker: closes the connection and emits the `disconnect` event. */
+  /**
+   * Handles DISCONNECT from the broker: emits the `disconnect` event and closes the connection.
+   * The event is emitted first, so before `closed`: a `closed` listener, e.g. one that reconnects, knows why the broker disconnected.
+   */
   private async handleDisconnect(packet: DisconnectPacket) {
-    await this.close();
     this.eventTarget.dispatchEvent(
       createCustomEvent('disconnect', { detail: packet }),
     );
+    await this.close();
   }
 
   /** Handles AUTH: emits the `auth` event. */
@@ -1748,13 +1793,13 @@ export abstract class BaseMqttClient {
   /**
    * Registers an event listener. `event.detail` holds the received packet.
    *
-   * | Event        | `event.detail`     | When                                                      |
-   * | ------------ | ------------------ | --------------------------------------------------------- |
-   * | `publish`    | `PublishPacket`    | A message is received.                                    |
-   * | `connack`    | `ConnackPacket`    | CONNACK is received.                                      |
-   * | `disconnect` | `DisconnectPacket` | The broker sends DISCONNECT (MQTT 5.0).                   |
-   * | `auth`       | `AuthPacket`       | The broker sends AUTH (MQTT 5.0 enhanced authentication). |
-   * | `closed`     | -                  | The connection is closed, for any reason.                 |
+   * | Event        | `event.detail`     | When                                                             |
+   * | ------------ | ------------------ | ---------------------------------------------------------------- |
+   * | `publish`    | `PublishPacket`    | A message is received.                                           |
+   * | `connack`    | `ConnackPacket`    | CONNACK is received.                                             |
+   * | `disconnect` | `DisconnectPacket` | The broker sends DISCONNECT (MQTT 5.0). Emitted before `closed`. |
+   * | `auth`       | `AuthPacket`       | The broker sends AUTH (MQTT 5.0 enhanced authentication).        |
+   * | `closed`     | -                  | The connection is closed, for any reason.                        |
    *
    * @param type event type
    * @param callback listener

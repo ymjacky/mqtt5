@@ -17,6 +17,9 @@ const writerFactory: WriterFactory = (
   };
 };
 
+// The port to connect to when the URL has none.
+const defaultPorts: Record<string, number> = { 'mqtt:': 1883, 'mqtts:': 8883 };
+
 /**
  * Waits for a connection that is being opened, unless `signal` aborts first: then rejects with the abort reason at once,
  * and closes the connection if it opens later. `Deno.connect()` / `Deno.connectTls()` cannot be stopped while opening.
@@ -72,6 +75,7 @@ export class MqttClient extends BaseMqttClient {
   /**
    * Creates a client. It does not connect until {@link MqttClient.connect} is called.
    * @param options client options. `url` must use `mqtt:` or `mqtts:` (default `mqtt://127.0.0.1:1883`).
+   * Without a port in the URL, the client connects to 1883 (`mqtt:`) or 8883 (`mqtts:`).
    */
   constructor(options?: ClientOptions) {
     super(options);
@@ -84,15 +88,17 @@ export class MqttClient extends BaseMqttClient {
    */
   protected async open(signal: AbortSignal): Promise<void> {
     const openSocket = async () => {
+      // A URL without a port has the default port of its protocol.
+      const port = this.url.port !== '' ? Number(this.url.port) : defaultPorts[this.url.protocol];
       if (this.url.protocol === 'mqtt:') {
         return await Deno.connect({
           hostname: this.url.hostname,
-          port: Number(this.url.port),
+          port,
         });
       } else if (this.url.protocol === 'mqtts:') {
         const tlsOpt: Deno.ConnectTlsOptions = {
           hostname: this.url.hostname,
-          port: Number(this.url.port),
+          port,
           caCerts: this.caCerts,
         };
         let conn: Deno.TlsConn;
@@ -100,7 +106,7 @@ export class MqttClient extends BaseMqttClient {
           type TlsType = Deno.ConnectTlsOptions & Deno.TlsCertifiedKeyPem;
           const tls: TlsType = {
             hostname: this.url.hostname,
-            port: Number(this.url.port),
+            port,
             caCerts: this.caCerts,
             cert: this.cert,
             key: this.privateKey,

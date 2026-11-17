@@ -229,13 +229,13 @@ await client.unsubscribe(['topicA', 'topicB']);
 
 Register listeners with `client.on(type, listener)` and remove them with `client.off(type, listener)`. `event.detail` holds the packet.
 
-| Event        | `event.detail`     | When                                                      |
-| ------------ | ------------------ | --------------------------------------------------------- |
-| `publish`    | `PublishPacket`    | A message is received.                                    |
-| `connack`    | `ConnackPacket`    | CONNACK is received.                                      |
-| `disconnect` | `DisconnectPacket` | The broker sends DISCONNECT (MQTT 5.0).                   |
-| `auth`       | `AuthPacket`       | The broker sends AUTH (MQTT 5.0 enhanced authentication). |
-| `closed`     | -                  | The connection is closed, for any reason.                 |
+| Event        | `event.detail`     | When                                                             |
+| ------------ | ------------------ | ---------------------------------------------------------------- |
+| `publish`    | `PublishPacket`    | A message is received.                                           |
+| `connack`    | `ConnackPacket`    | CONNACK is received.                                             |
+| `disconnect` | `DisconnectPacket` | The broker sends DISCONNECT (MQTT 5.0). Emitted before `closed`. |
+| `auth`       | `AuthPacket`       | The broker sends AUTH (MQTT 5.0 enhanced authentication).        |
+| `closed`     | -                  | The connection is closed, for any reason.                        |
 
 ## Disconnecting and reconnecting
 
@@ -254,6 +254,9 @@ await client.disconnect(); // send DISCONNECT, then close
 // await client.disconnect(true); // close without sending DISCONNECT (the broker publishes the will message)
 // await client.disconnect(false, { reasonString: 'bye', sessionExpiryInterval: 300 }); // MQTT 5.0 properties
 ```
+
+`disconnect()` sends DISCONNECT after the messages of the `publish()` calls made before it. Nothing is sent after DISCONNECT: until the connection is closed,
+`publish()`, `subscribe()` and `unsubscribe()` reject with `StateIsNotOnlineError`.
 
 [examples/deno/reconnect.ts](https://github.com/ymjacky/mqtt5/blob/main/examples/deno/reconnect.ts) reconnects when the broker closes the connection, keeping
 the session so that QoS 1 / QoS 2 messages in flight are resent.

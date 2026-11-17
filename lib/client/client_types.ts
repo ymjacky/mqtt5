@@ -14,6 +14,7 @@ import { Subscription } from '../mqtt_packets/mod.ts';
 export type ClientOptions = {
   /**
    * Broker URL. `MqttClient`: `mqtt:` or `mqtts:`. `WebSocketMqttClient`: `ws:` or `wss:` (required).
+   * Without a port, the default port of the protocol is used: 1883 (`mqtt:`), 8883 (`mqtts:`), 80 (`ws:`) or 443 (`wss:`).
    * @default {new URL('mqtt://127.0.0.1:1883')}
    */
   url?: URL;
