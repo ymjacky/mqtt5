@@ -449,3 +449,310 @@ Deno.test({ name: '@connection state: session store while CONNACK is handled', o
     },
   );
 }); // @connection state: session store while CONNACK is handled
+
+Deno.test({ name: '@connection state: default ports', only: false }, async (context) => {
+  for (const [url, port, tls] of [['mqtt://127.0.0.1', 1883, false], ['mqtts://127.0.0.1', 8883, true]] as const) {
+    await context.step(
+      `a URL without a port (${url}) connects to the default port ${port}`,
+      async () => {
+        const broker = new TestBroker();
+        const client = new MqttClient({
+          url: new URL(url),
+          clientId: 'cid',
+          logger: logger,
+          caCerts: [Deno.readTextFileSync('test/deno/test_certs/ca.crt.pem')],
+        });
+        try {
+          if (tls) {
+            broker.listenTls(); // 8883
+          } else {
+            broker.listen(); // 1883
+          }
+          broker.on('connect', (event) => {
+            const packet = event.detail;
+            broker.sendConnack(packet.clientId, false, packet.protocolVersion);
+          });
+
+          const connack = await settleWithin(client.connect(), 'connect()');
+          assertEquals(connack.reasonCode, Mqtt.ReasonCode.Success);
+        } finally {
+          await client.disconnect(true);
+          await broker.destroy();
+        }
+      },
+    );
+  }
+}); // @connection state: default ports
+
+Deno.test({ name: '@connection state: DISCONNECT from the broker', only: false }, async (context) => {
+  await context.step(
+    "'disconnect' is emitted before 'closed'",
+    async () => {
+      const broker = new TestBroker();
+      const client = new MqttClient({ clientId: 'cid', logger: logger });
+      try {
+        broker.listen();
+        broker.on('connect', (event) => {
+          const packet = event.detail;
+          broker.sendConnack(packet.clientId, false, packet.protocolVersion);
+        });
+        const events: string[] = [];
+        const closed = Promise.withResolvers<void>();
+        client.on('disconnect', (event) => {
+          events.push(`disconnect ${event.detail.reasonCode}`);
+        });
+        client.on('closed', () => {
+          events.push('closed');
+          closed.resolve();
+        });
+
+        await client.connect();
+        await broker.sendDisconnect('cid', Mqtt.ReasonCode.SessionTakenOver);
+        await settleWithin(closed.promise, "the 'closed' event");
+        await delay(50);
+
+        // A 'closed' listener that reconnects needs the reason first, e.g. not to reconnect when the session was taken over.
+        assertEquals(events, [`disconnect ${Mqtt.ReasonCode.SessionTakenOver}`, 'closed']);
+      } finally {
+        await broker.destroy();
+      }
+    },
+  );
+}); // @connection state: DISCONNECT from the broker
+
+// The broker of these tests does not close the connection on DISCONNECT: the client closes it after disconnectTimeoutMS,
+// and is disconnecting meanwhile.
+Deno.test({ name: '@connection state: after DISCONNECT is sent', only: false }, async (context) => {
+  await context.step(
+    'publish(), subscribe() and unsubscribe() reject, and nothing is sent after DISCONNECT',
+    async () => {
+      const broker = new TestBroker();
+      const client = new MqttClient({ clientId: 'cid', logger: logger, disconnectTimeoutMS: 300 });
+      try {
+        broker.listen();
+        broker.on('connect', (event) => {
+          const packet = event.detail;
+          broker.sendConnack(packet.clientId, false, packet.protocolVersion);
+        });
+        const seenByBroker: string[] = [];
+        const disconnectReceived = Promise.withResolvers<void>();
+        for (const type of ['publish', 'subscribe', 'unsubscribe', 'pingreq'] as const) {
+          broker.on(type, (event) => {
+            seenByBroker.push(event.detail.type);
+          });
+        }
+        broker.on('disconnect', () => {
+          seenByBroker.push('disconnect');
+          disconnectReceived.resolve();
+        });
+        broker.on('closed', () => {
+          seenByBroker.push('closed');
+        });
+
+        await client.connect();
+        // Called before disconnect(): sent before DISCONNECT. Called after it: rejected.
+        const before = client.publish('topicA', 'before');
+        const disconnecting = client.disconnect();
+        const after = client.publish('topicA', 'after');
+        assertEquals(await before, { result: 0, reason: '' });
+        await assertRejects(() => after, ClientErrors.StateIsNotOnlineError);
+
+        await settleWithin(disconnectReceived.promise, 'DISCONNECT');
+        await assertRejects(() => client.publish('topicA', 'x'), ClientErrors.StateIsNotOnlineError);
+        await assertRejects(() => client.publish('topicA', 'x', { qos: Mqtt.QoS.AT_LEAST_ONCE }), ClientErrors.StateIsNotOnlineError);
+        await assertRejects(() => client.subscribe('topicA'), ClientErrors.StateIsNotOnlineError);
+        await assertRejects(() => client.unsubscribe('topicA'), ClientErrors.StateIsNotOnlineError);
+        await assertRejects(() => client.auth(Mqtt.ReasonCode.ReAuthenticate), ClientErrors.SendPacketError);
+        assertEquals(await client.publishInflightCount(), 0);
+        // Still connecting is not possible either: the connection is not closed yet.
+        await assertRejects(() => client.connect(), ClientErrors.StateIsNotOfflineError);
+
+        await settleWithin(disconnecting, 'disconnect()');
+        await waitUntil(() => seenByBroker.includes('closed'), 'the close of the connection');
+        assertEquals(seenByBroker, ['publish', 'disconnect', 'closed']);
+      } finally {
+        await client.disconnect(true);
+        await broker.destroy();
+      }
+    },
+  );
+
+  await context.step(
+    'no PINGREQ and no acknowledgment is sent after DISCONNECT, and a QoS 2 message received then is completed after reconnecting',
+    async () => {
+      const broker = new TestBroker();
+      // The keep alive interval passes while the client waits for the connection to close.
+      const client = new MqttClient({ clientId: 'cid', logger: logger, clean: false, keepAlive: 1, disconnectTimeoutMS: 1500 });
+      try {
+        broker.listen();
+        let connects = 0;
+        broker.on('connect', (event) => {
+          const packet = event.detail;
+          broker.sendConnack(packet.clientId, connects++ > 0, packet.protocolVersion); // the broker keeps the session
+        });
+        const seenByBroker: string[] = [];
+        for (const type of ['pingreq', 'puback', 'pubrec', 'pubcomp'] as const) {
+          broker.on(type, (event) => {
+            seenByBroker.push(event.detail.type);
+          });
+        }
+        const payload = new TextEncoder().encode('x');
+        broker.on('disconnect', async () => {
+          seenByBroker.push('disconnect');
+          // Messages that the broker had sent before it received DISCONNECT.
+          await broker.sendPublish('cid', 1, 'qos1', Mqtt.ProtocolVersion.MQTT_V5, payload, Mqtt.QoS.AT_LEAST_ONCE);
+          await broker.sendPublish('cid', 2, 'qos2', Mqtt.ProtocolVersion.MQTT_V5, payload, Mqtt.QoS.EXACTLY_ONCE);
+        });
+        broker.on('closed', () => {
+          seenByBroker.push('closed');
+        });
+        const messages: string[] = [];
+        client.on('publish', (event) => {
+          messages.push(event.detail.topic);
+        });
+
+        await client.connect();
+        const start = Date.now();
+        await settleWithin(client.disconnect(), 'disconnect()', 3000);
+        assert(Date.now() - start >= 1400, 'the connection was closed before disconnectTimeoutMS');
+        await waitUntil(() => seenByBroker.includes('closed'), 'the close of the connection');
+
+        // The messages are emitted, but not acknowledged: the broker sends them again.
+        assertEquals(messages, ['qos1', 'qos2']);
+        assertEquals(seenByBroker, ['disconnect', 'closed']);
+
+        // After reconnecting, the broker sends the QoS 2 message again (DUP): the flow is completed, and the message is not emitted again.
+        await client.connect();
+        await broker.sendPublish('cid', 2, 'qos2', Mqtt.ProtocolVersion.MQTT_V5, payload, Mqtt.QoS.EXACTLY_ONCE, true);
+        await waitUntil(() => seenByBroker.includes('pubrec'), 'PUBREC');
+        await broker.sendPubrel('cid', 2, Mqtt.ProtocolVersion.MQTT_V5);
+        await waitUntil(() => seenByBroker.includes('pubcomp'), 'PUBCOMP');
+        assertEquals(seenByBroker, ['disconnect', 'closed', 'pubrec', 'pubcomp']);
+        assertEquals(messages, ['qos1', 'qos2']);
+      } finally {
+        await client.disconnect(true);
+        await broker.destroy();
+      }
+    },
+  );
+
+  await context.step(
+    'publish() rejects after the client has sent DISCONNECT because of a malformed packet',
+    async () => {
+      const broker = new TestBroker();
+      const client = new MqttClient({ clientId: 'cid', logger: logger, disconnectTimeoutMS: 300 });
+      try {
+        broker.listen();
+        broker.on('connect', (event) => {
+          const packet = event.detail;
+          broker.sendConnack(packet.clientId, false, packet.protocolVersion);
+        });
+        const seenByBroker: string[] = [];
+        const disconnectReceived = Promise.withResolvers<void>();
+        broker.on('publish', () => {
+          seenByBroker.push('publish');
+        });
+        broker.on('disconnect', (event) => {
+          seenByBroker.push(`disconnect ${event.detail.reasonCode}`);
+          disconnectReceived.resolve();
+        });
+        broker.on('closed', () => {
+          seenByBroker.push('closed');
+        });
+
+        await client.connect();
+        await broker.sendRawBytes('cid', new Uint8Array([0x40, 0x01, 0x00])); // PUBACK that is too short
+        await settleWithin(disconnectReceived.promise, 'DISCONNECT');
+
+        await assertRejects(() => client.publish('topicA', 'x'), ClientErrors.StateIsNotOnlineError);
+        // disconnect() waits for the same close, without sending DISCONNECT again.
+        await settleWithin(client.disconnect(), 'disconnect()');
+        await waitUntil(() => seenByBroker.includes('closed'), 'the close of the connection');
+        assertEquals(seenByBroker, [`disconnect ${Mqtt.ReasonCode.MalformedPacket}`, 'closed']);
+      } finally {
+        await client.disconnect(true);
+        await broker.destroy();
+      }
+    },
+  );
+
+  await context.step(
+    'when DISCONNECT cannot be written, the connection is closed and disconnect() resolves',
+    async () => {
+      // The connection does not work any more, e.g. it has been reset, and the client has not noticed it yet.
+      class WriteFailingClient extends MqttClient {
+        failWrites() {
+          this.write = () => {
+            throw new Error('write failed');
+          };
+        }
+      }
+
+      const broker = new TestBroker();
+      const client = new WriteFailingClient({ clientId: 'cid', logger: logger, disconnectTimeoutMS: 5000 });
+      try {
+        broker.listen();
+        broker.on('connect', (event) => {
+          const packet = event.detail;
+          broker.sendConnack(packet.clientId, false, packet.protocolVersion);
+        });
+        const closedAtBroker = Promise.withResolvers<void>();
+        broker.on('closed', () => closedAtBroker.resolve());
+        let closedCount = 0;
+        client.on('closed', () => {
+          closedCount++;
+        });
+
+        await client.connect();
+        client.failWrites();
+
+        // Not after disconnectTimeoutMS.
+        await settleWithin(client.disconnect(), 'disconnect()');
+        assertEquals(closedCount, 1);
+        await settleWithin(closedAtBroker.promise, 'the connection seen by the broker');
+      } finally {
+        await client.disconnect(true);
+        await broker.destroy();
+      }
+    },
+  );
+}); // @connection state: after DISCONNECT is sent
+
+Deno.test({ name: '@connection state: QoS 2 PUBLISH sent again by the broker', only: false }, async (context) => {
+  await context.step(
+    'PUBREC is sent again for a QoS 2 PUBLISH with DUP, and the message is emitted once',
+    async () => {
+      const broker = new TestBroker();
+      const client = new MqttClient({ clientId: 'cid', logger: logger });
+      try {
+        broker.listen();
+        broker.on('connect', (event) => {
+          const packet = event.detail;
+          broker.sendConnack(packet.clientId, false, packet.protocolVersion);
+        });
+        let pubrecCount = 0;
+        broker.on('pubrec', () => {
+          pubrecCount++;
+        });
+        let messageCount = 0;
+        client.on('publish', () => {
+          messageCount++;
+        });
+
+        await client.connect();
+        const payload = new TextEncoder().encode('x');
+        await broker.sendPublish('cid', 1, 'topicA', Mqtt.ProtocolVersion.MQTT_V5, payload, Mqtt.QoS.EXACTLY_ONCE);
+        await waitUntil(() => pubrecCount === 1, 'PUBREC');
+        assertEquals(messageCount, 1);
+
+        // The broker did not receive the PUBREC: it sends the PUBLISH again.
+        await broker.sendPublish('cid', 1, 'topicA', Mqtt.ProtocolVersion.MQTT_V5, payload, Mqtt.QoS.EXACTLY_ONCE, true);
+        await waitUntil(() => pubrecCount === 2, 'PUBREC for the PUBLISH with DUP');
+        assertEquals(messageCount, 1);
+      } finally {
+        await client.disconnect(true);
+        await broker.destroy();
+      }
+    },
+  );
+}); // @connection state: QoS 2 PUBLISH sent again by the broker

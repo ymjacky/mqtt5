@@ -50,7 +50,10 @@ export class StateIsNotOfflineError extends Error {
   }
 }
 
-/** `publish()`, `subscribe()` or `unsubscribe()` was called while the client is not connected. */
+/**
+ * `publish()`, `subscribe()` or `unsubscribe()` was called while the client is not connected,
+ * or after it has sent DISCONNECT and is waiting for the connection to close.
+ */
 export class StateIsNotOnlineError extends Error {
   readonly #className = 'StateIsNotOnlineError';
   /** Creates the error with the given details. */
