@@ -984,7 +984,21 @@ Deno.test({ name: '@subscribe invalid arguments', only: false }, async (context)
 
         // topic filters
         for (
-          const topicFilter of ['', 'a/#/b', 'a#', 'a/b+', '+a', 'a\u0000', '$share/', '$share/g', '$share//a', '$share/g/', '$share/g+/a', '$share/g\u0000x/a']
+          const topicFilter of [
+            '',
+            'a/#/b',
+            'a#',
+            'a/b+',
+            '+a',
+            'a\u0000',
+            'a\uD800',
+            '$share/',
+            '$share/g',
+            '$share//a',
+            '$share/g/',
+            '$share/g+/a',
+            '$share/g\u0000x/a',
+          ]
         ) {
           await assertRejects(() => client.subscribe(topicFilter), ClientErrors.InvalidTopicFilterError);
         }

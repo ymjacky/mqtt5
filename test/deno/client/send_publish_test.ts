@@ -1275,7 +1275,7 @@ Deno.test({ name: '@publish invalid topic', only: false }, async (context) => {
           resolve();
         });
 
-        for (const topic of ['', 'a/#', '#', 'a/+/b', '+', 'a\u0000b']) {
+        for (const topic of ['', 'a/#', '#', 'a/+/b', '+', 'a\u0000b', 'a\uD800']) {
           await assertRejects(() => client.publish(topic, 'x'), ClientErrors.InvalidTopicNameError);
         }
         await assertRejects(
@@ -1299,6 +1299,10 @@ Deno.test({ name: '@publish invalid topic', only: false }, async (context) => {
         );
         await assertRejects(
           () => client.publish('topicA', 'x', { qos: Mqtt.QoS.AT_LEAST_ONCE }, { contentType: 'a\u0000b' }),
+          ClientErrors.InvalidPropertyError,
+        );
+        await assertRejects(
+          () => client.publish('topicA', 'x', { qos: Mqtt.QoS.AT_LEAST_ONCE }, { userProperties: [{ key: 'k', val: '\uDC00' }] }),
           ClientErrors.InvalidPropertyError,
         );
         // An ignored rejection does not become an unhandled rejection.

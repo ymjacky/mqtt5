@@ -1,4 +1,5 @@
 import {
+  binaryDataToString,
   concatBytes,
   numToQoS,
   numToTwoByteInteger,
@@ -174,7 +175,8 @@ export function parse(
 
   if (passwordFlag) {
     // const passwordStart = usernameStart + (username ? username.length : 0);
-    password = utfEncodedStringToString(buffer, pos);
+    // The Password is Binary Data, not a UTF-8 Encoded String (MQTT 5.0 3.1.3.6, MQTT 3.1.1 3.1.3.5).
+    password = binaryDataToString(buffer, pos);
     pos += password.length;
   }
 

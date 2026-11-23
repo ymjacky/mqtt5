@@ -106,8 +106,8 @@ export class InvalidTopicFilterError extends Error {
 }
 
 /**
- * An MQTT 5.0 property is invalid, e.g. a number out of the range of its type, a string with U+0000 or longer than 65,535 bytes,
- * or a Subscription Identifier of 0. The call rejects with it and nothing is sent.
+ * An MQTT 5.0 property is invalid, e.g. a number out of the range of its type, a string longer than 65,535 bytes or with U+0000
+ * or a lone surrogate, or a Subscription Identifier of 0. The call rejects with it and nothing is sent.
  */
 export class InvalidPropertyError extends Error {
   readonly #className = 'InvalidPropertyError';

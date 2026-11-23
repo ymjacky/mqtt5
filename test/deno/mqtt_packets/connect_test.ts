@@ -1,4 +1,5 @@
-import { assertEquals } from 'std/assert/mod.ts';
+import { assertEquals, assertThrows } from 'std/assert/mod.ts';
+import { MqttUtilsError } from '../../../lib/mqtt_utils/mod.ts';
 import type { ConnectPacket } from '../../../lib/mqtt_packets/packet_types.ts';
 import { parse, toBytes } from '../../../lib/mqtt_packets/connect.ts';
 import * as Mqtt from '../../../lib/mqtt/mod.ts';
@@ -959,4 +960,55 @@ Deno.test('decodeConnectPacketWithEmptyUsernameAndPassword', function () {
       keepAlive: 0,
     },
   );
+});
+
+/** The bytes of a CONNECT (MQTT 3.1.1, Client ID 'id') after the fixed header, with the given User Name and Password bytes. */
+function connectWithUsernameAndPassword(username: number[], password: number[]): Uint8Array {
+  return Uint8Array.from([
+    0, // protocolNameLength MSB
+    4, // protocolNameLength LSB
+    77, // 'M'
+    81, // 'Q'
+    84, // 'T'
+    84, // 'T'
+    Mqtt.ProtocolVersion.MQTT_V3_1_1, // ProtocolVersion
+    194, // connectFlags (usernameFlag, passwordFlag, cleanSession)
+    0, // keepAlive MSB
+    0, // keepAlive LSB
+    0, // clientId length MSB
+    2, // clientId length LSB
+    105, // 'i'
+    100, // 'd'
+    0, // username length MSB
+    username.length, // username length LSB
+    ...username,
+    0, // password length MSB
+    password.length, // password length LSB
+    ...password,
+  ]);
+}
+
+// The Password is Binary Data, not a UTF-8 Encoded String (MQTT 5.0 3.1.3.6, MQTT 3.1.1 3.1.3.5): it may hold any bytes,
+// so a CONNECT with a Password that is not UTF-8 or contains 0x00 is decoded. A leading 0xEF 0xBB 0xBF is kept.
+Deno.test('decodeConnectPacketWithAPasswordThatIsNotUtf8', function () {
+  const bytes = connectWithUsernameAndPassword([0x75], [0xEF, 0xBB, 0xBF, 0xFF, 0x00]);
+  assertEquals<ConnectPacket>(parse(bytes, bytes.length), {
+    type: 'connect',
+    clientId: 'id',
+    protocolName: 'MQTT',
+    protocolVersion: 4,
+    username: 'u',
+    password: '﻿�\u0000',
+    will: undefined,
+    clean: true,
+    keepAlive: 0,
+  });
+});
+
+// The User Name is a UTF-8 Encoded String: ill-formed UTF-8 and U+0000 are not accepted [MQTT-1.5.4-1] [MQTT-1.5.4-2].
+Deno.test('decodeConnectPacketWithAnInvalidUsername', function () {
+  for (const username of [[0xFF], [0x75, 0x00]]) {
+    const bytes = connectWithUsernameAndPassword(username, [0x70]);
+    assertThrows(() => parse(bytes, bytes.length), MqttUtilsError.InvalidUtf8EncodedStringError, undefined, JSON.stringify(username));
+  }
 });

@@ -34,6 +34,20 @@ function utf8Length(str: string): number {
   return textEncoder.encode(str).length;
 }
 
+/**
+ * Matches a lone surrogate: a code unit from U+D800 to U+DFFF that is not part of a surrogate pair. With the `u` flag, a pair
+ * is one code point, so it does not match. (`String.prototype.isWellFormed()` does the same, but needs newer browsers.)
+ */
+const loneSurrogate = /[\uD800-\uDFFF]/u;
+
+/**
+ * Whether the string has a lone surrogate. UTF-8 cannot encode it [MQTT-1.5.4-1]: TextEncoder would send U+FFFD in its place,
+ * so the string that is sent would not be the one that was given.
+ */
+function hasLoneSurrogate(str: string): boolean {
+  return loneSurrogate.test(str);
+}
+
 /** Whether the packets of the protocol version have properties and the other MQTT 5.0 fields. */
 function isMqtt5(protocolVersion: Mqtt.ProtocolVersion): boolean {
   return protocolVersion > Mqtt.ProtocolVersion.MQTT_V3_1_1;
@@ -50,8 +64,8 @@ function validateZeroToTwo(value: number, name: string): void {
 }
 
 /**
- * Checks a Topic Name: at least one character, at most 65,535 bytes, no U+0000 and no wildcard characters
- * ([MQTT-4.7.3-1], [MQTT-4.7.3-2], [MQTT-4.7.3-3], [MQTT-3.3.2-2]).
+ * Checks a Topic Name: at least one character, at most 65,535 bytes, no U+0000, no lone surrogate and no wildcard characters
+ * ([MQTT-4.7.3-1], [MQTT-4.7.3-2], [MQTT-4.7.3-3], [MQTT-1.5.4-1], [MQTT-3.3.2-2]).
  * @param topic the Topic Name to check.
  * @param name what the value is, used in the error message, e.g. `topic`.
  * @throws {InvalidTopicNameError}
@@ -65,6 +79,9 @@ export function validateTopicName(topic: string, name: string): void {
   }
   if (topic.includes('\u0000')) {
     throw new InvalidTopicNameError(`${name} ${JSON.stringify(topic)} must not contain U+0000`);
+  }
+  if (hasLoneSurrogate(topic)) {
+    throw new InvalidTopicNameError(`${name} ${JSON.stringify(topic)} must not contain a lone surrogate, which UTF-8 cannot encode`);
   }
   if (topic.includes('+') || topic.includes('#')) {
     throw new InvalidTopicNameError(`${name} ${JSON.stringify(topic)} must not contain the wildcard characters + and #`);
@@ -93,8 +110,8 @@ function validateWildcards(topicFilter: string, quoted: string): void {
 }
 
 /**
- * Checks a Topic Filter: at least one character, at most 65,535 bytes, no U+0000 and the rules of {@link validateWildcards}
- * ([MQTT-4.7.3-1], [MQTT-4.7.3-3], [MQTT-4.7.3-2]).
+ * Checks a Topic Filter: at least one character, at most 65,535 bytes, no U+0000, no lone surrogate and the rules of
+ * {@link validateWildcards} ([MQTT-4.7.3-1], [MQTT-4.7.3-3], [MQTT-4.7.3-2], [MQTT-1.5.4-1]).
  * In MQTT 5.0, a filter that starts with `$share/` must have the form `$share/{ShareName}/{filter}`,
  * where ShareName is at least one character and contains no `/`, `+` or `#` ([MQTT-4.8.2-1], [MQTT-4.8.2-2]).
  * @throws {InvalidTopicFilterError}
@@ -109,6 +126,9 @@ export function validateTopicFilter(topicFilter: string, protocolVersion: Mqtt.P
   const quoted = JSON.stringify(topicFilter);
   if (topicFilter.includes('\u0000')) {
     throw new InvalidTopicFilterError(`${quoted} must not contain U+0000`);
+  }
+  if (hasLoneSurrogate(topicFilter)) {
+    throw new InvalidTopicFilterError(`${quoted} must not contain a lone surrogate, which UTF-8 cannot encode`);
   }
   if (!isSharedSubscription(topicFilter, protocolVersion)) {
     validateWildcards(topicFilter, quoted);
@@ -143,7 +163,7 @@ function integerIn(min: number, max: number): PropertyRule {
   };
 }
 
-/** A UTF-8 Encoded String: at most 65,535 bytes and no U+0000 ([MQTT-1.5.4-1], [MQTT-1.5.4-2]). */
+/** A UTF-8 Encoded String: at most 65,535 bytes, no U+0000 and no lone surrogate ([MQTT-1.5.4-1], [MQTT-1.5.4-2]). */
 const utf8String: PropertyRule = (value, name) => {
   if (typeof value !== 'string') {
     throw new InvalidPropertyError(`${name} must be a string`);
@@ -153,6 +173,9 @@ const utf8String: PropertyRule = (value, name) => {
   }
   if (value.includes('\u0000')) {
     throw new InvalidPropertyError(`${name} ${JSON.stringify(value)} must not contain U+0000`);
+  }
+  if (hasLoneSurrogate(value)) {
+    throw new InvalidPropertyError(`${name} ${JSON.stringify(value)} must not contain a lone surrogate, which UTF-8 cannot encode`);
   }
 };
 

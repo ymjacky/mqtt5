@@ -179,7 +179,7 @@ Deno.test({ name: '@will invalid', only: false }, async (context) => {
         });
 
         const payload = new TextEncoder().encode('will-message');
-        for (const topic of ['', 'a/+', 'a/#', 'a\u0000b']) {
+        for (const topic of ['', 'a/+', 'a/#', 'a\u0000b', 'a\uD800']) {
           await assertRejects(() => client.connect({ will: { topic, payload } }), ClientErrors.InvalidTopicNameError);
         }
         await assertRejects(

@@ -1,5 +1,6 @@
-import { assertEquals, assertThrows } from 'std/assert/mod.ts';
+import { assertEquals, assertInstanceOf, assertThrows } from 'std/assert/mod.ts';
 import { MqttUtilsError } from '../../../lib/mqtt_utils/mod.ts';
+import { decode, MqttPacketsError } from '../../../lib/mqtt_packets/mod.ts';
 import type { PublishPacket } from '../../../lib/mqtt_packets/packet_types.ts';
 import { parse, toBytes } from '../../../lib/mqtt_packets/publish.ts';
 import * as Mqtt from '../../../lib/mqtt/mod.ts';
@@ -719,4 +720,44 @@ Deno.test('encodePublishPacketTooLarge', function () {
       ),
     MqttUtilsError.RemainingLengthError,
   );
+});
+
+// [MQTT-1.5.4-3] 0xEF 0xBB 0xBF is U+FEFF wherever it appears: a receiver must not strip it, also at the start of the topic.
+Deno.test('decodePublishPacketKeepsU+FEFFAtTheStartOfTheTopic', function () {
+  const packet = parse(
+    0b0000, // packetFlag
+    Uint8Array.from([
+      // variableHeader
+      0, // topicLength MSB
+      4, // topicLength LSB
+      0xEF, // U+FEFF
+      0xBB,
+      0xBF,
+      97, // 'a'
+      // payload
+      120, // 'x'
+    ]),
+    7, // remainingLength
+    Mqtt.ProtocolVersion.MQTT_V3_1_1,
+  );
+
+  assertEquals(packet.topic, '﻿a');
+  assertEquals(packet.payload, Uint8Array.from([120]));
+});
+
+// [MQTT-1.5.4-1] [MQTT-1.5.4-2] a topic that is ill-formed UTF-8 or contains U+0000 makes the packet a Malformed Packet:
+// decode() throws MqttPacketParseError, which the client handles as a Malformed Packet.
+Deno.test('decodePublishPacketWithAnInvalidTopic', function () {
+  for (const topicBytes of [[0x61, 0xFF], [0xED, 0xA0, 0x80], [0x61, 0x00]]) {
+    const bytes = Uint8Array.from([
+      0x30, // packetType + flags
+      2 + topicBytes.length + 1, // remainingLength
+      0, // topicLength MSB
+      topicBytes.length, // topicLength LSB
+      ...topicBytes,
+      120, // payload 'x'
+    ]);
+    const error = assertThrows(() => decode(bytes, Mqtt.ProtocolVersion.MQTT_V5), MqttPacketsError.MqttPacketParseError);
+    assertInstanceOf(error.cause, MqttUtilsError.InvalidUtf8EncodedStringError, JSON.stringify(topicBytes));
+  }
 });
