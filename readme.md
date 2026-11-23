@@ -61,7 +61,8 @@ await client.disconnect();
 
 ### Client options
 
-All options are optional.
+All options are optional. The constructor throws `ClientErrors.InvalidArgumentError` when an option is invalid, e.g. a `keepAlive` that is not an integer
+from 0 to 65535.
 
 | Option                          | Default                        | Description                                                                                                                           |
 | ------------------------------- | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------- |
@@ -70,14 +71,14 @@ All options are optional.
 | `username` / `password`         | -                              | Credentials sent in CONNECT.                                                                                                          |
 | `protocolVersion`               | `Mqtt.ProtocolVersion.MQTT_V5` | `MQTT_V5` or `MQTT_V3_1_1`.                                                                                                           |
 | `clean`                         | `true`                         | Clean Start (5.0) / Clean Session (3.1.1).                                                                                            |
-| `keepAlive`                     | `10`                           | Keep alive interval in **seconds**. `0` disables it. A Server Keep Alive in CONNACK (5.0) overrides it.                               |
+| `keepAlive`                     | `10`                           | Keep alive interval in **seconds**, from `0` to `65535`. `0` disables it. A Server Keep Alive in CONNACK (5.0) overrides it.          |
 | `connectTimeoutMS`              | `10000`                        | Time to wait for CONNACK, in milliseconds.                                                                                            |
 | `disconnectTimeoutMS`           | `1000`                         | Time to wait for the connection to close after DISCONNECT, in milliseconds.                                                           |
 | `pingrespTimeoutMS`             | `2000`                         | Time to wait for PINGRESP, in milliseconds.                                                                                           |
 | `caCerts`                       | -                              | CA certificates (PEM) to trust in addition to the default root certificates, for `mqtts:` (`MqttClient` only). See [TLS](#tls-mqtts). |
 | `cert` / `privateKey`           | -                              | Client certificate and private key (PEM) for TLS client authentication (`MqttClient` only).                                           |
-| `topicAliasMaximumAboutSend`    | -                              | MQTT 5.0: topic alias maximum for outgoing PUBLISH packets. See [Topic aliases](#topic-aliases).                                      |
-| `topicAliasMaximumAboutReceive` | -                              | MQTT 5.0: topic alias maximum sent to the broker in CONNECT. See [Topic aliases](#topic-aliases).                                     |
+| `topicAliasMaximumAboutSend`    | -                              | MQTT 5.0: topic alias maximum for outgoing PUBLISH packets, from `0` to `65535`. See [Topic aliases](#topic-aliases).                 |
+| `topicAliasMaximumAboutReceive` | -                              | MQTT 5.0: topic alias maximum sent to the broker in CONNECT, from `0` to `65535`. See [Topic aliases](#topic-aliases).                |
 | `outgoingStore`                 | in memory                      | Where QoS 1 / QoS 2 messages in flight are kept. See [Session store](#session-store).                                                 |
 | `logger`                        | -                              | `(msg: string, ...args: unknown[]) => void`, called with debug logs.                                                                  |
 
@@ -305,7 +306,7 @@ A rejected promise that is not awaited does not terminate the process, so await 
 | `StateIsNotOnlineError`   | `publish()`, `subscribe()`, `unsubscribe()`                        | The client is not connected.                                                                                                                                 |
 | `InvalidTopicNameError`   | `publish()`, `connect()`                                           | The topic, Response Topic or Will Topic is empty, or contains `+`, `#`, U+0000 or a lone surrogate (which UTF-8 cannot encode).                              |
 | `InvalidTopicFilterError` | `subscribe()`, `unsubscribe()`                                     | A topic filter is invalid, e.g. `a/#/b`, `a+` or `$share/group`.                                                                                             |
-| `InvalidArgumentError`    | `connect()`, `publish()`, `subscribe()`, `unsubscribe()`           | Another argument is invalid, e.g. a QoS other than 0, 1 or 2, `dup: true` with QoS 0, an empty list of topic filters, or `noLocal` on a shared subscription. |
+| `InvalidArgumentError`    | `connect()`, `publish()`, `subscribe()`, `unsubscribe()`, the constructors (thrown) | Another argument is invalid, e.g. a QoS other than 0, 1 or 2, `dup: true` with QoS 0, an empty list of topic filters, or `noLocal` on a shared subscription. Constructors: an option is invalid, e.g. a `keepAlive` that is not an integer from 0 to 65535. |
 | `InvalidPropertyError`    | `connect()`, `publish()`, `subscribe()`, `unsubscribe()`, `disconnect()` | An MQTT 5.0 property is invalid, e.g. out of range (`subscriptionIdentifier: 0`, `receiveMaximum: 0`) or a string that contains U+0000 or a lone surrogate. `disconnect()`: also a `sessionExpiryInterval` other than 0 when `connect()` sent none. |
 | `PacketTooLargeError`     | `connect()`, `publish()`, `subscribe()`, `unsubscribe()`, `auth()` | The packet is larger than the Maximum Packet Size of the broker (MQTT 5.0) or than MQTT allows.                                                              |
 | `NotSupportedByBrokerError` | `publish()`, `subscribe()` | The broker said in CONNACK (MQTT 5.0) that it does not support what the call asks for; nothing is sent. Catch it to handle all of the following. `QoSNotSupportedError`: a QoS above the Maximum QoS (`err.maximumQoS` is the highest the broker accepts). `RetainNotSupportedError`: `retain: true`. `WildcardSubscriptionsNotSupportedError`, `SharedSubscriptionsNotSupportedError` and `SubscriptionIdentifiersNotSupportedError`: a topic filter with `+` / `#`, a `$share/...` topic filter, or a `subscriptionIdentifier`. |

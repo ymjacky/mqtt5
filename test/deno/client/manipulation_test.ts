@@ -826,7 +826,7 @@ Deno.test({ name: '@manipulation', only: false }, async (context) => {
           logger: logger,
           clean: true,
           connectTimeoutMS: 10000,
-          keepAlive: -1,
+          keepAlive: 0,
         });
 
         broker.on('connect', (event) => {

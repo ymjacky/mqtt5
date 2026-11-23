@@ -1,7 +1,8 @@
 /**
- * Checks of the values given to publish(), subscribe(), unsubscribe() and connect(), done before anything is sent.
- * Only the values that are sent are checked: MQTT 3.1.1 packets have no properties and no Retain Handling,
- * so they are not checked there.
+ * Checks of the values given to the client constructor, publish(), subscribe(), unsubscribe() and connect(),
+ * done before anything is sent.
+ * Only the values that are used are checked: MQTT 3.1.1 packets have no properties and no Retain Handling,
+ * and MQTT 3.1.1 has no topic aliases, so they are not checked there.
  * The packet encoders do not check them: they encode what they are given.
  * @module
  */
@@ -9,7 +10,7 @@
 import * as Mqtt from '../mqtt/mod.ts';
 import type * as MqttProperties from '../mqtt_properties/mod.ts';
 import * as MqttUtils from '../mqtt_utils/mod.ts';
-import type { ConnectOptions, SubscriptionOption } from './client_types.ts';
+import type { ClientOptions, ConnectOptions, SubscriptionOption } from './client_types.ts';
 import {
   InvalidArgumentError,
   InvalidPropertyError,
@@ -156,10 +157,15 @@ export function validateTopicFilter(topicFilter: string, protocolVersion: Mqtt.P
 /** Checks one property value. `name` is the property's path, used in the error message. */
 type PropertyRule = (value: unknown, name: string) => void;
 
+/** Whether the value is an integer from `min` to `max`. NaN, Infinity and values that are not numbers are not. */
+function isIntegerIn(value: unknown, min: number, max: number): boolean {
+  return typeof value === 'number' && Number.isInteger(value) && value >= min && value <= max;
+}
+
 /** An integer from `min` to `max`. */
 function integerIn(min: number, max: number): PropertyRule {
   return (value, name) => {
-    if (typeof value !== 'number' || !Number.isInteger(value) || value < min || value > max) {
+    if (!isIntegerIn(value, min, max)) {
       throw new InvalidPropertyError(`${name} must be an integer from ${min} to ${max} (got ${value})`);
     }
   };
@@ -407,6 +413,23 @@ export function validateUnsubscribe(
   }
   if (isMqtt5(protocolVersion)) {
     validateProperties(properties, 'properties');
+  }
+}
+
+/**
+ * Checks the options of the client constructor that are Two Byte Integers in MQTT: `keepAlive` (the Keep Alive of CONNECT),
+ * and, in MQTT 5.0, `topicAliasMaximumAboutReceive` (the Topic Alias Maximum of CONNECT) and `topicAliasMaximumAboutSend`
+ * (the largest Topic Alias to send). They must be integers from 0 to 65,535, the values a Two Byte Integer can hold:
+ * another value would not reach the broker as it is (e.g. a Keep Alive of 70,000 would be sent as 4,464).
+ * @throws {InvalidArgumentError}
+ */
+export function validateClientOptions(options: ClientOptions | undefined, protocolVersion: Mqtt.ProtocolVersion): void {
+  const names = isMqtt5(protocolVersion) ? ['keepAlive', 'topicAliasMaximumAboutSend', 'topicAliasMaximumAboutReceive'] as const : ['keepAlive'] as const;
+  for (const name of names) {
+    const value = options?.[name];
+    if (typeof value !== 'undefined' && !isIntegerIn(value, 0, maxTwoByteInteger)) {
+      throw new InvalidArgumentError(`${name} must be an integer from 0 to ${maxTwoByteInteger} (got ${value})`);
+    }
   }
 }
 

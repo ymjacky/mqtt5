@@ -11,6 +11,13 @@ Deno.test('a WebSocketMqttClient cannot be created without a url', () => {
   assertThrows(() => new WebSocketMqttClient({ clientId: 'cid' }), ClientErrors.InvalidArgumentError, 'url is required');
 });
 
+Deno.test('a WebSocketMqttClient cannot be created with an option that is not an integer from 0 to 65535', () => {
+  const url = new URL('ws://127.0.0.1:3000/');
+  assertThrows(() => new WebSocketMqttClient({ url, keepAlive: 70_000 }), ClientErrors.InvalidArgumentError, 'keepAlive');
+  assertThrows(() => new WebSocketMqttClient({ url, topicAliasMaximumAboutSend: 1.5 }), ClientErrors.InvalidArgumentError, 'topicAliasMaximumAboutSend');
+  assertThrows(() => new WebSocketMqttClient({ url, topicAliasMaximumAboutReceive: -1 }), ClientErrors.InvalidArgumentError, 'topicAliasMaximumAboutReceive');
+});
+
 Deno.test({ name: '@connect', only: false }, async (context) => {
   await context.step(
     'connect default value (v5.0)',
