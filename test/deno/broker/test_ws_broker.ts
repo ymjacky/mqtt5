@@ -1,4 +1,4 @@
-import { Mqtt, MqttPackets, MqttProperties } from '../../../deno/mod.ts';
+import { Mqtt, MqttPackets, type MqttProperties } from '../../../deno/mod.ts';
 
 export interface CustomEventMap {
   'accept': CustomEvent<WebSocket>;

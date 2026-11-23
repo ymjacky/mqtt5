@@ -1,4 +1,4 @@
-import * as Mqtt from '../mqtt/mod.ts';
+import type * as Mqtt from '../mqtt/mod.ts';
 
 export class InvalidQoSError extends Error {
   constructor(num: number) {

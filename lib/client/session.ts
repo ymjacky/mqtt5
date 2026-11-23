@@ -1,8 +1,9 @@
-import { IdProvider, MqttPackets } from '../mod.ts';
-import { MemoryStore, OutgoingStore } from '../mqtt_store/mod.ts';
+import * as IdProvider from '../id_provider/mod.ts';
+import type * as MqttPackets from '../mqtt_packets/mod.ts';
+import { MemoryStore, type OutgoingStore } from '../mqtt_store/mod.ts';
 import { Deferred } from './promise.ts';
 import { ConnectionClosed, SessionLostError } from './error.ts';
-import { PublishResult, SubscribeResults, UnsubscribeResults } from './client_types.ts';
+import type { PublishResult, SubscribeResults, UnsubscribeResults } from './client_types.ts';
 
 // The Receive Maximum of a CONNACK that has none (MQTT 5.0 3.2.2.3.2), and of MQTT 3.1.1, which has no flow control.
 const defaultReceiveMaximum = 65535;

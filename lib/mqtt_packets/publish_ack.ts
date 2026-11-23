@@ -1,5 +1,5 @@
 import * as Mqtt from '../mqtt/mod.ts';
-import * as MqttProperties from '../mqtt_properties/mod.ts';
+import type * as MqttProperties from '../mqtt_properties/mod.ts';
 import { readProperties } from '../mqtt_properties/read_properties.ts';
 import { ByteReader } from '../mqtt_utils/mod.ts';
 

@@ -1,7 +1,10 @@
-import { Mqtt, MqttPackets, MqttProperties, MqttUtils } from '../mod.ts';
+import * as Mqtt from '../mqtt/mod.ts';
+import * as MqttPackets from '../mqtt_packets/mod.ts';
+import type * as MqttProperties from '../mqtt_properties/mod.ts';
+import * as MqttUtils from '../mqtt_utils/mod.ts';
 import { Session } from './session.ts';
 import { TopicAliasManager } from './topic_alias.ts';
-import { ClientOptions, ConnectOptions, PublishOptions, PublishResult, SubscribeResults, SubscriptionOption, UnsubscribeResults } from './client_types.ts';
+import type { ClientOptions, ConnectOptions, PublishOptions, PublishResult, SubscribeResults, SubscriptionOption, UnsubscribeResults } from './client_types.ts';
 import {
   ConnectionClosed,
   ConnectTimeout,
@@ -25,25 +28,25 @@ import {
   validateSubscribeCapabilities,
   validateUnsubscribe,
 } from './validation.ts';
-import { IncomingMemoryStore, IncomingStore } from '../mqtt_store/mod.ts';
-import { createCustomEvent, CustomEventListener, CustomEventMap } from './events.ts';
+import { IncomingMemoryStore, type IncomingStore } from '../mqtt_store/mod.ts';
+import { createCustomEvent, type CustomEventListener, type CustomEventMap } from './events.ts';
 import * as MqttStream from '../mqtt_stream_utils/mod.ts';
 
-import {
-  type AnyPacket,
-  type AuthPacket,
-  type ConnackPacket,
-  type DisconnectPacket,
-  type PingrespPacket,
-  type PubackPacket,
-  type PubcompPacket,
-  type PublishPacket,
-  type PubrecPacket,
-  type PubrelPacket,
-  type SubackPacket,
-  type SubscribePacket,
-  type UnsubackPacket,
-  type UnsubscribePacket,
+import type {
+  AnyPacket,
+  AuthPacket,
+  ConnackPacket,
+  DisconnectPacket,
+  PingrespPacket,
+  PubackPacket,
+  PubcompPacket,
+  PublishPacket,
+  PubrecPacket,
+  PubrelPacket,
+  SubackPacket,
+  SubscribePacket,
+  UnsubackPacket,
+  UnsubscribePacket,
 } from '../mqtt_packets/mod.ts';
 
 type ConnectionStates =

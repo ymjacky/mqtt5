@@ -1,4 +1,4 @@
-import { ClientErrors, ClientTypes, Mqtt, MqttClient } from '@ymjacky/mqtt5';
+import { ClientErrors, type ClientTypes, Mqtt, MqttClient } from '@ymjacky/mqtt5';
 
 // Reconnects when the connection is closed by the broker (e.g. the broker restarts) or is lost.
 // The session is kept, so QoS 1 / QoS 2 messages in flight are resent after reconnecting.

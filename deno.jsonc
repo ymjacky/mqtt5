@@ -32,7 +32,7 @@
     "include": ["browser", "deno", "lib", "test", "examples"],
 
     "rules": {
-      "tags": ["recommended"]
+      "tags": ["recommended", "jsr"]
     },
 
     "report": "pretty"

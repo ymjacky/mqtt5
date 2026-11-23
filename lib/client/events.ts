@@ -1,4 +1,4 @@
-import { MqttPackets } from '../mod.ts';
+import type * as MqttPackets from '../mqtt_packets/mod.ts';
 
 /**
  * Events emitted by the clients. Register listeners with `client.on(type, listener)`;

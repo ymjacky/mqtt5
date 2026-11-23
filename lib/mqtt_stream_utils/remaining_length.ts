@@ -1,4 +1,4 @@
-import { MalformedPacketError } from '../client/error.ts';
+import { MalformedPacketError } from './error.ts';
 import * as MqttUtils from '../mqtt_utils/mod.ts';
 
 // The MQTT spec allows at most 4 bytes for a Variable Byte Integer.

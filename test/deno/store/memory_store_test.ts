@@ -1,5 +1,5 @@
 import { MemoryStore } from '../../../lib/mqtt_store/mod.ts';
-import { Mqtt } from '../../../lib/mod.ts';
+import * as Mqtt from '../../../lib/mqtt/mod.ts';
 
 import { assertEquals, assertFalse } from '@std/assert';
 

@@ -5,6 +5,10 @@
 
 import type * as Mqtt from '../mqtt/mod.ts';
 
+// Thrown below the client, by the splitting of the received bytes into packets, and re-exported here.
+// `export *` keeps it visible in the docs of the ClientErrors namespace.
+export * from '../mqtt_stream_utils/error.ts';
+
 /**
  * The connection was closed. Rejected by `connect()` when the connection is closed before CONNACK is received
  * (`WebSocketMqttClient` also when the connection cannot be opened), and by `subscribe()` and `unsubscribe()` when it is
@@ -14,15 +18,6 @@ export class ConnectionClosed extends Error {
   readonly #className = 'ConnectionClosed';
   constructor() {
     super(`connection closed`);
-  }
-}
-
-/** A received packet could not be decoded. */
-export class MalformedPacketError extends Error {
-  readonly #className = 'MalformedPacketError';
-  /** Creates the error with the given details. */
-  constructor(message: string) {
-    super(message);
   }
 }
 

@@ -3,7 +3,7 @@
  * @module
  */
 
-import * as Mqtt from '../mqtt/mod.ts';
+import type * as Mqtt from '../mqtt/mod.ts';
 
 import { ByteReader, concatBytes, numToFourByteInteger, numToTwoByteInteger, numToVariableByteInteger, stringToUtfEncodedString } from '../mqtt_utils/mod.ts';
 import { readPropertyList } from './read_properties.ts';

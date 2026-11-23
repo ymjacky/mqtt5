@@ -1,4 +1,4 @@
-import { ClientErrors, Mqtt, MqttClient, MqttPackets, MqttProperties } from '../../../deno/mod.ts';
+import { ClientErrors, Mqtt, MqttClient, MqttPackets, type MqttProperties } from '../../../deno/mod.ts';
 import { TestBroker } from '../broker/test_broker.ts';
 import { assert, assertEquals, assertExists, assertRejects } from '@std/assert';
 

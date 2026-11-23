@@ -1,4 +1,4 @@
-import { MqttPackets } from '../mod.ts';
+import type * as MqttPackets from '../mqtt_packets/mod.ts';
 
 /**
  * Keeps the packet IDs of received QoS 2 PUBLISH packets until PUBREL is received.

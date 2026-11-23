@@ -1,4 +1,4 @@
-import { ClientTypes, Mqtt, MqttProperties, WebSocketMqttClient } from '../../../deno/mod.ts';
+import { type ClientTypes, Mqtt, type MqttProperties, WebSocketMqttClient } from '../../../deno/mod.ts';
 import { TestWsBroker } from '../broker/test_ws_broker.ts';
 import { assertEquals, fail } from '@std/assert';
 

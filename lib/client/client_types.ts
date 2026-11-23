@@ -3,9 +3,10 @@
  * @module
  */
 
-import { Mqtt, MqttProperties } from '../mod.ts';
-import { IncomingStore, OutgoingStore } from '../mqtt_store/mod.ts';
-import { Subscription } from '../mqtt_packets/mod.ts';
+import type * as Mqtt from '../mqtt/mod.ts';
+import type * as MqttProperties from '../mqtt_properties/mod.ts';
+import type { IncomingStore, OutgoingStore } from '../mqtt_store/mod.ts';
+import type { Subscription } from '../mqtt_packets/mod.ts';
 
 /**
  * Options for the {@link MqttClient} and {@link WebSocketMqttClient} constructors. All options are optional,

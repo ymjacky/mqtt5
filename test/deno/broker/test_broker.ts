@@ -1,4 +1,4 @@
-import { ClientErrors, Mqtt, MqttPackets, MqttProperties } from '../../../deno/mod.ts';
+import { ClientErrors, Mqtt, MqttPackets, type MqttProperties } from '../../../deno/mod.ts';
 import * as MqttStream from '../../../lib/mqtt_stream_utils/mod.ts';
 
 interface CustomEventMap {

@@ -1,4 +1,4 @@
-import { KvOutgoingStore, Mqtt, MqttPackets, Store } from '../../../deno/mod.ts';
+import { KvOutgoingStore, Mqtt, type MqttPackets, type Store } from '../../../deno/mod.ts';
 import type { KvOutgoingStoreOptions } from '../../../deno/mod.ts';
 import { assertEquals, assertRejects } from '@std/assert';
 

@@ -1,5 +1,5 @@
 import { BaseMqttClient } from './base_mqtt_client.ts';
-import { ClientOptions } from './client_types.ts';
+import type { ClientOptions } from './client_types.ts';
 import * as MqttStream from '../mqtt_stream_utils/mod.ts';
 import { Deferred } from './promise.ts';
 import { ConnectionClosed } from './error.ts';

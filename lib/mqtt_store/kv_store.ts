@@ -1,4 +1,5 @@
-import { Mqtt, MqttPackets } from '../mod.ts';
+import * as Mqtt from '../mqtt/mod.ts';
+import * as MqttPackets from '../mqtt_packets/mod.ts';
 import type { OutgoingStore } from './store.ts';
 
 type StoredPacket = MqttPackets.PublishPacket | MqttPackets.PubrelPacket;
