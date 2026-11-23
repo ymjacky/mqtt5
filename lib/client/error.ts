@@ -31,6 +31,29 @@ export class ConnectTimeout extends Error {
   }
 }
 
+/**
+ * While `connect()` waited for CONNACK, the client received a packet that it cannot accept, and closed the connection
+ * without sending DISCONNECT. Rejected by `connect()`.
+ *
+ * The packet is a Malformed Packet, e.g. a CONNACK with a property that MQTT 5.0 does not define, a Protocol Error, e.g.
+ * a CONNACK with a property twice, a packet larger than the Maximum Packet Size of CONNECT, or a packet that only a
+ * client sends, e.g. SUBSCRIBE.
+ */
+export class InvalidPacketBeforeConnackError extends Error {
+  /** The name of the error class. */
+  override readonly name = 'InvalidPacketBeforeConnackError' as const;
+  /**
+   * Why the client closed the connection, e.g. `Mqtt.ReasonCode.MalformedPacket`, `Mqtt.ReasonCode.ProtocolError` or
+   * `Mqtt.ReasonCode.PacketTooLarge`. It is not sent to the broker. Set with MQTT 3.1.1 too, which has no reason codes.
+   */
+  readonly reasonCode: Mqtt.ReasonCode;
+  /** Creates the error for the reason the connection was closed for. */
+  constructor(reasonCode: Mqtt.ReasonCode) {
+    super(`invalid packet before CONNACK: the connection was closed (reason code 0x${reasonCode.toString(16).padStart(2, '0')})`);
+    this.reasonCode = reasonCode;
+  }
+}
+
 /** `connect()` was called while the client is connected or connecting. */
 export class StateIsNotOfflineError extends Error {
   /** The name of the error class. */

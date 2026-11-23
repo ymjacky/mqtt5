@@ -9,6 +9,7 @@ import {
   ConnectionClosed,
   ConnectTimeout,
   InvalidArgumentError,
+  InvalidPacketBeforeConnackError,
   MalformedPacketError,
   PacketTooLargeError,
   SendPacketError,
@@ -365,6 +366,8 @@ export abstract class BaseMqttClient {
    * @throws {PacketTooLargeError} if CONNECT is larger than MQTT allows. No connection is opened.
    * @throws {MqttPacketSerializeError} if CONNECT cannot be encoded, e.g. the user name is longer than 65,535 bytes. No connection is opened.
    * @throws {ConnectTimeout} if CONNACK is not received within `connectTimeoutMS`, including the time to open the connection.
+   * @throws {InvalidPacketBeforeConnackError} if a packet that the client cannot accept is received before CONNACK, e.g. a
+   * malformed CONNACK. The client closes the connection without sending DISCONNECT.
    * @throws {ConnectionClosed} if the connection is closed before CONNACK is received, e.g. by `disconnect(true)`.
    * `WebSocketMqttClient` also rejects with it when the connection cannot be opened.
    * @throws {Error} `MqttClient`: the error of opening the connection, e.g. `Deno.errors.ConnectionRefused` when the broker is not running,
@@ -1286,8 +1289,18 @@ export abstract class BaseMqttClient {
   /**
    * Ends the connection because of an error: sends DISCONNECT with `reasonCode` (MQTT 5.0),
    * or closes the connection (MQTT 3.1.1). The broker publishes the Will Message.
+   * Before CONNACK, the connection is closed without DISCONNECT with either version, and connect() rejects with
+   * InvalidPacketBeforeConnackError when the client is offline again (detectClosed()).
    */
   private async disconnectWithError(reasonCode: Mqtt.ReasonCode): Promise<void> {
+    const { state } = this;
+    if (state.kind === 'connecting') {
+      this.log(`Closing connection before CONNACK because of an error, reason code ${reasonCode}`);
+      // Keep the reason of a connect timeout, which may have closed the connection already.
+      state.connection.connectFailure ??= new InvalidPacketBeforeConnackError(reasonCode);
+      await this.close();
+      return;
+    }
     if (this.protocolVersion === Mqtt.ProtocolVersion.MQTT_V3_1_1) {
       // MQTT v3.1.1: DISCONNECT has no reason code and unconditionally signals a
       // clean disconnect, which also causes the broker to discard the Will message.

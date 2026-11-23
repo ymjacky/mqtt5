@@ -130,11 +130,8 @@ export class MqttClient extends BaseMqttClient {
               // Rejects for an error that is not a framing error.
               await this.handleFramingError(streamError);
 
-              // We can no longer safely read further packets on this
-              // connection, so tear it down ourselves; the disconnect timer
-              // started by handleMalformedPacket() won't help here because
-              // nothing else awaits `reader` once we stop this loop.
-              await reader.cancel();
+              // We can no longer safely read further packets on this connection: it is closed below. The disconnect
+              // timer started by handleMalformedPacket() would not help, as nothing reads `reader` after this loop.
               return;
             }
             if (!receiveBytes) {
@@ -145,10 +142,13 @@ export class MqttClient extends BaseMqttClient {
           }
         }
       } catch (err) {
-        // e.g. the connection was reset by the broker.
+        // e.g. the connection was reset by the broker, or an error that the received bytes do not cause.
         this.log('the receive loop ended with an error', err);
       } finally {
-        // Reported however the loop ended: the client does not read this connection any more.
+        // However the loop ended, nothing reads this connection any more: close it, then report the close. Left open, it
+        // would keep receiving, and the broker would see the client as connected until the keep alive expires.
+        // cancel() rejects when the connection has failed already, e.g. it was reset: there is nothing to close then.
+        await reader.cancel().catch(() => {});
         if (this.reader === reader) {
           this.detectClosed();
         }
