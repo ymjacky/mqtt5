@@ -1,11 +1,12 @@
 import { assert, assertEquals } from '@std/assert';
-import { ClientErrors, MqttPackets, MqttProperties } from '../../../deno/mod.ts';
+import { ClientErrors, Mqtt, MqttPackets, MqttProperties } from '../../../deno/mod.ts';
 
 // One instance of each error class that users can catch, by the name of its class.
 const errors: Record<string, Error> = {
   ConnectionClosed: new ClientErrors.ConnectionClosed(),
   MalformedPacketError: new ClientErrors.MalformedPacketError('m'),
   ConnectTimeout: new ClientErrors.ConnectTimeout(),
+  InvalidPacketBeforeConnackError: new ClientErrors.InvalidPacketBeforeConnackError(Mqtt.ReasonCode.MalformedPacket),
   StateIsNotOfflineError: new ClientErrors.StateIsNotOfflineError('m'),
   StateIsNotOnlineError: new ClientErrors.StateIsNotOnlineError('m'),
   SessionLostError: new ClientErrors.SessionLostError(),
@@ -50,6 +51,12 @@ Deno.test('a subclass of NotSupportedByBrokerError is still one', () => {
   const error = new ClientErrors.QoSNotSupportedError(2, 1);
   assert(error instanceof ClientErrors.NotSupportedByBrokerError);
   assertEquals(error.maximumQoS, 1);
+});
+
+Deno.test('InvalidPacketBeforeConnackError has the reason the connection was closed for', () => {
+  const error = new ClientErrors.InvalidPacketBeforeConnackError(Mqtt.ReasonCode.ProtocolError);
+  assertEquals(error.reasonCode, Mqtt.ReasonCode.ProtocolError);
+  assert(error.message.includes('0x82'), error.message);
 });
 
 Deno.test('the error classes stay apart as types', () => {
