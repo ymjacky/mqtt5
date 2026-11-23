@@ -1,4 +1,4 @@
-import { assert, assertEquals, assertThrows } from 'std/assert/mod.ts';
+import { assert, assertEquals, assertThrows } from '@std/assert';
 import * as MqttStream from '../../../lib/mqtt_stream_utils/mod.ts';
 import * as Publish from '../../../lib/mqtt_packets/publish.ts';
 import * as Mqtt from '../../../lib/mqtt/mod.ts';

@@ -1,4 +1,4 @@
-import { assertThrows } from 'std/assert/mod.ts';
+import { assertThrows } from '@std/assert';
 import { Mqtt } from '../../../deno/mod.ts';
 import { InvalidArgumentError, InvalidPropertyError, InvalidTopicFilterError, InvalidTopicNameError } from '../../../lib/client/error.ts';
 import {

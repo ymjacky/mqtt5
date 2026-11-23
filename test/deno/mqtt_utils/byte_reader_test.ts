@@ -1,4 +1,4 @@
-import { assertEquals, assertThrows } from 'std/assert/mod.ts';
+import { assertEquals, assertThrows } from '@std/assert';
 import { ByteReader, MqttUtilsError } from '../../../lib/mqtt_utils/mod.ts';
 
 // The values are read by twoByteIntegerToNum() and the other functions of mqtt_utils, which have their own tests. These

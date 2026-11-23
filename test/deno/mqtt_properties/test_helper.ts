@@ -1,4 +1,4 @@
-import { assertEquals } from 'std/assert/mod.ts';
+import { assertEquals } from '@std/assert';
 import { parseMqttProperties, type Properties, propertiesToBytes } from '../../../lib/mqtt_properties/mod.ts';
 
 /** A test case that encodes and decodes properties. */

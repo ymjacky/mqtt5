@@ -1,7 +1,7 @@
 import { MemoryStore } from '../../../lib/mqtt_store/mod.ts';
 import { Mqtt } from '../../../lib/mod.ts';
 
-import { assertEquals, assertFalse } from 'std/assert/mod.ts';
+import { assertEquals, assertFalse } from '@std/assert';
 
 Deno.test({ name: '@MemoryStore', only: false }, async (context) => {
   await context.step(

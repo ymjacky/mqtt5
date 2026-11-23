@@ -1,6 +1,6 @@
 import { ClientErrors, ClientTypes, Mqtt, MqttClient, MqttPackets, MqttProperties, Store } from '../../../deno/mod.ts';
 import { TestBroker } from '../broker/test_broker.ts';
-import { assertEquals, assertExists, assertFalse, assertRejects, fail } from 'std/assert/mod.ts';
+import { assertEquals, assertExists, assertFalse, assertRejects, fail } from '@std/assert';
 
 function logger(msg: string, ...args: unknown[]): void {
   console.log('[Test Client]', msg, ...args);

@@ -1,7 +1,7 @@
 import { ClientErrors, Mqtt, MqttClient, MqttPackets, Store } from '../../../deno/mod.ts';
 import { TestBroker } from '../broker/test_broker.ts';
 import { connackBytes, RawServer, waitUntil } from '../broker/raw_server.ts';
-import { assert, assertEquals, assertRejects } from 'std/assert/mod.ts';
+import { assert, assertEquals, assertRejects } from '@std/assert';
 
 // How the client behaves when the connection is refused, cannot be established, is lost or has to be ended.
 

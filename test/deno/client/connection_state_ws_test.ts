@@ -1,7 +1,7 @@
 import { ClientErrors, Mqtt, WebSocketMqttClient } from '../../../deno/mod.ts';
 import { TestWsBroker } from '../broker/test_ws_broker.ts';
 import { acceptWebSocket, connackBytes, RawServer, waitUntil, webSocketFrame } from '../broker/raw_server.ts';
-import { assert, assertEquals, assertRejects } from 'std/assert/mod.ts';
+import { assert, assertEquals, assertRejects } from '@std/assert';
 
 // How the client behaves when the connection is refused, is lost or has to be ended.
 

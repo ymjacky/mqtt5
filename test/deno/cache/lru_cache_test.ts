@@ -1,4 +1,4 @@
-import { assert, assertEquals, assertThrows } from 'std/assert/mod.ts';
+import { assert, assertEquals, assertThrows } from '@std/assert';
 import { LruCache } from '../../../lib/cache/lru_cache.ts';
 
 Deno.test('set removes the least recently used entry when the cache is full, not the least often used one', () => {

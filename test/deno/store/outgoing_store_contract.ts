@@ -1,6 +1,6 @@
 import { KvOutgoingStore, Mqtt, MqttPackets, Store } from '../../../deno/mod.ts';
 import type { KvOutgoingStoreOptions } from '../../../deno/mod.ts';
-import { assertEquals, assertRejects } from 'std/assert/mod.ts';
+import { assertEquals, assertRejects } from '@std/assert';
 
 type StoredPacket = MqttPackets.PublishPacket | MqttPackets.PubrelPacket;
 

@@ -1,4 +1,4 @@
-import { assertEquals, assertInstanceOf, assertThrows } from 'std/assert/mod.ts';
+import { assertEquals, assertInstanceOf, assertThrows } from '@std/assert';
 import * as Mqtt from '../../../lib/mqtt/mod.ts';
 import { decode, MqttPacketsError } from '../../../lib/mqtt_packets/mod.ts';
 import { MqttUtilsError } from '../../../lib/mqtt_utils/mod.ts';

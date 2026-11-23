@@ -9,7 +9,9 @@
     // Lets the examples import the package the same way users do after `deno add jsr:@ymjacky/mqtt5`.
     "@ymjacky/mqtt5": "./deno/mod.ts",
     "@ymjacky/mqtt5/browser": "./browser/mod.ts",
-    "std/": "https://deno.land/std@0.219.0/"
+    // Used by the tests and browser/server.ts only; the library itself has no dependencies.
+    "@std/assert": "jsr:@std/assert@^1.0.19",
+    "@std/http": "jsr:@std/http@^1.1.4"
   },
   "publish": {
     "include": ["deno/", "browser/mod.ts", "lib/", "readme.md", "LICENSE"]
@@ -20,7 +22,6 @@
     "lineWidth": 160,
     "include": [
       "browser",
-      "client",
       "deno",
       "lib",
       "examples",
@@ -28,12 +29,10 @@
     ]
   },
   "lint": {
-    "include": ["deno", "lib", "test", "examples"],
-    "exclude": ["./exclude/"],
+    "include": ["browser", "deno", "lib", "test", "examples"],
 
     "rules": {
-      "tags": ["recommended"],
-      "exclude": ["ban-untagged-todo"]
+      "tags": ["recommended"]
     },
 
     "report": "pretty"
@@ -45,6 +44,6 @@
     "test": "deno test --unstable-kv --allow-net --allow-read --allow-write --trace-leaks test/deno/",
     "tsc": "deno check --doc deno/mod.ts browser/mod.ts lib/ && deno check --doc-only readme.md",
     "check": "deno lint && deno task tsc && deno task test",
-    "build_ems": "deno bundle --platform browser -o browser/mqtt5.mjs browser/mod.ts"
+    "build_esm": "deno bundle --platform browser -o browser/mqtt5.mjs browser/mod.ts"
   }
 }

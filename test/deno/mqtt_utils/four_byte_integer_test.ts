@@ -1,4 +1,4 @@
-import { assertEquals, assertThrows } from 'std/assert/mod.ts';
+import { assertEquals, assertThrows } from '@std/assert';
 import { fourByteIntegerToNum, MqttUtilsError, numToFourByteInteger } from '../../../lib/mqtt_utils/mod.ts';
 
 Deno.test('numToFourByteInteger', () => {

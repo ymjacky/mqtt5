@@ -14,7 +14,7 @@ API reference: [jsr.io/@ymjacky/mqtt5/doc](https://jsr.io/@ymjacky/mqtt5/doc)
 - Deno 2.3.1 or later
 - To use `KvOutgoingStore`, the persistent [session store](#session-store): run Deno with `--unstable-kv`
 - For the browser: a browser that supports ES modules and WebSocket
-- To build `mqtt5.mjs` yourself (`deno task build_ems`): Deno 2.4 or later
+- To build `mqtt5.mjs` yourself (`deno task build_esm`): Deno 2.4 or later
 
 ## Installation
 
@@ -468,7 +468,7 @@ esm.sh is a third-party service. To serve everything from your own server, use `
 `mqtt5.mjs` is the browser entry point bundled into a single JavaScript module file. Get it in either way:
 
 - Download `mqtt5.mjs` from the assets of a [GitHub Release](https://github.com/ymjacky/mqtt5/releases) (0.0.25 and later).
-- Build it in a clone of this repository with `deno task build_ems` (uses `deno bundle`, Deno 2.4 or later). This creates `browser/mqtt5.mjs`.
+- Build it in a clone of this repository with `deno task build_esm` (uses `deno bundle`, Deno 2.4 or later). This creates `browser/mqtt5.mjs`.
 
 Copy it to the directory your web page is served from and import it from a module script. Serve the page over HTTP(S); module scripts do not load from `file://`
 URLs.
