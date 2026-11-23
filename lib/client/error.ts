@@ -3,6 +3,8 @@
  * @module
  */
 
+import type * as Mqtt from '../mqtt/mod.ts';
+
 /**
  * The connection was closed. Rejected by `connect()` when the connection is closed before CONNACK is received
  * (`WebSocketMqttClient` also when the connection cannot be opened), and by `subscribe()` and `unsubscribe()` when it is
@@ -138,6 +140,80 @@ export class PacketTooLargeError extends Error {
   /** Creates the error with the given details. */
   constructor(message: string) {
     super(`packet too large: ${message}`);
+  }
+}
+
+/**
+ * The call asks for something that the broker said in CONNACK (MQTT 5.0) it does not support. The call rejects with one of
+ * the subclasses, which tell what is not supported, and nothing is sent: the broker would treat it as a Protocol Error and
+ * close the connection. Catch this class to handle all of them at once.
+ *
+ * What the broker supports is that of the connection that is open now, and can differ after reconnecting.
+ */
+export class NotSupportedByBrokerError extends Error {
+  readonly #className = 'NotSupportedByBrokerError';
+  /** Creates the error with the given details. */
+  constructor(message: string) {
+    super(message);
+  }
+}
+
+/**
+ * `publish()` was called with a QoS higher than the Maximum QoS of the broker (CONNACK). Publish with `maximumQoS`, or lower.
+ */
+export class QoSNotSupportedError extends NotSupportedByBrokerError {
+  readonly #className = 'QoSNotSupportedError';
+  /** The highest QoS the broker supports: `Mqtt.QoS.AT_MOST_ONCE` or `Mqtt.QoS.AT_LEAST_ONCE`. */
+  readonly maximumQoS: Mqtt.QoS;
+  /** Creates the error for the QoS that was requested and the Maximum QoS of the broker. */
+  constructor(qos: number, maximumQoS: Mqtt.QoS) {
+    super(`QoS not supported: qos ${qos} is higher than the Maximum QoS ${maximumQoS} of the broker`);
+    this.maximumQoS = maximumQoS;
+  }
+}
+
+/** `publish()` was called with `retain: true`, but the broker does not support retained messages (Retain Available is 0 in CONNACK). */
+export class RetainNotSupportedError extends NotSupportedByBrokerError {
+  readonly #className = 'RetainNotSupportedError';
+  /** Creates the error. */
+  constructor() {
+    super('retain not supported: the broker does not support retained messages (Retain Available is 0)');
+  }
+}
+
+/**
+ * `subscribe()` was called with a topic filter that has a wildcard (`+` or `#`), but the broker does not support
+ * wildcard subscriptions (Wildcard Subscription Available is 0 in CONNACK).
+ */
+export class WildcardSubscriptionsNotSupportedError extends NotSupportedByBrokerError {
+  readonly #className = 'WildcardSubscriptionsNotSupportedError';
+  /** Creates the error for the topic filter that was requested. */
+  constructor(topicFilter: string) {
+    super(`wildcard subscriptions not supported: ${JSON.stringify(topicFilter)} has a wildcard (Wildcard Subscription Available is 0)`);
+  }
+}
+
+/**
+ * `subscribe()` was called with a Subscription Identifier, but the broker does not support them
+ * (Subscription Identifiers Available is 0 in CONNACK).
+ */
+export class SubscriptionIdentifiersNotSupportedError extends NotSupportedByBrokerError {
+  readonly #className = 'SubscriptionIdentifiersNotSupportedError';
+  /** Creates the error. */
+  constructor() {
+    super('subscription identifiers not supported: the broker does not support them (Subscription Identifiers Available is 0)');
+  }
+}
+
+/**
+ * `subscribe()` was called with a shared subscription (`$share/...`), but the broker does not support them
+ * (Shared Subscription Available is 0 in CONNACK).
+ */
+export class SharedSubscriptionsNotSupportedError extends NotSupportedByBrokerError {
+  readonly #className = 'SharedSubscriptionsNotSupportedError';
+  /** Creates the error for the topic filter that was requested. */
+  constructor(topicFilter: string) {
+    super(`shared subscriptions not supported: ${JSON.stringify(topicFilter)} is a shared subscription (Shared Subscription Available is 0)`);
   }
 }
 

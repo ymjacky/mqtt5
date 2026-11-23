@@ -1,4 +1,4 @@
-import { Mqtt, MqttClient, MqttPackets, MqttProperties } from '../../../deno/mod.ts';
+import { ClientErrors, Mqtt, MqttClient, MqttProperties } from '../../../deno/mod.ts';
 import { TestBroker } from '../broker/test_broker.ts';
 import { assertEquals, assertExists, assertRejects, fail } from 'std/assert/mod.ts';
 
@@ -160,7 +160,8 @@ Deno.test({ name: '@closing', only: false }, async (context) => {
           broker.sendConnack(packet.clientId, false, packet.protocolVersion);
         });
 
-        await client.connect();
+        // DISCONNECT can have a Session Expiry Interval other than 0 only when CONNECT has one.
+        await client.connect({ properties: { sessionExpiryInterval: 600 } });
 
         const properties: MqttProperties.DisconnectProperties = {
           reasonString: 'trouble',
@@ -411,7 +412,8 @@ Deno.test({ name: '@closing', only: false }, async (context) => {
             reject('Disconnect packet has not been verified');
           }
         });
-        client.connect();
+        // DISCONNECT can have a Session Expiry Interval other than 0 only when CONNECT has one.
+        client.connect({ properties: { sessionExpiryInterval: 600 } });
 
         await promise;
       } catch (err) {
@@ -459,7 +461,7 @@ Deno.test({ name: '@closing DISCONNECT that cannot be sent as is', only: false }
   );
 
   await context.step(
-    'a DISCONNECT that cannot be encoded rejects, and the next disconnect() does not wait for it',
+    'a DISCONNECT with an invalid property rejects, and the next disconnect() does not wait for it',
     async () => {
       const broker = new TestBroker();
       try {
@@ -477,10 +479,10 @@ Deno.test({ name: '@closing DISCONNECT that cannot be sent as is', only: false }
         const client = new MqttClient({ clientId: 'cid', logger: logger });
         await client.connect();
 
-        // A Reason String longer than 65,535 bytes cannot be encoded: its length is a Two Byte Integer.
+        // A Reason String longer than 65,535 bytes is invalid: its length is a Two Byte Integer.
         await assertRejects(
           () => client.disconnect(false, { reasonString: 'a'.repeat(0x10000) }),
-          MqttPackets.MqttPacketsError.MqttPacketSerializeError,
+          ClientErrors.InvalidPropertyError,
         );
         assertEquals(received, []);
 
@@ -495,3 +497,68 @@ Deno.test({ name: '@closing DISCONNECT that cannot be sent as is', only: false }
     },
   );
 }); // @closing DISCONNECT that cannot be sent as is
+
+Deno.test({ name: '@closing DISCONNECT properties are checked before anything is sent', only: false }, async (context) => {
+  /** Runs `test` with a connected client. The broker records the properties of the DISCONNECT it receives, and closes the connection. */
+  async function withClient(
+    connectOptions: Parameters<MqttClient['connect']>[0],
+    protocolVersion: Mqtt.ProtocolVersion,
+    test: (client: MqttClient, received: (MqttProperties.DisconnectProperties | undefined)[]) => Promise<void>,
+  ) {
+    const broker = new TestBroker();
+    const client = new MqttClient({ clientId: 'cid', logger, protocolVersion });
+    try {
+      broker.listen();
+      broker.on('connect', (event) => {
+        const packet = event.detail;
+        broker.sendConnack(packet.clientId, false, packet.protocolVersion);
+      });
+      const received: (MqttProperties.DisconnectProperties | undefined)[] = [];
+      broker.on('disconnect', (event) => {
+        received.push(event.detail.properties);
+        broker.closeConnectionFromBroker('cid');
+      });
+      await client.connect(connectOptions);
+      await test(client, received);
+    } finally {
+      await client.disconnect(true);
+      await broker.destroy();
+    }
+  }
+
+  await context.step(
+    'a Session Expiry Interval other than 0 rejects with InvalidPropertyError when CONNECT has none, and the connection stays open',
+    async () => {
+      await withClient(undefined, Mqtt.ProtocolVersion.MQTT_V5, async (client, received) => {
+        // MQTT 5.0 3.14.2.2.2: the broker would not treat this DISCONNECT as valid, and would publish the will message.
+        await assertRejects(() => client.disconnect(false, { sessionExpiryInterval: 300 }), ClientErrors.InvalidPropertyError);
+        assertEquals(received, []);
+
+        // 0 can be sent, as in CONNECT.
+        await client.disconnect(false, { sessionExpiryInterval: 0 });
+        assertEquals(received, [{ sessionExpiryInterval: 0 }]);
+      });
+    },
+  );
+
+  await context.step('a Session Expiry Interval other than 0 rejects also when that of CONNECT is 0', async () => {
+    await withClient({ properties: { sessionExpiryInterval: 0 } }, Mqtt.ProtocolVersion.MQTT_V5, async (client, received) => {
+      await assertRejects(() => client.disconnect(false, { sessionExpiryInterval: 300 }), ClientErrors.InvalidPropertyError);
+      assertEquals(received, []);
+    });
+  });
+
+  await context.step('a Reason String with U+0000 rejects with InvalidPropertyError', async () => {
+    await withClient(undefined, Mqtt.ProtocolVersion.MQTT_V5, async (client, received) => {
+      await assertRejects(() => client.disconnect(false, { reasonString: 'a\u0000b' }), ClientErrors.InvalidPropertyError);
+      assertEquals(received, []);
+    });
+  });
+
+  await context.step('MQTT 3.1.1: DISCONNECT has no properties, so they are not checked', async () => {
+    await withClient(undefined, Mqtt.ProtocolVersion.MQTT_V3_1_1, async (client, received) => {
+      await client.disconnect(false, { sessionExpiryInterval: 300 });
+      assertEquals(received, [undefined]);
+    });
+  });
+}); // @closing DISCONNECT properties are checked before anything is sent

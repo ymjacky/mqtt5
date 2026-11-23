@@ -8,7 +8,17 @@
 
 import { Mqtt, MqttProperties, MqttUtils } from '../mod.ts';
 import { ConnectOptions, SubscriptionOption } from './client_types.ts';
-import { InvalidArgumentError, InvalidPropertyError, InvalidTopicFilterError, InvalidTopicNameError } from './error.ts';
+import {
+  InvalidArgumentError,
+  InvalidPropertyError,
+  InvalidTopicFilterError,
+  InvalidTopicNameError,
+  QoSNotSupportedError,
+  RetainNotSupportedError,
+  SharedSubscriptionsNotSupportedError,
+  SubscriptionIdentifiersNotSupportedError,
+  WildcardSubscriptionsNotSupportedError,
+} from './error.ts';
 
 const sharedSubscriptionPrefix = '$share/';
 
@@ -190,6 +200,8 @@ const propertyRules: Partial<Record<keyof MqttProperties.Properties, PropertyRul
   authenticationMethod: utf8String, // id: 0x15
   authenticationData: binaryData, // id: 0x16
   willDelayInterval: integerIn(0, maxFourByteInteger), // id: 0x18
+  serverReference: utf8String, // id: 0x1C
+  reasonString: utf8String, // id: 0x1F
   receiveMaximum: integerIn(1, maxTwoByteInteger), // id: 0x21, 0 is a Protocol Error
   topicAliasMaximum: integerIn(0, maxTwoByteInteger), // id: 0x22
   userProperties, // id: 0x26
@@ -236,6 +248,83 @@ export function validatePublish(
   }
   if (isMqtt5(protocolVersion)) {
     validateProperties(properties, 'properties');
+  }
+}
+
+/**
+ * What the broker accepts from the client on a connection, as it said in CONNACK. The broker treats what it does not
+ * accept as a Protocol Error and closes the connection.
+ */
+export type BrokerCapabilities = {
+  /** The Maximum QoS of CONNACK. Every QoS level is supported if undefined. */
+  maximumQoS?: Mqtt.QoS;
+  /** The Retain Available of CONNACK: whether retained messages are supported. */
+  retainAvailable: boolean;
+  /** The Wildcard Subscription Available of CONNACK: whether topic filters with `+` or `#` are supported. */
+  wildcardSubscriptionAvailable: boolean;
+  /** The Subscription Identifiers Available of CONNACK: whether Subscription Identifiers are supported. */
+  subscriptionIdentifiersAvailable: boolean;
+  /** The Shared Subscription Available of CONNACK: whether `$share/...` subscriptions are supported. */
+  sharedSubscriptionAvailable: boolean;
+};
+
+/** What a broker that restricts nothing accepts: before CONNACK, with MQTT 3.1.1, and for a CONNACK without these properties. */
+export const unrestrictedBroker: Readonly<BrokerCapabilities> = {
+  retainAvailable: true,
+  wildcardSubscriptionAvailable: true,
+  subscriptionIdentifiersAvailable: true,
+  sharedSubscriptionAvailable: true,
+};
+
+/** The capabilities of the broker from the properties of its CONNACK. An absent property means that it is supported. */
+export function brokerCapabilitiesOf(properties: MqttProperties.ConnackProperties | undefined): BrokerCapabilities {
+  return {
+    maximumQoS: properties?.maximumQoS,
+    retainAvailable: properties?.retainAvailable ?? true,
+    wildcardSubscriptionAvailable: properties?.wildcardSubscriptionAvailable ?? true,
+    subscriptionIdentifiersAvailable: properties?.subscriptionIdentifiersAvailable ?? true,
+    sharedSubscriptionAvailable: properties?.sharedSubscriptionAvailable ?? true,
+  };
+}
+
+/**
+ * Checks that the broker accepts the QoS and the Retain flag of a PUBLISH.
+ * @param qos the QoS that is sent.
+ * @param retain the Retain flag that is sent.
+ * @throws {QoSNotSupportedError} if `qos` is higher than the Maximum QoS [MQTT-3.2.2-11].
+ * @throws {RetainNotSupportedError} if `retain` is true and retained messages are not supported [MQTT-3.2.2-14].
+ */
+export function validatePublishCapabilities(qos: number, retain: boolean, capabilities: BrokerCapabilities): void {
+  if (capabilities.maximumQoS !== undefined && qos > capabilities.maximumQoS) {
+    throw new QoSNotSupportedError(qos, capabilities.maximumQoS);
+  }
+  if (retain && !capabilities.retainAvailable) {
+    throw new RetainNotSupportedError();
+  }
+}
+
+/**
+ * Checks that the broker supports what the subscriptions and properties of a SUBSCRIBE use: wildcards, shared subscriptions
+ * and a Subscription Identifier (MQTT 5.0 3.2.2.3.11 to 3.2.2.3.13). The Topic Filters are valid: see {@link validateSubscribe}.
+ * @throws {WildcardSubscriptionsNotSupportedError}
+ * @throws {SharedSubscriptionsNotSupportedError}
+ * @throws {SubscriptionIdentifiersNotSupportedError}
+ */
+export function validateSubscribeCapabilities(
+  subscriptions: SubscriptionOption[],
+  properties: MqttProperties.SubscribeProperties | undefined,
+  capabilities: BrokerCapabilities,
+): void {
+  for (const { topicFilter } of subscriptions) {
+    if (!capabilities.sharedSubscriptionAvailable && topicFilter.startsWith(sharedSubscriptionPrefix)) {
+      throw new SharedSubscriptionsNotSupportedError(topicFilter);
+    }
+    if (!capabilities.wildcardSubscriptionAvailable && (topicFilter.includes('+') || topicFilter.includes('#'))) {
+      throw new WildcardSubscriptionsNotSupportedError(topicFilter);
+    }
+  }
+  if (!capabilities.subscriptionIdentifiersAvailable && typeof properties?.subscriptionIdentifier !== 'undefined') {
+    throw new SubscriptionIdentifiersNotSupportedError();
   }
 }
 
@@ -322,5 +411,30 @@ export function validateConnect(options: ConnectOptions | undefined, protocolVer
   }
   if (mqtt5) {
     validateProperties(will.properties, 'will.properties');
+  }
+}
+
+/**
+ * Checks the properties of disconnect() (MQTT 5.0; MQTT 3.1.1 DISCONNECT has none, so they are not sent there).
+ * A Session Expiry Interval other than 0 cannot be set when the Session Expiry Interval of CONNECT was 0 or absent:
+ * the broker would not treat the DISCONNECT as valid, and would publish the Will Message (MQTT 5.0 3.14.2.2.2).
+ * The rule is about the value the client sent in CONNECT, also when the broker uses another one (CONNACK).
+ * @param connectProperties the properties of the CONNECT of the current connection.
+ * @throws {InvalidPropertyError}
+ */
+export function validateDisconnect(
+  properties: MqttProperties.DisconnectProperties | undefined,
+  connectProperties: MqttProperties.ConnectProperties | undefined,
+  protocolVersion: Mqtt.ProtocolVersion,
+): void {
+  if (!isMqtt5(protocolVersion)) {
+    return;
+  }
+  validateProperties(properties, 'properties');
+  const sessionExpiryInterval = properties?.sessionExpiryInterval;
+  if (sessionExpiryInterval !== undefined && sessionExpiryInterval !== 0 && !connectProperties?.sessionExpiryInterval) {
+    throw new InvalidPropertyError(
+      `properties.sessionExpiryInterval must be 0 or absent, as the Session Expiry Interval of CONNECT was 0 or absent (got ${sessionExpiryInterval})`,
+    );
   }
 }

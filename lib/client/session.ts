@@ -4,6 +4,9 @@ import { Deferred } from './promise.ts';
 import { ConnectionClosed, SessionLostError } from './error.ts';
 import { PublishResult, SubscribeResults, UnsubscribeResults } from './client_types.ts';
 
+// The Receive Maximum of a CONNACK that has none (MQTT 5.0 3.2.2.3.2), and of MQTT 3.1.1, which has no flow control.
+const defaultReceiveMaximum = 65535;
+
 export class Session {
   private sessionId: string;
 
@@ -13,6 +16,16 @@ export class Session {
   private inflightUnsubscribe: Map<number, Deferred<UnsubscribeResults>>;
 
   private outgoingStore: OutgoingStore;
+
+  // The packet IDs of the QoS 1 / QoS 2 flows that use the send quota of the current connection (MQTT 5.0 4.9): their PUBLISH
+  // has been sent on it, or is about to be, and no PUBACK, PUBCOMP, or PUBREC with an error Reason Code has been received for
+  // them. At most `receiveMaximum` PUBLISH packets may be in flight at a time [MQTT-3.3.4-7]. Each connection starts with the
+  // whole quota: a flow kept in the session uses it again when its packet is resent on the connection.
+  private quotaFlows = new Set<number>();
+  // The Receive Maximum of the broker for the current connection.
+  private receiveMaximum = defaultReceiveMaximum;
+  // The publish() calls and the resending that wait for a flow to complete (see waitForSendQuota()).
+  private sendQuotaWaiters: Deferred<void>[] = [];
 
   constructor(sessionId: string, outgoingStore?: OutgoingStore) {
     this.sessionId = sessionId;
@@ -36,6 +49,64 @@ export class Session {
     return await this.packetIdProvider.acquire();
   }
 
+  /**
+   * Acquires the packet ID of a QoS 1 / QoS 2 PUBLISH, which is sent on the current connection right after. Its flow uses
+   * the send quota of the connection until it completes, or until the packet ID is released.
+   */
+  public async acquirePublishPacketId() {
+    const packetId = await this.packetIdProvider.acquire();
+    this.quotaFlows.add(packetId);
+    return packetId;
+  }
+
+  /**
+   * Starts the send quota of the connection that has just been established: no flow uses it yet (MQTT 5.0 4.9).
+   * @param receiveMaximum the Receive Maximum of CONNACK. 65,535 if absent. 0 is a Protocol Error of the broker: it is
+   * treated as absent, as it would stop publishing for good.
+   */
+  public resetSendQuota(receiveMaximum: number | undefined) {
+    this.receiveMaximum = receiveMaximum ? receiveMaximum : defaultReceiveMaximum;
+    this.quotaFlows.clear();
+    this.wakeSendQuotaWaiters();
+  }
+
+  /**
+   * Counts a flow kept in the session against the send quota of the current connection, when its packet is resent on it.
+   * A PUBREL is counted too: the broker keeps the flow in flight until it sends PUBCOMP.
+   * @returns false if the flow has ended meanwhile, e.g. the broker has acknowledged it: its packet must not be resent then.
+   */
+  public useSendQuota(packetId: number): boolean {
+    if (!this.packetIdProvider.inUse(packetId)) {
+      return false;
+    }
+    this.quotaFlows.add(packetId);
+    return true;
+  }
+
+  /**
+   * Waits until fewer than Receive Maximum flows use the send quota of the connection, so that one more QoS 1 / QoS 2 PUBLISH
+   * can be sent [MQTT-3.3.4-7]. The PUBACK, PUBCOMP or PUBREC with an error Reason Code that ends a flow lets it go on.
+   * It returns at once when the connection is closed, and the caller has to check that: the flows that are left are resent
+   * after reconnecting, and nothing may be sent on a connection that is closed.
+   * @param connectionOpen whether the connection is still open. It is checked again each time the wait ends.
+   */
+  public async waitForSendQuota(connectionOpen: () => boolean) {
+    while (connectionOpen() && this.quotaFlows.size >= this.receiveMaximum) {
+      const waiter = new Deferred<void>();
+      this.sendQuotaWaiters.push(waiter);
+      await waiter.promise;
+    }
+  }
+
+  /** Ends the wait in waitForSendQuota(): the waiting calls check again whether they can go on. */
+  public wakeSendQuotaWaiters() {
+    const waiters = this.sendQuotaWaiters;
+    this.sendQuotaWaiters = [];
+    for (const waiter of waiters) {
+      waiter.resolve();
+    }
+  }
+
   public async clearAllStores(newSessionId?: string) {
     if (newSessionId) {
       this.sessionId = newSessionId;
@@ -51,6 +122,19 @@ export class Session {
     this.inflightSubscribe.clear();
     this.inflightUnsubscribe.clear();
     this.packetIdProvider.clear();
+    this.quotaFlows.clear();
+    this.wakeSendQuotaWaiters();
+  }
+
+  /**
+   * Releases a packet ID. If its flow used the send quota of the connection, it no longer does, and a waiting publish()
+   * or resend may go on.
+   */
+  private release(packetId: number) {
+    this.packetIdProvider.release(packetId);
+    if (this.quotaFlows.delete(packetId)) {
+      this.wakeSendQuotaWaiters();
+    }
   }
 
   /**
@@ -60,7 +144,7 @@ export class Session {
   public abortSubscribeRequests() {
     for (const [packetId, deferred] of [...this.inflightSubscribe, ...this.inflightUnsubscribe]) {
       deferred.reject(new ConnectionClosed());
-      this.packetIdProvider.release(packetId);
+      this.release(packetId);
     }
     this.inflightSubscribe.clear();
     this.inflightUnsubscribe.clear();
@@ -68,7 +152,7 @@ export class Session {
 
   /** Releases a packet ID that was acquired for a packet that is not sent. */
   public releasePacketId(packetId: number) {
-    this.packetIdProvider.release(packetId);
+    this.release(packetId);
   }
 
   /**
@@ -77,7 +161,7 @@ export class Session {
    */
   public async discardPublishFlow(packetId: number, reason: Error) {
     await this.outgoingStore.discard(packetId);
-    this.packetIdProvider.release(packetId);
+    this.release(packetId);
     this.getPublishDeferred(packetId)?.reject(reason);
   }
 
@@ -85,7 +169,7 @@ export class Session {
   public discardSubscribeRequest(packetId: number) {
     this.inflightSubscribe.delete(packetId);
     this.inflightUnsubscribe.delete(packetId);
-    this.packetIdProvider.release(packetId);
+    this.release(packetId);
   }
 
   public async packetIdInUse(packetId: number) {
@@ -103,10 +187,14 @@ export class Session {
   public async endPublishFlow(packetId: number): Promise<Deferred<PublishResult> | undefined> {
     await this.outgoingStore.discard(packetId);
     const deferred = this.getPublishDeferred(packetId);
-    this.packetIdProvider.release(packetId);
+    this.release(packetId);
     return deferred;
   }
 
+  /**
+   * Iterates over the stored PUBLISH and PUBREL packets to resend after reconnecting, and registers their packet IDs as in use.
+   * They use the send quota of the connection only when they are resent: see useSendQuota().
+   */
   public async *resendTargets(): AsyncIterable<MqttPackets.PublishPacket | MqttPackets.PubrelPacket> {
     for await (const packet of this.outgoingStore.resendIterator()) {
       if (packet.type === 'publish') {

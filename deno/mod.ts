@@ -239,7 +239,7 @@
  *   outgoingStore: new KvOutgoingStore(kv),
  * });
  *
- * // Resolves after the messages a previous process left have been resent.
+ * // The messages a previous process left are resent after connect() resolves, before the message of this publish().
  * await client.connect({ properties: { sessionExpiryInterval: 3600 } });
  * await client.publish('topicA', 'payload', { qos: Mqtt.QoS.AT_LEAST_ONCE });
  *
