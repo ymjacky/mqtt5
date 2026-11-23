@@ -1,5 +1,4 @@
 import { LruCache } from '../cache/mod.ts';
-import { ReuseIdProvider } from '../id_provider/mod.ts';
 
 /**
  * Assigns topic aliases to the topics of sent PUBLISH packets, on one connection.
@@ -7,11 +6,14 @@ import { ReuseIdProvider } from '../id_provider/mod.ts';
  * so the aliases follow the order in which the packets are written.
  */
 export class TopicAliasManager {
-  private topicIdProvider: ReuseIdProvider;
+  /** The alias of each topic that has one. */
   private topicAliasMap: LruCache<string, number>;
+  /** Aliases given back by releaseTopic(), used again before new ones. */
+  private releasedTopicIds: number[] = [];
+  /** The lowest alias not given yet. The aliases are 1 to the Topic Alias Maximum. */
+  private nextTopicId = 1;
 
   constructor(topicAliasMaximum: number) {
-    this.topicIdProvider = new ReuseIdProvider(1, topicAliasMaximum);
     this.topicAliasMap = new LruCache<string, number>(topicAliasMaximum);
   }
 
@@ -19,49 +21,42 @@ export class TopicAliasManager {
     return this.topicAliasMap.capacity();
   }
 
-  private isFull() {
-    return this.topicAliasMap.size() == this.topicAliasMap.capacity();
-  }
-
   /**
    * Returns the topic alias of the topic. A topic without one gets a new alias,
-   * replacing the least used topic when all aliases are in use.
+   * replacing the least recently used topic when all aliases are in use.
    * @returns whether the alias is new, and the alias.
    * A new alias must be sent with the Topic Name; it can be sent without it after that PUBLISH has been written.
    */
   public getTopicId(topic: string): [boolean, number] {
     const topicId = this.topicAliasMap.get(topic);
-    if (topicId) {
+    if (topicId !== undefined) {
       return [false, topicId];
     }
-    return [true, this.registerTopic(topic)];
+    const newTopicId = this.freeTopicId();
+    // When all aliases are in use, this replaces the least recently used topic, whose alias freeTopicId() returned.
+    this.topicAliasMap.set(topic, newTopicId);
+    return [true, newTopicId];
   }
 
-  private registerTopic(topic: string) {
-    if (this.isFull()) {
-      const lruTopic = this.topicAliasMap.lruKey();
-      if (lruTopic) {
-        const tid = this.topicAliasMap.get(lruTopic);
-        if (tid) {
-          this.topicIdProvider.release(tid);
-        }
-        this.topicAliasMap.delete(lruTopic);
-      }
+  /** Returns an alias that no topic has, or the alias of the least recently used topic when all aliases are in use. */
+  private freeTopicId(): number {
+    const released = this.releasedTopicIds.pop();
+    if (released !== undefined) {
+      return released;
     }
-
-    const topicId = this.topicIdProvider.acquire();
-    this.topicAliasMap.set(topic, topicId);
-    return topicId;
+    if (this.nextTopicId <= this.topicAliasMap.capacity()) {
+      return this.nextTopicId++;
+    }
+    const [, lruTopicId] = this.topicAliasMap.entries().next().value as [string, number];
+    return lruTopicId;
   }
 
   /** Removes the topic alias of the topic, e.g. when the PUBLISH that registers it is not sent. */
   public releaseTopic(topic: string) {
-    if (this.topicAliasMap.has(topic)) {
-      const topicId = this.topicAliasMap.get(topic);
-      if (topicId) {
-        this.topicIdProvider.release(topicId);
-        this.topicAliasMap.delete(topic);
-      }
+    const topicId = this.topicAliasMap.get(topic);
+    if (topicId !== undefined) {
+      this.topicAliasMap.delete(topic);
+      this.releasedTopicIds.push(topicId);
     }
   }
 }
