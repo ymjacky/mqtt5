@@ -13,7 +13,18 @@ import {
   StateIsNotOnlineError,
 } from './error.ts';
 import { Deferred } from './promise.ts';
-import { validateConnect, validatePublish, validateSubscribe, validateUnsubscribe } from './validation.ts';
+import {
+  type BrokerCapabilities,
+  brokerCapabilitiesOf,
+  unrestrictedBroker,
+  validateConnect,
+  validateDisconnect,
+  validatePublish,
+  validatePublishCapabilities,
+  validateSubscribe,
+  validateSubscribeCapabilities,
+  validateUnsubscribe,
+} from './validation.ts';
 import { IncomingMemoryStore, IncomingStore } from '../mqtt_store/mod.ts';
 import { createCustomEvent, CustomEventListener, CustomEventMap } from './events.ts';
 
@@ -40,6 +51,9 @@ type ConnectionStates =
   | 'online'
   // The client has sent DISCONNECT and waits for the connection to close. Nothing may be sent any more [MQTT-3.14.4-1].
   | 'disconnecting';
+
+/** A packet kept in the session, read to be resent after reconnecting, and its bytes. */
+type ResendTarget = { packet: PublishPacket | PubrelPacket; bytes: Uint8Array };
 
 const defaultKeepAlive = 10; // 10 sec
 const defaultConnectTimeout = 10 * 1000;
@@ -160,9 +174,14 @@ export abstract class BaseMqttClient {
   private topicAliasMapAboutReceive: Map<number, string>;
   // Maximum Packet Size of the broker (CONNACK) for the current connection. No limit if undefined.
   private maximumPacketSizeAboutSend?: number;
+  // What the broker accepts (Maximum QoS, Retain Available, ...) for the current connection, from CONNACK.
+  private brokerCapabilities: BrokerCapabilities = unrestrictedBroker;
   private waitForClose?: Deferred<void>;
   // Settles when the PUBLISH of the last publish() call has been written or has failed (see waitForPublishTurn()).
   private publishQueue: Promise<void> = Promise.resolve();
+  // The number of connections that have been closed. Work that belongs to one connection compares it to know whether
+  // that connection is still open (see connectionOpen()).
+  private closedConnections = 0;
 
   /** Creates a client. Use {@link MqttClient} or {@link WebSocketMqttClient}. */
   constructor(options?: ClientOptions) {
@@ -307,6 +326,9 @@ export abstract class BaseMqttClient {
    * When the broker rejects the connection, the client does not become online: it closes the connection, and the promise
    * resolves when the connection is closed.
    * After the client is closed, it can connect again with this method; it does not reconnect automatically.
+   * When the broker has kept the session (Session Present), the QoS 1 / QoS 2 messages in flight are resent after the promise
+   * resolves, in the order they were published and within the Receive Maximum of the broker; publish() calls made meanwhile
+   * are sent after them.
    * When the returned promise rejects, or resolves with a CONNACK that rejects the connection, the client is offline again,
    * so this method can be called again right away.
    * A rejection of an ignored promise does not terminate the process; await the promise to handle failures.
@@ -407,8 +429,9 @@ export abstract class BaseMqttClient {
       properties: connectProperties,
       will: options?.will,
     };
-    // The limit of the previous connection does not apply: the new one comes in CONNACK.
+    // The limits of the previous connection do not apply: the new ones come in CONNACK.
     this.maximumPacketSizeAboutSend = undefined;
+    this.brokerCapabilities = unrestrictedBroker;
     // Nor do the topic aliases of the broker: they are valid on one connection only.
     this.topicAliasMapAboutReceive.clear();
     // Encode before opening the connection: if it fails, nothing is opened or changed.
@@ -475,6 +498,15 @@ export abstract class BaseMqttClient {
    * Messages are sent in the order publish() is called, whatever their QoS: each PUBLISH is sent after the PUBLISH
    * of the previous call has been written to the connection, or has failed.
    *
+   * The broker limits, in CONNACK, what the client may send. QoS 1 and QoS 2: no more PUBLISH packets are in flight than its
+   * Receive Maximum (MQTT 5.0, 65,535 if it has none), so a call waits until the PUBACK or PUBCOMP of an earlier message
+   * arrives, and the calls after it wait too. If the connection is closed while waiting, the call rejects with `StateIsNotOnlineError`.
+   * After reconnecting, the messages in flight kept in the session are resent first, also within the Receive Maximum, and the
+   * calls wait for them.
+   * A QoS higher than the Maximum QoS of the broker, and `retain` when the broker does not support retained messages
+   * (Retain Available is 0), are rejected with {@link QoSNotSupportedError} and {@link RetainNotSupportedError}: the broker
+   * would close the connection.
+   *
    * @param topic topic name
    * @param payload payload. A string is encoded as UTF-8.
    * @param options {@link PublishOptions}: QoS, retain and DUP flags. QoS defaults to `Mqtt.QoS.AT_MOST_ONCE`.
@@ -483,6 +515,8 @@ export abstract class BaseMqttClient {
    * @throws {StateIsNotOnlineError} if the client is not connected.
    * @throws {InvalidTopicNameError} if `topic` or the Response Topic is not a valid Topic Name. Nothing is sent.
    * @throws {InvalidArgumentError} if the QoS is not 0, 1 or 2, or `dup` is true with QoS 0. Nothing is sent.
+   * @throws {QoSNotSupportedError} if the QoS is higher than the Maximum QoS of the broker (CONNACK). Nothing is sent.
+   * @throws {RetainNotSupportedError} if `retain` is true and the broker does not support retained messages. Nothing is sent.
    * @throws {InvalidPropertyError} if a property is invalid. Nothing is sent.
    * @throws {PacketTooLargeError} if PUBLISH is larger than the Maximum Packet Size of the broker or than MQTT allows,
    * or QoS 1 and 2: than the session store can keep. Nothing is sent.
@@ -555,8 +589,22 @@ export abstract class BaseMqttClient {
       if (this.connectionState !== 'online') {
         throw new StateIsNotOnlineError('publish');
       }
+      // Checked here, not before waiting for the turn: the connection may have been closed and opened again meanwhile,
+      // and the PUBLISH is sent on the current one.
+      validatePublishCapabilities(qos, retain, this.brokerCapabilities);
 
-      const packetId = qos === Mqtt.QoS.AT_MOST_ONCE ? 0 : await this.session.acquirePacketId();
+      if (qos !== Mqtt.QoS.AT_MOST_ONCE) {
+        // Do not send more QoS 1 / QoS 2 PUBLISH packets than the Receive Maximum of the broker allows [MQTT-3.3.4-7]:
+        // wait until an acknowledgment ends one. The turn is kept, so the publish() calls after this one wait too, in order.
+        const connectionOpen = this.connectionOpen();
+        await this.session.waitForSendQuota(connectionOpen);
+        // The connection may have been closed while waiting.
+        if (!connectionOpen()) {
+          throw new StateIsNotOnlineError('publish');
+        }
+      }
+
+      const packetId = qos === Mqtt.QoS.AT_MOST_ONCE ? 0 : await this.session.acquirePublishPacketId();
       // Without a topic alias: it is set right before writing.
       const packet: PublishPacket = {
         type: 'publish',
@@ -615,6 +663,16 @@ export abstract class BaseMqttClient {
   }
 
   /**
+   * Returns a function that tells whether the connection that is online now is still open. Work that waits on behalf of
+   * that connection, e.g. for its send quota, checks it: after a reconnect the client is online again, but on another
+   * connection.
+   */
+  private connectionOpen(): () => boolean {
+    const closedConnections = this.closedConnections;
+    return () => this.connectionState === 'online' && this.closedConnections === closedConnections;
+  }
+
+  /**
    * Sets the topic alias of the connection, if topic aliases are used, and encodes PUBLISH to write it.
    *
    * Call it right before writing, with no await in between. A topic alias is then resolved in the order the packets
@@ -665,6 +723,9 @@ export abstract class BaseMqttClient {
    * @throws {InvalidTopicFilterError} if a topic filter is invalid. Nothing is sent.
    * @throws {InvalidArgumentError} if no topic filter is given, or a QoS, Retain Handling or No Local is invalid. Nothing is sent.
    * @throws {InvalidPropertyError} if a property, e.g. the Subscription Identifier, is invalid. Nothing is sent.
+   * @throws {WildcardSubscriptionsNotSupportedError} if a topic filter has a wildcard and the broker does not support them. Nothing is sent.
+   * @throws {SharedSubscriptionsNotSupportedError} if a topic filter is a shared subscription and the broker does not support them. Nothing is sent.
+   * @throws {SubscriptionIdentifiersNotSupportedError} if a Subscription Identifier is set and the broker does not support them. Nothing is sent.
    * @throws {PacketTooLargeError} if SUBSCRIBE is larger than the Maximum Packet Size of the broker or than MQTT allows. Nothing is sent.
    * @throws {ConnectionClosed} if the connection is closed before SUBACK is received.
    * @example
@@ -693,6 +754,9 @@ export abstract class BaseMqttClient {
    * @throws {InvalidTopicFilterError} if a topic filter is invalid. Nothing is sent.
    * @throws {InvalidArgumentError} if no topic filter is given, or a QoS, Retain Handling or No Local is invalid. Nothing is sent.
    * @throws {InvalidPropertyError} if a property, e.g. the Subscription Identifier, is invalid. Nothing is sent.
+   * @throws {WildcardSubscriptionsNotSupportedError} if a topic filter has a wildcard and the broker does not support them. Nothing is sent.
+   * @throws {SharedSubscriptionsNotSupportedError} if a topic filter is a shared subscription and the broker does not support them. Nothing is sent.
+   * @throws {SubscriptionIdentifiersNotSupportedError} if a Subscription Identifier is set and the broker does not support them. Nothing is sent.
    * @throws {PacketTooLargeError} if SUBSCRIBE is larger than the Maximum Packet Size of the broker or than MQTT allows. Nothing is sent.
    * @throws {ConnectionClosed} if the connection is closed before SUBACK is received.
    * @example
@@ -721,6 +785,9 @@ export abstract class BaseMqttClient {
    * @throws {InvalidTopicFilterError} if a topic filter is invalid. Nothing is sent.
    * @throws {InvalidArgumentError} if no topic filter is given, or a QoS, Retain Handling or No Local is invalid. Nothing is sent.
    * @throws {InvalidPropertyError} if a property, e.g. the Subscription Identifier, is invalid. Nothing is sent.
+   * @throws {WildcardSubscriptionsNotSupportedError} if a topic filter has a wildcard and the broker does not support them. Nothing is sent.
+   * @throws {SharedSubscriptionsNotSupportedError} if a topic filter is a shared subscription and the broker does not support them. Nothing is sent.
+   * @throws {SubscriptionIdentifiersNotSupportedError} if a Subscription Identifier is set and the broker does not support them. Nothing is sent.
    * @throws {PacketTooLargeError} if SUBSCRIBE is larger than the Maximum Packet Size of the broker or than MQTT allows. Nothing is sent.
    * @throws {ConnectionClosed} if the connection is closed before SUBACK is received.
    * @example
@@ -749,6 +816,9 @@ export abstract class BaseMqttClient {
    * @throws {InvalidTopicFilterError} if a topic filter is invalid. Nothing is sent.
    * @throws {InvalidArgumentError} if no topic filter is given, or a QoS, Retain Handling or No Local is invalid. Nothing is sent.
    * @throws {InvalidPropertyError} if a property, e.g. the Subscription Identifier, is invalid. Nothing is sent.
+   * @throws {WildcardSubscriptionsNotSupportedError} if a topic filter has a wildcard and the broker does not support them. Nothing is sent.
+   * @throws {SharedSubscriptionsNotSupportedError} if a topic filter is a shared subscription and the broker does not support them. Nothing is sent.
+   * @throws {SubscriptionIdentifiersNotSupportedError} if a Subscription Identifier is set and the broker does not support them. Nothing is sent.
    * @throws {PacketTooLargeError} if SUBSCRIBE is larger than the Maximum Packet Size of the broker or than MQTT allows. Nothing is sent.
    * @throws {ConnectionClosed} if the connection is closed before SUBACK is received.
    * @example
@@ -810,6 +880,7 @@ export abstract class BaseMqttClient {
         : { topicFilter: sub, qos: qos ?? Mqtt.QoS.AT_MOST_ONCE };
     });
     validateSubscribe(subs, properties, this.protocolVersion);
+    validateSubscribeCapabilities(subs, properties, this.brokerCapabilities);
 
     const packet: SubscribePacket = {
       type: 'subscribe',
@@ -944,10 +1015,13 @@ export abstract class BaseMqttClient {
    * If a disconnect is already in progress, waits for the same close without sending DISCONNECT again;
    * with `force`, closes the connection now instead of waiting for the broker. `properties` of this call are ignored.
    * The Reason String and User Properties are left out if they make DISCONNECT larger than the Maximum Packet Size of the broker.
-   * If DISCONNECT cannot be encoded, e.g. a property is invalid, the promise rejects, nothing is sent and the connection stays open.
+   * If a property is invalid, or DISCONNECT cannot be encoded, the promise rejects, nothing is sent and the connection stays open.
    *
    * @param force `true` to close without sending DISCONNECT.
-   * @param properties MQTT 5.0 DISCONNECT properties ({@link MqttProperties.DisconnectProperties}).
+   * @param properties MQTT 5.0 DISCONNECT properties ({@link MqttProperties.DisconnectProperties}). A Session Expiry Interval
+   * other than 0 can be set only when the Session Expiry Interval of CONNECT was not 0 (and not absent).
+   * @throws {InvalidPropertyError} if a property is invalid, e.g. a Session Expiry Interval other than 0 when that of CONNECT
+   * was 0 or absent: the broker would not treat DISCONNECT as valid, and would publish the will message. Nothing is sent.
    * @example
    * normal disconnection
    * ```ts
@@ -963,6 +1037,8 @@ export abstract class BaseMqttClient {
    * import { MqttClient, MqttProperties } from '@ymjacky/mqtt5';
    *
    * const client = new MqttClient();
+   * // The Session Expiry Interval can be changed in DISCONNECT because CONNECT has one other than 0.
+   * await client.connect({ properties: { sessionExpiryInterval: 3600 } });
    *
    * const properties: MqttProperties.DisconnectProperties = {
    *   reasonString: 'trouble',
@@ -1025,6 +1101,9 @@ export abstract class BaseMqttClient {
         if (force) {
           await this.doDisconnect(true);
         } else {
+          // Checked before waiting for the publish() calls made before: if a property is invalid, nothing is sent and the
+          // connection stays open. The rules depend on the CONNECT of the connection, which is known now.
+          validateDisconnect(properties, this.connectProperties, this.protocolVersion);
           // Nothing may be sent after DISCONNECT [MQTT-3.14.4-1]. Take a turn in the publish queue: the messages of the
           // publish() calls made before are sent first, and the calls made after wait until DISCONNECT is sent, and reject.
           const publishTurnFinished = await this.waitForPublishTurn();
@@ -1231,6 +1310,7 @@ export abstract class BaseMqttClient {
     this.refusedConnack = undefined;
     this.abortConnect = undefined;
     this.connectionState = 'offline';
+    this.closedConnections++;
     this.stopConnectTimer();
     this.stopDisconnectTimer();
     this.stopKeepAliveTimer();
@@ -1238,6 +1318,8 @@ export abstract class BaseMqttClient {
 
     // SUBACK and UNSUBACK will not arrive: SUBSCRIBE and UNSUBSCRIBE are not resent after reconnecting.
     this.session.abortSubscribeRequests();
+    // A publish() or the resending waiting for the send quota stops waiting: the connection is closed.
+    this.session.wakeSendQuotaWaiters();
 
     if (this.waitForClose) {
       this.waitForClose.resolve();
@@ -1345,6 +1427,11 @@ export abstract class BaseMqttClient {
     }
 
     this.connectionState = 'online';
+    // What the broker accepts is set together with the state, with no await in between: publish(), subscribe() and
+    // unsubscribe() can be called from now on, and check it. A property that is absent means that it is supported;
+    // MQTT 3.1.1 has none of these properties.
+    this.brokerCapabilities = brokerCapabilitiesOf(packet.properties);
+    this.maximumPacketSizeAboutSend = packet.properties?.maximumPacketSize;
     // publish() can be called from now on. Take a turn in the publish queue before any await: the calls wait until
     // the session and the settings of the connection are updated and the packets kept in the session are resent.
     // Otherwise a new PUBLISH could be written before the resent ones, or get the packet ID of a stored packet
@@ -1354,13 +1441,13 @@ export abstract class BaseMqttClient {
     // as connect() may have been called again.
     const connectPending = () => this.unresolvedConnect === pendingConnect;
 
-    let sessionStarted = false;
+    let resendTargets: ResendTarget[] | undefined;
     const publishTurnFinished = await publishTurn;
     try {
-      sessionStarted = await this.startSession(packet, connectPending);
+      resendTargets = await this.startSession(packet, connectPending);
     } catch (err) {
       if (connectPending()) {
-        // The session cannot be used as it is, e.g. the store could not be cleared: do not go on with this connection.
+        // The session cannot be used as it is, e.g. the store could not be cleared or read: do not go on with this connection.
         // connect() rejects with the error when the connection is closed (detectClosed()).
         this.log('cannot update the session on CONNACK, ending the connection', err);
         this.connectFailure = err instanceof Error ? err : new Error(String(err));
@@ -1369,11 +1456,16 @@ export abstract class BaseMqttClient {
         this.log('error after the connection of the CONNACK was closed:', err);
       }
     } finally {
-      publishTurnFinished();
+      // On success, the turn is kept for the resending below.
+      if (!resendTargets) {
+        publishTurnFinished();
+      }
     }
-    if (!sessionStarted) {
+    if (!resendTargets) {
       return;
     }
+    // Taken before connect() resolves and the `connack` event is emitted: the resending belongs to this connection only.
+    const connectionOpen = this.connectionOpen();
 
     this.unresolvedConnect = undefined;
     pendingConnect.resolve(packet);
@@ -1383,18 +1475,28 @@ export abstract class BaseMqttClient {
     );
 
     this.startKeepAliveTimer();
+
+    // The packets kept in the session are resent after connect() has resolved, not before: a PUBLISH may have to wait for
+    // the send quota, which only the acknowledgments handled after this CONNACK give back. The turn is kept until they have
+    // been sent, so the publish() calls made meanwhile are sent after them.
+    this.resendInOrder(resendTargets, connectionOpen)
+      .catch((err) => this.log('error while resending the packets kept in the session:', err))
+      .finally(publishTurnFinished);
   }
 
   /**
    * Updates the session and the settings of the connection from a CONNACK that accepts the connection,
-   * and resends the packets kept in the session.
+   * and reads the packets kept in the session to resend.
    * @param connectPending whether connect() is still waiting: false once the connection has been closed.
-   * @returns false if the connection was closed meanwhile.
+   * @returns the packets to resend, in the order they were stored; undefined if the connection was closed meanwhile.
    */
-  private async startSession(packet: ConnackPacket, connectPending: () => boolean): Promise<boolean> {
+  private async startSession(packet: ConnackPacket, connectPending: () => boolean): Promise<ResendTarget[] | undefined> {
     if (!connectPending()) {
-      return false;
+      return undefined;
     }
+    // A new connection starts with the whole send quota of the Receive Maximum of the broker (65,535 if absent). Reset here,
+    // with the turn of the publish queue: no publish() of the previous connection is sending any more.
+    this.session.resetSendQuota(packet.properties?.receiveMaximum);
     // server generates clientId
     if (packet.properties?.assignedClientIdentifier) {
       this.clientId = packet.properties.assignedClientIdentifier;
@@ -1402,11 +1504,9 @@ export abstract class BaseMqttClient {
     if (!packet.sessionPresent) {
       await this.session.clearAllStores(this.clientId);
       if (!connectPending()) {
-        return false;
+        return undefined;
       }
     }
-
-    this.maximumPacketSizeAboutSend = packet.properties?.maximumPacketSize;
 
     // The Server Keep Alive replaces the Keep Alive sent in CONNECT for this connection, even when it is higher or 0.
     this.currentKeepAlive = packet.properties?.serverKeepAlive ?? this.keepAlive;
@@ -1415,35 +1515,61 @@ export abstract class BaseMqttClient {
     const topicAliasMaximum = Math.min(this.topicAliasMaximumAboutSend ?? 0, packet.properties?.topicAliasMaximum ?? 0);
     this.topicAliasManagerAboutSend = topicAliasMaximum > 0 ? new TopicAliasManager(topicAliasMaximum) : undefined;
 
-    await this.resendSessionPackets(connectPending);
-    return connectPending();
+    return await this.readResendTargets(connectPending);
   }
 
   /**
-   * Resends the PUBLISH and PUBREL packets kept in the session after reconnecting.
+   * Reads the PUBLISH and PUBREL packets kept in the session, to resend them on the connection that has just been
+   * established, and encodes them. Done before connect() resolves, so that connect() rejects when the store cannot be read.
    * A packet that cannot be sent on this connection, e.g. larger than the Maximum Packet Size of the broker,
    * is removed from the session, and its publish() rejects with the error.
    * @param connectPending whether the connection is still the one to resend on: false once it has been closed.
+   * @returns the packets to resend and their bytes, in the order they were stored; undefined if the connection was closed meanwhile.
    */
-  private async resendSessionPackets(connectPending: () => boolean) {
+  private async readResendTargets(connectPending: () => boolean): Promise<ResendTarget[] | undefined> {
+    const targets: ResendTarget[] = [];
     const unsendable: { packetId: number; err: Error }[] = [];
     for await (const packet of this.session.resendTargets()) {
       if (!connectPending()) {
-        return;
+        return undefined;
       }
       try {
-        this.sendPacketInBackground(packet, this.encodePacket(packet));
+        targets.push({ packet, bytes: this.encodePacket(packet) });
       } catch (err) {
         this.log(`can't resend ${packet.type} packet, removing it from the session`, packet, err);
         unsendable.push({ packetId: packet.packetId!, err: err as Error });
       }
     }
     if (!connectPending()) {
-      return;
+      return undefined;
     }
     // Removed after the iteration: an OutgoingStore does not have to support removing packets while iterating.
     for (const { packetId, err } of unsendable) {
       await this.session.discardPublishFlow(packetId, err);
+    }
+    return connectPending() ? targets : undefined;
+  }
+
+  /**
+   * Resends the packets kept in the session, in the order they were stored [MQTT-4.6.0-1], after connect() has resolved.
+   * A PUBLISH waits for the send quota of the Receive Maximum of the broker, as publish() does [MQTT-3.3.4-7]: the
+   * acknowledgments of the packets resent before it give it back. A PUBREL is not limited, but its flow uses the quota
+   * until PUBCOMP.
+   * Stops when the connection is closed: the packets that are left stay in the session, to be resent after reconnecting.
+   * @param connectionOpen whether the connection to resend on is still open.
+   */
+  private async resendInOrder(targets: ResendTarget[], connectionOpen: () => boolean) {
+    for (const { packet, bytes } of targets) {
+      if (packet.type === 'publish') {
+        await this.session.waitForSendQuota(connectionOpen);
+      }
+      if (!connectionOpen()) {
+        return;
+      }
+      // False if the flow has ended meanwhile: then the packet is not resent.
+      if (this.session.useSendQuota(packet.packetId!)) {
+        this.sendPacketInBackground(packet, bytes);
+      }
     }
   }
 

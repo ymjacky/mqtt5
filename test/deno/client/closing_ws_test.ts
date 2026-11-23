@@ -164,7 +164,8 @@ Deno.test({ name: '@closing', only: false }, async (context) => {
           broker.sendConnack(packet.clientId, false, packet.protocolVersion);
         });
 
-        await client.connect();
+        // DISCONNECT can have a Session Expiry Interval other than 0 only when CONNECT has one.
+        await client.connect({ properties: { sessionExpiryInterval: 600 } });
 
         const properties: MqttProperties.DisconnectProperties = {
           reasonString: 'trouble',

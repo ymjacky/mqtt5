@@ -190,6 +190,15 @@ const result = await client.publish('topicA', 'payload', { qos: Mqtt.QoS.EXACTLY
 console.log(result.result === Mqtt.ReasonCode.Success);
 ```
 
+The broker tells in CONNACK what the client may send, and `publish()` respects it:
+
+- **Receive Maximum** (MQTT 5.0): the broker accepts only so many QoS 1 / QoS 2 messages in flight at a time (65,535 if it does not say). When that many are
+  waiting for PUBACK / PUBCOMP, `publish()` waits for one of them to complete before it sends the next message, and the `publish()` calls after it wait too,
+  in order. If the connection is closed meanwhile, the waiting calls reject with `StateIsNotOnlineError`.
+- **Maximum QoS** and **Retain Available**: a message with a QoS higher than the Maximum QoS, or with `retain: true` when the broker does not support
+  retained messages, is rejected with `QoSNotSupportedError` or `RetainNotSupportedError` (both are `NotSupportedByBrokerError`) and nothing is sent.
+  The broker would close the connection otherwise. `err.maximumQoS` of `QoSNotSupportedError` is the highest QoS the broker accepts.
+
 ## Subscribing
 
 Received messages are delivered as `publish` events.
@@ -225,6 +234,10 @@ console.log(result.reasons);
 await client.unsubscribe(['topicA', 'topicB']);
 ```
 
+A broker can say in CONNACK (MQTT 5.0) that it does not support wildcard subscriptions, shared subscriptions or Subscription Identifiers. `subscribe()` then
+rejects a topic filter with `+` / `#`, a `$share/...` topic filter or a `subscriptionIdentifier` with `WildcardSubscriptionsNotSupportedError`,
+`SharedSubscriptionsNotSupportedError` or `SubscriptionIdentifiersNotSupportedError`, and nothing is sent. The broker would close the connection otherwise.
+
 ## Events
 
 Register listeners with `client.on(type, listener)` and remove them with `client.off(type, listener)`. `event.detail` holds the packet.
@@ -252,11 +265,14 @@ client.on('closed', () => {
 
 await client.disconnect(); // send DISCONNECT, then close
 // await client.disconnect(true); // close without sending DISCONNECT (the broker publishes the will message)
-// await client.disconnect(false, { reasonString: 'bye', sessionExpiryInterval: 300 }); // MQTT 5.0 properties
+// await client.disconnect(false, { reasonString: 'bye' }); // MQTT 5.0 properties
 ```
 
 `disconnect()` sends DISCONNECT after the messages of the `publish()` calls made before it. Nothing is sent after DISCONNECT: until the connection is closed,
 `publish()`, `subscribe()` and `unsubscribe()` reject with `StateIsNotOnlineError`.
+
+A `sessionExpiryInterval` other than 0 can be set in the DISCONNECT properties only when `connect()` sent one other than 0. Otherwise the broker does not treat
+DISCONNECT as valid and publishes the will message, so `disconnect()` rejects with `InvalidPropertyError` and nothing is sent.
 
 While `connect()` is in progress, `disconnect()` waits for it and then disconnects; it resolves also when `connect()` fails. `disconnect(true)` gives up
 `connect()` at once: `connect()` rejects with `ConnectionClosed`.
@@ -286,8 +302,9 @@ A rejected promise that is not awaited does not terminate the process, so await 
 | `InvalidTopicNameError`   | `publish()`, `connect()`                                           | The topic, Response Topic or Will Topic is empty, or contains `+`, `#` or U+0000.                                                                            |
 | `InvalidTopicFilterError` | `subscribe()`, `unsubscribe()`                                     | A topic filter is invalid, e.g. `a/#/b`, `a+` or `$share/group`.                                                                                             |
 | `InvalidArgumentError`    | `connect()`, `publish()`, `subscribe()`, `unsubscribe()`           | Another argument is invalid, e.g. a QoS other than 0, 1 or 2, `dup: true` with QoS 0, an empty list of topic filters, or `noLocal` on a shared subscription. |
-| `InvalidPropertyError`    | `connect()`, `publish()`, `subscribe()`, `unsubscribe()`           | An MQTT 5.0 property is invalid, e.g. out of range (`subscriptionIdentifier: 0`, `receiveMaximum: 0`) or a string that contains U+0000.                      |
+| `InvalidPropertyError`    | `connect()`, `publish()`, `subscribe()`, `unsubscribe()`, `disconnect()` | An MQTT 5.0 property is invalid, e.g. out of range (`subscriptionIdentifier: 0`, `receiveMaximum: 0`) or a string that contains U+0000. `disconnect()`: also a `sessionExpiryInterval` other than 0 when `connect()` sent none. |
 | `PacketTooLargeError`     | `connect()`, `publish()`, `subscribe()`, `unsubscribe()`, `auth()` | The packet is larger than the Maximum Packet Size of the broker (MQTT 5.0) or than MQTT allows.                                                              |
+| `NotSupportedByBrokerError` | `publish()`, `subscribe()` | The broker said in CONNACK (MQTT 5.0) that it does not support what the call asks for; nothing is sent. Catch it to handle all of the following. `QoSNotSupportedError`: a QoS above the Maximum QoS (`err.maximumQoS` is the highest the broker accepts). `RetainNotSupportedError`: `retain: true`. `WildcardSubscriptionsNotSupportedError`, `SharedSubscriptionsNotSupportedError` and `SubscriptionIdentifiersNotSupportedError`: a topic filter with `+` / `#`, a `$share/...` topic filter, or a `subscriptionIdentifier`. |
 | `SessionLostError`        | `publish()` (QoS 1 and 2)                                          | The broker did not keep the session when reconnecting. The message may or may not have reached the broker.                                                   |
 | `ConnectionClosed`        | `connect()`, `subscribe()`, `unsubscribe()`                        | The connection is closed before CONNACK / SUBACK / UNSUBACK. For SUBACK / UNSUBACK, the broker may or may not have processed the request.                    |
 | `SendPacketError`         | `auth()`                                                           | The client is not connected.                                                                                                                                 |
@@ -559,7 +576,7 @@ const client = new MqttClient({
   outgoingStore: new KvOutgoingStore(kv),
 });
 
-// resolves after the messages of a previous process have been resent
+// the messages of a previous process are resent after connect() resolves, before the messages of later publish() calls
 await client.connect({ properties: { sessionExpiryInterval: 3600 } });
 await client.publish('topicA', 'payload', { qos: Mqtt.QoS.AT_LEAST_ONCE });
 
@@ -571,8 +588,9 @@ kv.close(); // after the client has disconnected
   `clientId` cannot be created with the store. The messages are kept under it; the keys are `['mqtt5', clientId, 'outgoing', packetId]`.
 - **The broker has to keep the session**: connect without Clean Start (`clean: false`) and with a Session Expiry Interval (MQTT 5.0). The messages are resent
   when CONNACK has Session Present, in the order they were published. Otherwise the session is new, and they are removed from the store.
-- **`publish()` waits while the messages are resent.** The messages of a previous process are resent first, right after CONNACK, and `connect()` resolves after
-  that. A `publish()` called meanwhile is not rejected: it waits, and its message is sent after the resent ones.
+- **`publish()` waits while the messages are resent.** `connect()` resolves after the messages of a previous process have been read from the store, and they
+  are resent right after that, in order. A `publish()` called meanwhile is not rejected: it waits, and its message is sent after the resent ones. When there
+  are more of them than the Receive Maximum of the broker, they are resent as the broker acknowledges the earlier ones, so that may take some time.
 - **Size limit**: a QoS 1 / QoS 2 PUBLISH packet larger than 65,498 bytes (`KvOutgoingStore.maximumPacketSize`) cannot be kept, and `publish()` rejects
   with `PacketTooLargeError`. The lower of this limit and the Maximum Packet Size of the broker applies. QoS 0 is not stored, so it is not limited by the
   store. The limit comes from Deno KV, which at present (checked with Deno 2.3.1 and 2.9.8) keeps values of up to 65,536 bytes; it is a fixed value in
