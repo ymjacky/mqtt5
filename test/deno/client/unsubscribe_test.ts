@@ -469,7 +469,7 @@ Deno.test({ name: '@unsubscribe invalid arguments', only: false }, async (contex
         });
 
         await assertRejects(() => client.unsubscribe([]), ClientErrors.InvalidArgumentError);
-        for (const topicFilter of ['', 'a/#/b', 'a+', '$share/g']) {
+        for (const topicFilter of ['', 'a/#/b', 'a+', '$share/g', 'a\uD800']) {
           await assertRejects(() => client.unsubscribe(topicFilter), ClientErrors.InvalidTopicFilterError);
         }
         await assertRejects(() => client.unsubscribe(['topicA', 'a/#/b']), ClientErrors.InvalidTopicFilterError);

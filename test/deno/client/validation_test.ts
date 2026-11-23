@@ -3,6 +3,7 @@ import { Mqtt } from '../../../deno/mod.ts';
 import { InvalidArgumentError, InvalidPropertyError, InvalidTopicFilterError, InvalidTopicNameError } from '../../../lib/client/error.ts';
 import {
   validateConnect,
+  validateDisconnect,
   validateProperties,
   validatePublish,
   validateSubscribe,
@@ -86,6 +87,33 @@ Deno.test('validateTopicFilter does not apply the shared subscription rules to M
   }
   assertThrows(() => validateTopicFilter('$share/g+/a', V3), InvalidTopicFilterError);
   assertThrows(() => validateTopicFilter('$share/g\u0000x/a', V3), InvalidTopicFilterError);
+});
+
+Deno.test('a lone surrogate is rejected: UTF-8 cannot encode it, and TextEncoder would send U+FFFD in its place [MQTT-1.5.4-1]', () => {
+  // A surrogate pair is one character: it is accepted.
+  validateTopicName('a/\u{1F600}', 'topic');
+  validateTopicFilter('\u{1F600}/#', V5);
+  validateProperties({ contentType: '\u{1F600}', userProperties: [{ key: '\u{1F600}', val: '\uD83D\uDE00' }] }, 'properties');
+
+  // a high surrogate without its pair, a low one, a pair in the wrong order, and one after a pair
+  for (const str of ['a\uD800', '\uDC00a', 'a\uDE00\uD83Db', '\u{1F600}\uDBFF']) {
+    const quoted = JSON.stringify(str);
+    assertThrows(() => validateTopicName(str, 'topic'), InvalidTopicNameError, 'lone surrogate', quoted);
+    assertThrows(() => validateTopicFilter(str, V5), InvalidTopicFilterError, 'lone surrogate', quoted);
+    assertThrows(() => validateTopicFilter(str, V3), InvalidTopicFilterError, 'lone surrogate', quoted);
+    assertThrows(() => validateProperties({ contentType: str }, 'properties'), InvalidPropertyError, 'lone surrogate', quoted);
+  }
+  assertThrows(() => validateTopicFilter('$share/g\uD800/a', V5), InvalidTopicFilterError, 'lone surrogate');
+  // The message shows the lone surrogate escaped.
+  assertThrows(
+    () => validateProperties({ userProperties: [{ key: 'k', val: 'v\uDFFF' }] }, 'properties'),
+    InvalidPropertyError,
+    'properties.userProperties[0].val "v\\udfff" must not contain a lone surrogate',
+  );
+  assertThrows(() => validateProperties({ responseTopic: 'r\uD800' }, 'properties'), InvalidTopicNameError, 'properties.responseTopic');
+  assertThrows(() => validatePublish('a\uD800', 0, false, undefined, V3), InvalidTopicNameError, 'lone surrogate');
+  assertThrows(() => validateConnect({ will: { topic: 'w\uD800' } }, V3), InvalidTopicNameError, 'will.topic');
+  assertThrows(() => validateDisconnect({ reasonString: 'bye\uD800' }, undefined, V5), InvalidPropertyError, 'properties.reasonString');
 });
 
 Deno.test('validateProperties accepts valid properties', () => {
