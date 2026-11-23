@@ -8,7 +8,7 @@ export class InvalidQoSError extends Error {
   }
 }
 
-export function numToQoS(num: number) {
+export function numToQoS(num: number): Mqtt.QoS {
   if (num === 0 || num === 1 || num === 2) {
     return num as Mqtt.QoS;
   }

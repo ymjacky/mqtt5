@@ -7,7 +7,7 @@ import type { UnsubscribePacket } from './packet_types.ts';
 export function toBytes(
   packet: UnsubscribePacket,
   protocolVersion: Mqtt.ProtocolVersion,
-) {
+): Uint8Array {
   const variableHeaderChunks: (Uint8Array | number[])[] = [numToTwoByteInteger(packet.packetId)];
   if (protocolVersion > Mqtt.ProtocolVersion.MQTT_V3_1_1) {
     if (packet.properties) {

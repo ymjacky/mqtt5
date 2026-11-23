@@ -7,9 +7,9 @@ import { LruCache } from '../cache/mod.ts';
  */
 export class TopicAliasManager {
   /** The alias of each topic that has one. */
-  private topicAliasMap: LruCache<string, number>;
+  private readonly topicAliasMap: LruCache<string, number>;
   /** Aliases given back by releaseTopic(), used again before new ones. */
-  private releasedTopicIds: number[] = [];
+  private readonly releasedTopicIds: number[] = [];
   /** The lowest alias not given yet. The aliases are 1 to the Topic Alias Maximum. */
   private nextTopicId = 1;
 
@@ -17,7 +17,8 @@ export class TopicAliasManager {
     this.topicAliasMap = new LruCache<string, number>(topicAliasMaximum);
   }
 
-  public capacity() {
+  /** The Topic Alias Maximum: the aliases are 1 to it. */
+  get capacity(): number {
     return this.topicAliasMap.capacity();
   }
 
@@ -27,7 +28,7 @@ export class TopicAliasManager {
    * @returns whether the alias is new, and the alias.
    * A new alias must be sent with the Topic Name; it can be sent without it after that PUBLISH has been written.
    */
-  public getTopicId(topic: string): [boolean, number] {
+  getTopicId(topic: string): [boolean, number] {
     const topicId = this.topicAliasMap.get(topic);
     if (topicId !== undefined) {
       return [false, topicId];
@@ -52,7 +53,7 @@ export class TopicAliasManager {
   }
 
   /** Removes the topic alias of the topic, e.g. when the PUBLISH that registers it is not sent. */
-  public releaseTopic(topic: string) {
+  releaseTopic(topic: string): void {
     const topicId = this.topicAliasMap.get(topic);
     if (topicId !== undefined) {
       this.topicAliasMap.delete(topic);

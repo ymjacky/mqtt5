@@ -189,25 +189,20 @@ export abstract class BaseMqttClient {
 
   /** Creates a client. Use {@link MqttClient} or {@link WebSocketMqttClient}. */
   constructor(options?: ClientOptions) {
-    this.url = options?.url || new URL('mqtt://127.0.0.1:1883');
-    this.log = options?.logger || (() => {});
+    this.url = options?.url ?? new URL('mqtt://127.0.0.1:1883');
+    this.log = options?.logger ?? (() => {});
     this.userName = options?.username;
     this.password = options?.password;
-    this.clientId = options?.clientId || '';
+    this.clientId = options?.clientId ?? '';
     this.keepAlive = options?.keepAlive === undefined ? defaultKeepAlive : Math.max(options.keepAlive, 0);
     this.currentKeepAlive = this.keepAlive;
-    this.protocolVersion = options?.protocolVersion || Mqtt.ProtocolVersion.MQTT_V5;
-    this.clean = (() => {
-      if (options) {
-        return (typeof options.clean === 'undefined') ? true : options.clean;
-      }
-      return true;
-    })();
+    this.protocolVersion = options?.protocolVersion ?? Mqtt.ProtocolVersion.MQTT_V5;
+    this.clean = options?.clean ?? true;
     this.connectTimeout = positiveOrDefault(options?.connectTimeoutMS, defaultConnectTimeout);
     this.disconnectTimeout = positiveOrDefault(options?.disconnectTimeoutMS, defaultDisconnectTimeout);
 
     this.connectionState = 'offline';
-    this.incomingStore = options?.incomingStore || new IncomingMemoryStore();
+    this.incomingStore = options?.incomingStore ?? new IncomingMemoryStore();
 
     // The store is used whatever `clean` is: the session lasts for the Session Expiry Interval (MQTT 5.0), and
     // the broker tells in CONNACK (Session Present) whether the stored packets are resent or removed.
@@ -227,11 +222,11 @@ export abstract class BaseMqttClient {
     this.pingrespTimeoutMs = positiveOrDefault(options?.pingrespTimeoutMS, defaultPingrespTimeout);
     this.timers = {};
 
-    if (this.protocolVersion == Mqtt.ProtocolVersion.MQTT_V5 && options?.topicAliasMaximumAboutSend) {
+    if (this.protocolVersion === Mqtt.ProtocolVersion.MQTT_V5 && options?.topicAliasMaximumAboutSend) {
       this.topicAliasMaximumAboutSend = options.topicAliasMaximumAboutSend;
     }
 
-    if (this.protocolVersion == Mqtt.ProtocolVersion.MQTT_V5 && options?.topicAliasMaximumAboutReceive) {
+    if (this.protocolVersion === Mqtt.ProtocolVersion.MQTT_V5 && options?.topicAliasMaximumAboutReceive) {
       this.topicAliasMaximumAboutReceive = options.topicAliasMaximumAboutReceive;
     }
     this.topicAliasMapAboutReceive = new Map<number, string>();
@@ -278,7 +273,7 @@ export abstract class BaseMqttClient {
    * Encodes and sends a packet, and restarts the keep alive timer.
    * @param bytes the packet already encoded by the caller, if any.
    */
-  private async sendPacket(packet: AnyPacket, bytes?: Uint8Array) {
+  private async sendPacket(packet: AnyPacket, bytes?: Uint8Array): Promise<void> {
     try {
       if (this.connectionState === 'offline') {
         this.log(`can't send packet because offline.`, packet);
@@ -308,7 +303,7 @@ export abstract class BaseMqttClient {
    * is only logged by sendPacket(); the closed connection itself is detected
    * by the receive side.
    */
-  private sendPacketInBackground(packet: AnyPacket, bytes?: Uint8Array) {
+  private sendPacketInBackground(packet: AnyPacket, bytes?: Uint8Array): void {
     this.sendPacket(packet, bytes).catch(() => {
       // already logged in sendPacket()
     });
@@ -407,8 +402,8 @@ export abstract class BaseMqttClient {
   }
 
   /** Opens the connection and sends CONNECT for connect(). CONNACK, a failure or the connect timeout settles `deferred`. */
-  private async startConnect(options: ConnectOptions | undefined, deferred: Deferred<ConnackPacket>) {
-    if (this.connectionState != 'offline') {
+  private async startConnect(options: ConnectOptions | undefined, deferred: Deferred<ConnackPacket>): Promise<void> {
+    if (this.connectionState !== 'offline') {
       throw new StateIsNotOfflineError('connect');
     }
 
@@ -574,18 +569,18 @@ export abstract class BaseMqttClient {
     options: PublishOptions | undefined,
     properties: MqttProperties.UserPublishProperties | undefined,
     deferred: Deferred<PublishResult>,
-  ) {
+  ): Promise<void> {
     if (this.connectionState !== 'online') {
       throw new StateIsNotOnlineError('publish');
     }
 
-    const dup = (options && options.dup) || false;
-    const qos = (options && options.qos) || 0;
-    const retain = (options && options.retain) || false;
+    const dup = options?.dup ?? false;
+    const qos = options?.qos ?? Mqtt.QoS.AT_MOST_ONCE;
+    const retain = options?.retain ?? false;
     // Check the topic given by the caller: with a topic alias, the client itself sends an empty Topic Name.
     validatePublish(topic, qos, dup, properties, this.protocolVersion);
 
-    const buffer: Uint8Array = (typeof payload === 'string') ? new TextEncoder().encode(payload) : payload;
+    const buffer: Uint8Array = (typeof payload === 'string') ? MqttUtils.stringToBytes(payload) : payload;
 
     const finished = await this.waitForPublishTurn();
     try {
@@ -866,7 +861,7 @@ export abstract class BaseMqttClient {
     qos: Mqtt.QoS | undefined,
     properties: MqttProperties.SubscribeProperties | undefined,
     deferred: Deferred<SubscribeResults>,
-  ) {
+  ): Promise<void> {
     if (this.connectionState !== 'online') {
       throw new StateIsNotOnlineError('subscribe');
     }
@@ -979,7 +974,7 @@ export abstract class BaseMqttClient {
     input: string | string[],
     properties: MqttProperties.UnsubscribeProperties | undefined,
     deferred: Deferred<UnsubscribeResults>,
-  ) {
+  ): Promise<void> {
     if (this.connectionState !== 'online') {
       throw new StateIsNotOnlineError('unsubscribe');
     }
@@ -1141,7 +1136,7 @@ export abstract class BaseMqttClient {
     force: boolean = false,
     reasonCode?: Mqtt.ReasonCode,
     properties?: MqttProperties.Properties,
-  ) {
+  ): Promise<void> {
     if (force) {
       if (this.connectionState === 'online' || this.connectionState === 'disconnecting') {
         await this.close();
@@ -1356,7 +1351,7 @@ export abstract class BaseMqttClient {
    * Called by subclasses when the connection is closed: stops the timers and emits the `closed` event.
    * @ignore
    */
-  protected detectClosed() {
+  protected detectClosed(): void {
     this.log('connection closed.');
     // A connect() that has not settled yet ends with this connection. Taken before the `closed` event is emitted:
     // a listener may call connect() again.
@@ -1405,7 +1400,7 @@ export abstract class BaseMqttClient {
    * which ends the connection.
    * @ignore
    */
-  protected packetReceived(packet: AnyPacket) {
+  protected packetReceived(packet: AnyPacket): void {
     let handle: () => void | Promise<void>;
     switch (packet.type) {
       case 'connack':
@@ -1458,7 +1453,7 @@ export abstract class BaseMqttClient {
    * Handles CONNACK: updates the session and settings from the broker, resends unacknowledged packets
    * and resolves `connect()`.
    */
-  private async handleConnack(packet: ConnackPacket) {
+  private async handleConnack(packet: ConnackPacket): Promise<void> {
     const pendingConnect = this.unresolvedConnect;
     if (this.connectionState !== 'connecting' || this.connectFailure || !pendingConnect) {
       // No connect() is waiting for it, e.g. it has timed out and the connection is being closed.
@@ -1572,7 +1567,7 @@ export abstract class BaseMqttClient {
     const topicAliasMaximum = Math.min(this.topicAliasMaximumAboutSend ?? 0, packet.properties?.topicAliasMaximum ?? 0);
     this.topicAliasManagerAboutSend = topicAliasMaximum > 0 ? new TopicAliasManager(topicAliasMaximum) : undefined;
 
-    return await this.readResendTargets(connectPending);
+    return this.readResendTargets(connectPending);
   }
 
   /**
@@ -1615,7 +1610,7 @@ export abstract class BaseMqttClient {
    * Stops when the connection is closed: the packets that are left stay in the session, to be resent after reconnecting.
    * @param connectionOpen whether the connection to resend on is still open.
    */
-  private async resendInOrder(targets: ResendTarget[], connectionOpen: () => boolean) {
+  private async resendInOrder(targets: ResendTarget[], connectionOpen: () => boolean): Promise<void> {
     for (const { packet, bytes } of targets) {
       if (packet.type === 'publish') {
         await this.session.waitForSendQuota(connectionOpen);
@@ -1631,10 +1626,10 @@ export abstract class BaseMqttClient {
   }
 
   /** Handles PUBLISH: resolves the topic alias, sends PUBACK / PUBREC per QoS and emits the `publish` event. */
-  private async handlePublish(packet: PublishPacket) {
+  private async handlePublish(packet: PublishPacket): Promise<void> {
     { // resolve topic alias
       if (packet.properties?.topicAlias) {
-        if (packet.topic == '') {
+        if (packet.topic === '') {
           const storedTopic = this.topicAliasMapAboutReceive.get(packet.properties.topicAlias);
           if (storedTopic) {
             packet.topic = storedTopic;
@@ -1694,7 +1689,7 @@ export abstract class BaseMqttClient {
    * If the packet cannot be removed from the store, the acknowledgment is handled as not received: the connection is
    * closed, and the stored packet is resent after reconnecting, to be acknowledged again. publish() keeps waiting.
    */
-  private async completePublishFlow(packet: PubackPacket | PubrecPacket | PubcompPacket) {
+  private async completePublishFlow(packet: PubackPacket | PubrecPacket | PubcompPacket): Promise<void> {
     let deferred: Deferred<PublishResult> | undefined;
     try {
       deferred = await this.session.endPublishFlow(packet.packetId);
@@ -1711,20 +1706,20 @@ export abstract class BaseMqttClient {
   }
 
   /** Handles PUBACK: completes a QoS 1 publish. */
-  private async handlePuback(packet: PubackPacket) {
+  private async handlePuback(packet: PubackPacket): Promise<void> {
     if (await this.session.packetIdInUse(packet.packetId)) {
       await this.completePublishFlow(packet);
     } else {
-      this.log(`Unknown packetId received, it ignore. (packetId:${packet.packetId})`, 'puback');
+      this.log(`Unknown packetId received, ignoring it. (packetId:${packet.packetId})`, 'puback');
     }
   }
 
   /** Handles PUBREC: sends PUBREL for a QoS 2 publish. */
-  private async handlePubrec(packet: PubrecPacket) {
+  private async handlePubrec(packet: PubrecPacket): Promise<void> {
     if (await this.session.packetIdInUse(packet.packetId)) {
       // MUST send a PUBREL packet when it receives a PUBREC packet from the receiver with a Reason Code value less than 0x80.
       // This PUBREL packet MUST contain the same Packet Identifier as the original PUBLISH packet
-      // sea: https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html#_Toc3901237
+      // see: https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html#_Toc3901237
       if (
         packet.reasonCode && packet.reasonCode >= Mqtt.ReasonCode.UnspecifiedError // UnspecifiedError: 128
       ) {
@@ -1770,7 +1765,7 @@ export abstract class BaseMqttClient {
   }
 
   /** Handles PUBREL: sends PUBCOMP for a received QoS 2 publish. */
-  private async handlePubrel(packet: PubrelPacket) {
+  private async handlePubrel(packet: PubrelPacket): Promise<void> {
     if (await this.incomingStore.has(packet.packetId)) {
       await this.incomingStore.discard(packet.packetId);
 
@@ -1800,16 +1795,16 @@ export abstract class BaseMqttClient {
   }
 
   /** Handles PUBCOMP: completes a QoS 2 publish. */
-  private async handlePubcomp(packet: PubcompPacket) {
+  private async handlePubcomp(packet: PubcompPacket): Promise<void> {
     if (await this.session.packetIdInUse(packet.packetId)) {
       await this.completePublishFlow(packet);
     } else {
-      this.log(`Unknown packetId received, it ignore. (packetId:${packet.packetId})`, 'pubcomp');
+      this.log(`Unknown packetId received, ignoring it. (packetId:${packet.packetId})`, 'pubcomp');
     }
   }
 
   /** Handles SUBACK: resolves `subscribe()`. */
-  private async handleSuback(packet: SubackPacket) {
+  private async handleSuback(packet: SubackPacket): Promise<void> {
     if (await this.session.packetIdInUse(packet.packetId)) {
       const rvList = packet.reasonCodes ? packet.reasonCodes : packet.returnCodes;
 
@@ -1821,12 +1816,12 @@ export abstract class BaseMqttClient {
         deferred.resolve({ reasons: rvList!, reason });
       }
     } else {
-      this.log(`Unknown packetId received, it ignore. (packetId:${packet.packetId})`, 'suback');
+      this.log(`Unknown packetId received, ignoring it. (packetId:${packet.packetId})`, 'suback');
     }
   }
 
   /** Handles UNSUBACK: resolves `unsubscribe()`. */
-  private async handleUnsuback(packet: UnsubackPacket) {
+  private async handleUnsuback(packet: UnsubackPacket): Promise<void> {
     if (await this.session.packetIdInUse(packet.packetId)) {
       // Take the deferred before releasing the packet ID: an unsubscribe() that gets the ID again must not lose its own.
       const deferred = this.session.getUnsubscribeDeferred(packet.packetId);
@@ -1840,12 +1835,12 @@ export abstract class BaseMqttClient {
         }
       }
     } else {
-      this.log(`Unknown packetId received, it ignore. (packetId:${packet.packetId})`, 'unsuback');
+      this.log(`Unknown packetId received, ignoring it. (packetId:${packet.packetId})`, 'unsuback');
     }
   }
 
   /** Handles PINGRESP: stops the PINGRESP timeout. */
-  private handlePingresp(_packet: PingrespPacket) {
+  private handlePingresp(_packet: PingrespPacket): void {
     this.stopPingrespTimer();
   }
 
@@ -1853,7 +1848,7 @@ export abstract class BaseMqttClient {
    * Handles DISCONNECT from the broker: emits the `disconnect` event and closes the connection.
    * The event is emitted first, so before `closed`: a `closed` listener, e.g. one that reconnects, knows why the broker disconnected.
    */
-  private async handleDisconnect(packet: DisconnectPacket) {
+  private async handleDisconnect(packet: DisconnectPacket): Promise<void> {
     this.eventTarget.dispatchEvent(
       createCustomEvent('disconnect', { detail: packet }),
     );
@@ -1861,7 +1856,7 @@ export abstract class BaseMqttClient {
   }
 
   /** Handles AUTH: emits the `auth` event. */
-  private handleAuth(packet: AuthPacket) {
+  private handleAuth(packet: AuthPacket): void {
     this.eventTarget.dispatchEvent(
       createCustomEvent('auth', { detail: packet }),
     );
@@ -1871,13 +1866,13 @@ export abstract class BaseMqttClient {
    * Handles a packet that only a client sends (CONNECT, SUBSCRIBE, UNSUBSCRIBE, PINGREQ): a protocol error.
    * Ends the connection as for a malformed packet, with the ProtocolError reason code (MQTT 5.0).
    */
-  private async handleUnexpectedPacket(packet: AnyPacket) {
+  private async handleUnexpectedPacket(packet: AnyPacket): Promise<void> {
     this.log(`${packet.type} packet must not be sent by a broker, ending the connection`, packet);
     await this.disconnectWithError(Mqtt.ReasonCode.ProtocolError);
   }
 
   /** Closes the connection if the broker does not close it within `disconnectTimeoutMS` after DISCONNECT. */
-  private startDisconnectTimer() {
+  private startDisconnectTimer(): void {
     this.startTimer(
       'disconnect',
       () => {
@@ -1887,7 +1882,7 @@ export abstract class BaseMqttClient {
     );
   }
   /** Stops the timer started by startDisconnectTimer(). */
-  private stopDisconnectTimer() {
+  private stopDisconnectTimer(): void {
     if (this.timerExists('disconnect')) {
       this.stopTimer('disconnect');
     }
@@ -1897,7 +1892,7 @@ export abstract class BaseMqttClient {
    * Gives up connect() if CONNACK is not received within `connectTimeoutMS`: aborts the opening of the connection,
    * or closes the connection. connect() rejects with ConnectTimeout when the client is offline again (detectClosed()).
    */
-  private startConnectTimer(abortConnect: (reason: Error) => void) {
+  private startConnectTimer(abortConnect: (reason: Error) => void): void {
     this.startTimer(
       'connect',
       () => {
@@ -1908,14 +1903,14 @@ export abstract class BaseMqttClient {
     );
   }
   /** Stops the timer started by startConnectTimer(). */
-  private stopConnectTimer() {
+  private stopConnectTimer(): void {
     if (this.timerExists('connect')) {
       this.stopTimer('connect');
     }
   }
 
   /** Sends PINGREQ when nothing is sent within the keep alive interval. */
-  private startKeepAliveTimer() {
+  private startKeepAliveTimer(): void {
     if (!this.currentKeepAlive) {
       return;
     }
@@ -1941,7 +1936,7 @@ export abstract class BaseMqttClient {
     );
   }
   /** Stops the timer started by startKeepAliveTimer(). */
-  private stopKeepAliveTimer() {
+  private stopKeepAliveTimer(): void {
     if (this.timerExists('keepAlive')) {
       this.stopTimer('keepAlive');
     }
@@ -1952,7 +1947,7 @@ export abstract class BaseMqttClient {
    * The timer of an earlier PINGREQ that is not answered yet keeps running: restarted on every PINGREQ, it would never
    * expire when `pingrespTimeoutMS` is not shorter than the keep alive interval.
    */
-  private startPingrespTimer() {
+  private startPingrespTimer(): void {
     if (this.timerExists('pingrespTimeout')) {
       return;
     }
@@ -1963,7 +1958,7 @@ export abstract class BaseMqttClient {
     }, this.pingrespTimeoutMs);
   }
   /** Stops the timer started by startPingrespTimer(). */
-  private stopPingrespTimer() {
+  private stopPingrespTimer(): void {
     if (this.timerExists('pingrespTimeout')) {
       this.stopTimer('pingrespTimeout');
     }
@@ -1974,7 +1969,7 @@ export abstract class BaseMqttClient {
     name: string,
     cb: (...args: unknown[]) => void,
     delay: number,
-  ) {
+  ): void {
     if (this.timerExists(name)) {
       this.stopTimer(name);
     }
@@ -1986,7 +1981,7 @@ export abstract class BaseMqttClient {
   }
 
   /** Stops the named timer. */
-  private stopTimer(name: string) {
+  private stopTimer(name: string): void {
     if (!this.timerExists(name)) {
       return;
     }

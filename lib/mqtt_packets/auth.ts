@@ -7,7 +7,7 @@ import type { AuthPacket } from './packet_types.ts';
 export function toBytes(
   packet: AuthPacket,
   _protocolVersion: Mqtt.ProtocolVersion,
-) {
+): Uint8Array {
   const variableHeaderChunks: (Uint8Array | number[])[] = [];
 
   const reasonCode = packet.reasonCode || 0x00; // 0x00 success
@@ -15,7 +15,7 @@ export function toBytes(
     variableHeaderChunks.push([reasonCode & 0xFF]);
     variableHeaderChunks.push(MqttProperties.propertiesToBytes(packet.properties));
   } else {
-    if (reasonCode != 0x00) {
+    if (reasonCode !== 0x00) {
       variableHeaderChunks.push([reasonCode & 0xFF]);
     }
   }

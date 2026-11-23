@@ -13,6 +13,9 @@
     "@std/assert": "jsr:@std/assert@^1.0.19",
     "@std/http": "jsr:@std/http@^1.1.4"
   },
+  "compilerOptions": {
+    "noImplicitOverride": true
+  },
   "publish": {
     "include": ["deno/", "browser/mod.ts", "lib/", "readme.md", "LICENSE"]
   },
@@ -32,7 +35,8 @@
     "include": ["browser", "deno", "lib", "test", "examples"],
 
     "rules": {
-      "tags": ["recommended", "jsr"]
+      "tags": ["recommended", "jsr"],
+      "include": ["eqeqeq", "explicit-module-boundary-types"]
     },
 
     "report": "pretty"

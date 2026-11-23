@@ -5,7 +5,7 @@ function delay(ms: number) {
 }
 
 /** Waits until `condition` is true. Rejects after `ms`, instead of letting the test hang. */
-export async function waitUntil(condition: () => boolean, label: string, ms = 2000) {
+export async function waitUntil(condition: () => boolean, label: string, ms = 2000): Promise<void> {
   const start = Date.now();
   while (!condition()) {
     if (Date.now() - start > ms) {
@@ -44,7 +44,7 @@ export class RawConnection {
     this.isClosed = true;
   }
 
-  async send(bytes: Uint8Array) {
+  async send(bytes: Uint8Array): Promise<void> {
     const writer = this.#conn.writable.getWriter();
     try {
       await writer.write(bytes);
@@ -53,7 +53,7 @@ export class RawConnection {
     }
   }
 
-  close() {
+  close(): void {
     try {
       this.#conn.close();
     } catch {
@@ -99,7 +99,7 @@ export class RawServer {
     return this.connections[index];
   }
 
-  async close() {
+  async close(): Promise<void> {
     this.#listener.close();
     await this.#accepting;
     for (const connection of this.connections) {

@@ -22,12 +22,12 @@ export interface CustomEventMap {
 export interface CustomEventListener<T = unknown> {
   (evt: T): void | Promise<void>;
 }
+type EventDetail<T extends keyof CustomEventMap> = CustomEventMap[T] extends CustomEvent<infer D> ? D : never;
+
 export const createCustomEvent = <T extends keyof CustomEventMap>(
   type: T,
-  eventInitDict: CustomEventInit<
-    CustomEventMap[T] extends CustomEvent<infer T> ? T : never
-  >,
-) => new CustomEvent(type, eventInitDict);
+  eventInitDict: CustomEventInit<EventDetail<T>>,
+): CustomEvent<EventDetail<T>> => new CustomEvent(type, eventInitDict);
 
 class Client {
   public clientId;
@@ -76,7 +76,7 @@ export class TestWsBroker extends EventTarget {
     this.addEventListener(type, callback as EventListener);
   };
 
-  listen(port: number = 3000) {
+  listen(port: number = 3000): void {
     this.server = Deno.serve({
       port: port,
       hostname: '[::]',
@@ -111,7 +111,7 @@ export class TestWsBroker extends EventTarget {
     });
   }
 
-  listenTls(port: number = 443) {
+  listenTls(port: number = 443): void {
     this.server = Deno.serve({
       port: port,
       hostname: '[::]',
@@ -148,7 +148,7 @@ export class TestWsBroker extends EventTarget {
     });
   }
 
-  private register(conn: WebSocket) {
+  private register(conn: WebSocket): void {
     conn.onclose = (_e: CloseEvent) => {
       log('websocket connection closed');
       this.dispatchEvent(
@@ -195,7 +195,7 @@ export class TestWsBroker extends EventTarget {
     };
   }
 
-  async destroy() {
+  async destroy(): Promise<void> {
     for (const client of this.clients.values()) {
       await client.destrory();
     }
@@ -212,7 +212,7 @@ export class TestWsBroker extends EventTarget {
     protocolVersion: Mqtt.ProtocolVersion,
     returnValue: number = 0, // success
     properties?: MqttProperties.Properties,
-  ) {
+  ): Promise<void> {
     const client = this.clients.get(clientId);
     if (client) { // found
       let packet: MqttPackets.ConnackPacket;
@@ -249,7 +249,7 @@ export class TestWsBroker extends EventTarget {
     dup: boolean = false,
     retain: boolean = false,
     properties?: MqttProperties.Properties,
-  ) {
+  ): Promise<void> {
     const client = this.clients.get(clientId);
     if (client) { // found
       let packet: MqttPackets.PublishPacket;
@@ -290,7 +290,7 @@ export class TestWsBroker extends EventTarget {
     protocolVersion: Mqtt.ProtocolVersion,
     returnValue: number = 0, // success
     properties?: MqttProperties.Properties,
-  ) {
+  ): Promise<void> {
     const client = this.clients.get(clientId);
     if (client) { // found
       let packet: MqttPackets.PubackPacket;
@@ -322,7 +322,7 @@ export class TestWsBroker extends EventTarget {
     protocolVersion: Mqtt.ProtocolVersion,
     returnValue: number = 0, // success
     properties?: MqttProperties.Properties,
-  ) {
+  ): Promise<void> {
     const client = this.clients.get(clientId);
     if (client) { // found
       let packet: MqttPackets.PubrecPacket;
@@ -354,7 +354,7 @@ export class TestWsBroker extends EventTarget {
     protocolVersion: Mqtt.ProtocolVersion,
     returnValue: number = 0, // success
     properties?: MqttProperties.Properties,
-  ) {
+  ): Promise<void> {
     const client = this.clients.get(clientId);
     if (client) { // found
       let packet: MqttPackets.PubrelPacket;
@@ -386,7 +386,7 @@ export class TestWsBroker extends EventTarget {
     protocolVersion: Mqtt.ProtocolVersion,
     returnValue: number = 0, // success
     properties?: MqttProperties.Properties,
-  ) {
+  ): Promise<void> {
     const client = this.clients.get(clientId);
     if (client) { // found
       let packet: MqttPackets.PubcompPacket;
@@ -418,7 +418,7 @@ export class TestWsBroker extends EventTarget {
     protocolVersion: Mqtt.ProtocolVersion,
     returnValues: number[] = [0], // success
     properties?: MqttProperties.Properties,
-  ) {
+  ): Promise<void> {
     const client = this.clients.get(clientId);
     if (client) { // found
       let packet: MqttPackets.SubackPacket;
@@ -451,7 +451,7 @@ export class TestWsBroker extends EventTarget {
     protocolVersion: Mqtt.ProtocolVersion,
     returnValues: number[] = [0], // success
     properties?: MqttProperties.Properties,
-  ) {
+  ): Promise<void> {
     const client = this.clients.get(clientId);
     if (client) { // found
       let packet: MqttPackets.UnsubackPacket;
@@ -481,7 +481,7 @@ export class TestWsBroker extends EventTarget {
     clientId: string,
     reasonCode: Mqtt.ReasonCode,
     properties?: MqttProperties.DisconnectProperties,
-  ) {
+  ): Promise<void> {
     const client = this.clients.get(clientId);
     if (client) { // found
       const packet: MqttPackets.DisconnectPacket = {
@@ -501,7 +501,7 @@ export class TestWsBroker extends EventTarget {
     clientId: string,
     reasonCode: Mqtt.ReasonCode,
     properties?: MqttProperties.AuthProperties,
-  ) {
+  ): Promise<void> {
     const client = this.clients.get(clientId);
     if (client) { // found
       const packet: MqttPackets.AuthPacket = {
@@ -520,7 +520,7 @@ export class TestWsBroker extends EventTarget {
 
   async closeConnectionFromBroker(
     clientId: string,
-  ) {
+  ): Promise<void> {
     const client = this.clients.get(clientId);
     if (client) { // found
       await client.conn.close();
@@ -535,7 +535,7 @@ export class TestWsBroker extends EventTarget {
   sendRawBytes(
     clientId: string,
     bytes: Uint8Array,
-  ) {
+  ): void {
     const client = this.clients.get(clientId);
     if (client) { // found
       log(`sending raw bytes (length: ${bytes.length})`, bytes);

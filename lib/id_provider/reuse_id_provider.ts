@@ -21,7 +21,7 @@ export class ReuseIdProvider {
     this._next = this._start;
   }
 
-  public clear() {
+  public clear(): void {
     this._use = [];
     this._reuse = [];
     this._reusable = [];
@@ -72,7 +72,7 @@ export class ReuseIdProvider {
     return false;
   }
 
-  public inUse(id: number) {
+  public inUse(id: number): boolean {
     return this._reuse.includes(id) || this._use.includes(id);
   }
 

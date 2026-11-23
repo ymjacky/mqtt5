@@ -70,7 +70,7 @@ export interface OutgoingStore {
   resendIterator(): AsyncIterableIterator<MqttPackets.PublishPacket | MqttPackets.PubrelPacket>;
 
   /** Returns whether a packet with the packet ID is stored. */
-  has(packet: number): Promise<boolean>;
+  has(packetId: number): Promise<boolean>;
 
   /** Returns the number of stored packets. */
   count(): Promise<number>;

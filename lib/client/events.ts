@@ -22,9 +22,10 @@ export interface CustomEventListener<T = unknown> {
   (evt: T): void | Promise<void>;
 }
 
+/** The type of `event.detail` of an event in {@link CustomEventMap}. */
+type EventDetail<T extends keyof CustomEventMap> = CustomEventMap[T] extends CustomEvent<infer D> ? D : never;
+
 export const createCustomEvent = <T extends keyof CustomEventMap>(
   type: T,
-  eventInitDict: CustomEventInit<
-    CustomEventMap[T] extends CustomEvent<infer T> ? T : never
-  >,
-) => new CustomEvent(type, eventInitDict);
+  eventInitDict: CustomEventInit<EventDetail<T>>,
+): CustomEvent<EventDetail<T>> => new CustomEvent(type, eventInitDict);

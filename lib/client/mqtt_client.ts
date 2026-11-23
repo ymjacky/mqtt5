@@ -78,7 +78,7 @@ export class MqttClient extends BaseMqttClient {
       // A URL without a port has the default port of its protocol.
       const port = this.url.port !== '' ? Number(this.url.port) : defaultPorts[this.url.protocol];
       if (this.url.protocol === 'mqtt:') {
-        return await Deno.connect({
+        return Deno.connect({
           hostname: this.url.hostname,
           port,
         });

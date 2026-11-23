@@ -7,7 +7,7 @@ import type { DisconnectPacket } from './packet_types.ts';
 export function toBytes(
   packet: DisconnectPacket,
   protocolVersion: Mqtt.ProtocolVersion,
-) {
+): Uint8Array {
   // Collect variable header chunks and concatenate them at the end instead of
   // spreading byte arrays into push()/Uint8Array.from(), which can overflow
   // the call stack once the byte array grows large (e.g. many properties).
@@ -19,7 +19,7 @@ export function toBytes(
       variableHeaderChunks.push([reasonCode & 0xFF]);
       variableHeaderChunks.push(MqttProperties.propertiesToBytes(packet.properties));
     } else {
-      if (reasonCode != 0x00) {
+      if (reasonCode !== 0x00) {
         variableHeaderChunks.push([reasonCode & 0xFF]);
       }
     }

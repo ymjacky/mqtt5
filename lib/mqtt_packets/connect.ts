@@ -5,7 +5,7 @@ import { readProperties } from '../mqtt_properties/read_properties.ts';
 import { InvalidProtocolVersionError } from './error.ts';
 import type { ConnectPacket } from './packet_types.ts';
 
-export function toBytes(packet: ConnectPacket) {
+export function toBytes(packet: ConnectPacket): Uint8Array {
   const protocolName = stringToUtfEncodedString('MQTT');
   const protocolVersion = packet.protocolVersion;
 
@@ -96,8 +96,8 @@ export function parse(
   const cleanSession = !!(connectFlags & 2);
 
   if (
-    protocolVersion != Mqtt.ProtocolVersion.MQTT_V3_1_1 &&
-    protocolVersion != Mqtt.ProtocolVersion.MQTT_V5
+    protocolVersion !== Mqtt.ProtocolVersion.MQTT_V3_1_1 &&
+    protocolVersion !== Mqtt.ProtocolVersion.MQTT_V5
   ) {
     throw new InvalidProtocolVersionError(`${protocolVersion}`);
   }

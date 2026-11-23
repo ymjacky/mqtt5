@@ -7,7 +7,7 @@ import type { ConnackPacket } from './packet_types.ts';
 export function toBytes(
   packet: ConnackPacket,
   protocolVersion: Mqtt.ProtocolVersion,
-) {
+): Uint8Array {
   const variableHeaderChunks: (Uint8Array | number[])[] = [[packet.sessionPresent ? 1 : 0]];
   if (protocolVersion > 4) {
     const reasonCode = packet.reasonCode || 0x00; // 0x00 success

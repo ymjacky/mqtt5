@@ -31,7 +31,7 @@ export async function resendOrder(store: Store.OutgoingStore): Promise<string[]>
 export async function testOutgoingStoreContract(
   context: Deno.TestContext,
   createStore: () => Promise<{ store: Store.OutgoingStore; close?: () => void }>,
-) {
+): Promise<void> {
   async function step(name: string, fn: (store: Store.OutgoingStore) => Promise<void>) {
     await context.step(name, async () => {
       const { store, close } = await createStore();
