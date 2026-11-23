@@ -117,7 +117,7 @@ Deno.test({ name: '@send topic alias', only: false }, async (context) => {
           } else {
             assertEquals(message, '8th');
             assertEquals(packet.topic, 'topicB');
-            assertEquals(packet.properties?.topicAlias, 2);
+            assertEquals(packet.properties?.topicAlias, 3);
             resolve();
           }
         });
@@ -125,12 +125,13 @@ Deno.test({ name: '@send topic alias', only: false }, async (context) => {
         await client.publish('topicA', new TextEncoder().encode('1st')); // topic alias 1
         await client.publish('topicB', new TextEncoder().encode('2nd')); // topic alias 2
         await client.publish('topicC', new TextEncoder().encode('3rd')); // topic alias 3
-        await client.publish('topicD', new TextEncoder().encode('4th')); // topic alias 1
+        await client.publish('topicD', new TextEncoder().encode('4th')); // topic alias 1, replacing topicA
 
         await client.publish('topicC', new TextEncoder().encode('5th')); // topic alias 3
         await client.publish('topicD', new TextEncoder().encode('6th')); // topic alias 1
-        await client.publish('topicA', new TextEncoder().encode('7th')); // topic alias 2
-        await client.publish('topicB', new TextEncoder().encode('8th')); // topic alias 2
+        await client.publish('topicA', new TextEncoder().encode('7th')); // topic alias 2, replacing topicB
+        // topic alias 3, replacing topicC: the least recently used topic, though topicC and topicD are used more often than topicA
+        await client.publish('topicB', new TextEncoder().encode('8th'));
 
         await promise;
       } catch (err) {
@@ -254,6 +255,66 @@ Deno.test({ name: '@send topic alias', only: false }, async (context) => {
       }
     },
   );
+
+  for (
+    const [name, topicAliasMaximumAboutSend, topicAliasMaximum] of [
+      ['CONNACK Topic Alias Maximum is 1', 3, 1],
+      ['topicAliasMaximumAboutSend is 1', 1, 3],
+    ] as const
+  ) {
+    await context.step(
+      `send publish using topic alias, ${name}`,
+      async () => {
+        const broker = new TestBroker();
+
+        try {
+          broker.listen();
+
+          const client = new MqttClient({
+            clientId: 'cid',
+            logger: logger,
+            clean: true,
+            connectTimeoutMS: 10000,
+            keepAlive: 10,
+            topicAliasMaximumAboutSend,
+          });
+
+          broker.on('connect', (event) => {
+            const packet = event.detail;
+            broker.sendConnack(packet.clientId, false, packet.protocolVersion, 0, { topicAliasMaximum });
+          });
+
+          await client.connect();
+
+          const received: { topic: string; topicAlias?: number }[] = [];
+          broker.on('publish', (event) => {
+            const packet = event.detail;
+            received.push({ topic: packet.topic, topicAlias: packet.properties?.topicAlias });
+            broker.sendPuback('cid', packet.packetId!, Mqtt.ProtocolVersion.MQTT_V5);
+          });
+
+          const qos = { qos: Mqtt.QoS.AT_LEAST_ONCE };
+          await client.publish('topicA', new TextEncoder().encode('1st'), qos); // topic alias 1
+          await client.publish('topicA', new TextEncoder().encode('2nd'), qos); // topic alias 1
+          await client.publish('topicB', new TextEncoder().encode('3rd'), qos); // topic alias 1, replacing topicA
+          await client.publish('topicA', new TextEncoder().encode('4th'), qos); // topic alias 1, replacing topicB
+
+          assertEquals(received, [
+            { topic: 'topicA', topicAlias: 1 },
+            { topic: '', topicAlias: 1 },
+            { topic: 'topicB', topicAlias: 1 },
+            { topic: 'topicA', topicAlias: 1 },
+          ]);
+
+          await client.disconnect();
+        } catch (err) {
+          fail(`error occured: ${err}`);
+        } finally {
+          await broker.destroy();
+        }
+      },
+    );
+  }
 
   await context.step(
     'send concurrent publishes sharing one properties object',
