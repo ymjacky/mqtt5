@@ -1,6 +1,8 @@
 import type * as Mqtt from '../mqtt/mod.ts';
 
 export class InvalidQoSError extends Error {
+  /** The name of the error class. */
+  override readonly name = 'InvalidQoSError' as const;
   constructor(num: number) {
     super(`invalid qos: ${num}`);
   }

@@ -2,7 +2,8 @@
 
 /** A received packet could not be decoded. */
 export class MalformedPacketError extends Error {
-  readonly #className = 'MalformedPacketError';
+  /** The name of the error class. */
+  override readonly name = 'MalformedPacketError' as const;
   /** Creates the error with the given details. */
   constructor(message: string) {
     super(message);

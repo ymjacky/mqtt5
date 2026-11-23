@@ -15,7 +15,8 @@ export * from '../mqtt_stream_utils/error.ts';
  * closed before SUBACK / UNSUBACK is received; the broker may or may not have processed the request.
  */
 export class ConnectionClosed extends Error {
-  readonly #className = 'ConnectionClosed';
+  /** The name of the error class. */
+  override readonly name = 'ConnectionClosed' as const;
   constructor() {
     super(`connection closed`);
   }
@@ -23,7 +24,8 @@ export class ConnectionClosed extends Error {
 
 /** CONNACK was not received within `connectTimeoutMS`. Rejected by `connect()`. */
 export class ConnectTimeout extends Error {
-  readonly #className = 'ConnectTimeout';
+  /** The name of the error class. */
+  override readonly name = 'ConnectTimeout' as const;
   constructor() {
     super('connect timed out');
   }
@@ -31,7 +33,8 @@ export class ConnectTimeout extends Error {
 
 /** `connect()` was called while the client is connected or connecting. */
 export class StateIsNotOfflineError extends Error {
-  readonly #className = 'StateIsNotOfflineError';
+  /** The name of the error class. */
+  override readonly name = 'StateIsNotOfflineError' as const;
   /** Creates the error with the given details. */
   constructor(message: string) {
     super(`State is not offline: ${message}`);
@@ -43,7 +46,8 @@ export class StateIsNotOfflineError extends Error {
  * or after it has sent DISCONNECT and is waiting for the connection to close.
  */
 export class StateIsNotOnlineError extends Error {
-  readonly #className = 'StateIsNotOnlineError';
+  /** The name of the error class. */
+  override readonly name = 'StateIsNotOnlineError' as const;
   /** Creates the error with the given details. */
   constructor(message: string) {
     super(`State is not online: ${message}`);
@@ -56,7 +60,8 @@ export class StateIsNotOnlineError extends Error {
  * The message may or may not have reached the broker.
  */
 export class SessionLostError extends Error {
-  readonly #className = 'SessionLostError';
+  /** The name of the error class. */
+  override readonly name = 'SessionLostError' as const;
   constructor() {
     super('session lost: the broker did not keep the session');
   }
@@ -64,7 +69,8 @@ export class SessionLostError extends Error {
 
 /** A packet could not be sent because the client is not connected. */
 export class SendPacketError extends Error {
-  readonly #className = 'SendPacketError';
+  /** The name of the error class. */
+  override readonly name = 'SendPacketError' as const;
   constructor() {
     super(`can't send packet because offline`);
   }
@@ -75,7 +81,8 @@ export class SendPacketError extends Error {
  * The call rejects with it and nothing is sent.
  */
 export class InvalidTopicNameError extends Error {
-  readonly #className = 'InvalidTopicNameError';
+  /** The name of the error class. */
+  override readonly name = 'InvalidTopicNameError' as const;
   /** Creates the error with the given details. */
   constructor(message: string) {
     super(`invalid topic name: ${message}`);
@@ -84,7 +91,8 @@ export class InvalidTopicNameError extends Error {
 
 /** A Topic Filter of `subscribe()` or `unsubscribe()` is invalid. The call rejects with it and nothing is sent. */
 export class InvalidTopicFilterError extends Error {
-  readonly #className = 'InvalidTopicFilterError';
+  /** The name of the error class. */
+  override readonly name = 'InvalidTopicFilterError' as const;
   /** Creates the error with the given details. */
   constructor(message: string) {
     super(`invalid topic filter: ${message}`);
@@ -96,7 +104,8 @@ export class InvalidTopicFilterError extends Error {
  * or a lone surrogate, or a Subscription Identifier of 0. The call rejects with it and nothing is sent.
  */
 export class InvalidPropertyError extends Error {
-  readonly #className = 'InvalidPropertyError';
+  /** The name of the error class. */
+  override readonly name = 'InvalidPropertyError' as const;
   /** Creates the error with the given details. */
   constructor(message: string) {
     super(`invalid property: ${message}`);
@@ -108,7 +117,8 @@ export class InvalidPropertyError extends Error {
  * The call rejects with it and nothing is sent.
  */
 export class InvalidArgumentError extends Error {
-  readonly #className = 'InvalidArgumentError';
+  /** The name of the error class. */
+  override readonly name = 'InvalidArgumentError' as const;
   /** Creates the error with the given details. */
   constructor(message: string) {
     super(`invalid argument: ${message}`);
@@ -122,7 +132,8 @@ export class InvalidArgumentError extends Error {
  * A QoS 1 / QoS 2 `publish()` also rejects with it when its message, resent after reconnecting, is too large for the new connection.
  */
 export class PacketTooLargeError extends Error {
-  readonly #className = 'PacketTooLargeError';
+  /** The name of the error class. */
+  override readonly name = 'PacketTooLargeError' as const;
   /** Creates the error with the given details. */
   constructor(message: string) {
     super(`packet too large: ${message}`);
@@ -137,7 +148,11 @@ export class PacketTooLargeError extends Error {
  * What the broker supports is that of the connection that is open now, and can differ after reconnecting.
  */
 export class NotSupportedByBrokerError extends Error {
-  readonly #className = 'NotSupportedByBrokerError';
+  /**
+   * The name of the error class. The subclasses narrow it to their own name; the type keeps the errors that are not
+   * about broker support apart from this class.
+   */
+  override readonly name: `${string}NotSupported${string}Error` = 'NotSupportedByBrokerError';
   /** Creates the error with the given details. */
   constructor(message: string) {
     super(message);
@@ -148,7 +163,8 @@ export class NotSupportedByBrokerError extends Error {
  * `publish()` was called with a QoS higher than the Maximum QoS of the broker (CONNACK). Publish with `maximumQoS`, or lower.
  */
 export class QoSNotSupportedError extends NotSupportedByBrokerError {
-  readonly #className = 'QoSNotSupportedError';
+  /** The name of the error class. */
+  override readonly name = 'QoSNotSupportedError' as const;
   /** The highest QoS the broker supports: `Mqtt.QoS.AT_MOST_ONCE` or `Mqtt.QoS.AT_LEAST_ONCE`. */
   readonly maximumQoS: Mqtt.QoS;
   /** Creates the error for the QoS that was requested and the Maximum QoS of the broker. */
@@ -160,7 +176,8 @@ export class QoSNotSupportedError extends NotSupportedByBrokerError {
 
 /** `publish()` was called with `retain: true`, but the broker does not support retained messages (Retain Available is 0 in CONNACK). */
 export class RetainNotSupportedError extends NotSupportedByBrokerError {
-  readonly #className = 'RetainNotSupportedError';
+  /** The name of the error class. */
+  override readonly name = 'RetainNotSupportedError' as const;
   /** Creates the error. */
   constructor() {
     super('retain not supported: the broker does not support retained messages (Retain Available is 0)');
@@ -172,7 +189,8 @@ export class RetainNotSupportedError extends NotSupportedByBrokerError {
  * wildcard subscriptions (Wildcard Subscription Available is 0 in CONNACK).
  */
 export class WildcardSubscriptionsNotSupportedError extends NotSupportedByBrokerError {
-  readonly #className = 'WildcardSubscriptionsNotSupportedError';
+  /** The name of the error class. */
+  override readonly name = 'WildcardSubscriptionsNotSupportedError' as const;
   /** Creates the error for the topic filter that was requested. */
   constructor(topicFilter: string) {
     super(`wildcard subscriptions not supported: ${JSON.stringify(topicFilter)} has a wildcard (Wildcard Subscription Available is 0)`);
@@ -184,7 +202,8 @@ export class WildcardSubscriptionsNotSupportedError extends NotSupportedByBroker
  * (Subscription Identifiers Available is 0 in CONNACK).
  */
 export class SubscriptionIdentifiersNotSupportedError extends NotSupportedByBrokerError {
-  readonly #className = 'SubscriptionIdentifiersNotSupportedError';
+  /** The name of the error class. */
+  override readonly name = 'SubscriptionIdentifiersNotSupportedError' as const;
   /** Creates the error. */
   constructor() {
     super('subscription identifiers not supported: the broker does not support them (Subscription Identifiers Available is 0)');
@@ -196,7 +215,8 @@ export class SubscriptionIdentifiersNotSupportedError extends NotSupportedByBrok
  * (Shared Subscription Available is 0 in CONNACK).
  */
 export class SharedSubscriptionsNotSupportedError extends NotSupportedByBrokerError {
-  readonly #className = 'SharedSubscriptionsNotSupportedError';
+  /** The name of the error class. */
+  override readonly name = 'SharedSubscriptionsNotSupportedError' as const;
   /** Creates the error for the topic filter that was requested. */
   constructor(topicFilter: string) {
     super(`shared subscriptions not supported: ${JSON.stringify(topicFilter)} is a shared subscription (Shared Subscription Available is 0)`);
@@ -205,7 +225,8 @@ export class SharedSubscriptionsNotSupportedError extends NotSupportedByBrokerEr
 
 /** The URL protocol is not supported by the client (`MqttClient` accepts `mqtt:` and `mqtts:`). */
 export class UnexpectedUrlProtocol extends Error {
-  readonly #className = 'UnexpectedUrlProtocol';
+  /** The name of the error class. */
+  override readonly name = 'UnexpectedUrlProtocol' as const;
   /** Creates the error with the given details. */
   constructor(message: string) {
     super(`unexpected URL protocol: ${message}`);
