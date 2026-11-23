@@ -1,5 +1,5 @@
 import { assertEquals, assertThrows } from 'std/assert/mod.ts';
-import { fourByteIntegerToNum, numToFourByteInteger } from '../../../lib/mqtt_utils/mod.ts';
+import { fourByteIntegerToNum, MqttUtilsError, numToFourByteInteger } from '../../../lib/mqtt_utils/mod.ts';
 
 Deno.test('numToFourByteInteger', () => {
   assertEquals(numToFourByteInteger(0), new Uint8Array([0x00, 0x00, 0x00, 0x00]));
@@ -22,4 +22,14 @@ Deno.test('fourByteIntegerToNum', () => {
   assertEquals(fourByteIntegerToNum(new Uint8Array([0xFF, 0xFF, 0xFF, 0xFF]), 0), 0xFFFFFFFF);
   // offset
   assertEquals(fourByteIntegerToNum(new Uint8Array([0xEE, 0x00, 0x00, 0x01, 0x2C]), 1), 300);
+});
+
+Deno.test('fourByteIntegerToNum throws instead of reading past the end of the buffer', () => {
+  assertThrows(
+    () => fourByteIntegerToNum(new Uint8Array([0x00, 0x00, 0x01]), 0),
+    MqttUtilsError.MalformedDataError,
+    '4 bytes are needed at byte 0, but only 3 are left',
+  );
+  assertThrows(() => fourByteIntegerToNum(new Uint8Array([0xEE, 0x00, 0x00, 0x01]), 1), MqttUtilsError.MalformedDataError, '4 bytes are needed at byte 1');
+  assertThrows(() => fourByteIntegerToNum(new Uint8Array([]), 0), MqttUtilsError.MalformedDataError);
 });

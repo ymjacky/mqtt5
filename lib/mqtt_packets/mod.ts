@@ -135,56 +135,39 @@ export function packetToBytes(
 
 /**
  * Decodes the bytes of a single complete packet.
- * @param buffer the bytes of the packet.
+ * @param buffer the bytes of the packet: the fixed header, and exactly as many bytes after it as its Remaining Length says.
  * @param protocolVersion the protocol version to decode the packet for.
  * @returns the decoded packet.
- * @throws {MqttPacketsError.MqttPacketParseError} if the bytes cannot be decoded.
+ * @throws {MqttPacketsError.MqttPacketParseError} if the bytes cannot be decoded: they are not exactly one packet, or the
+ * packet is a Malformed Packet or a Protocol Error, e.g. a field goes past the end of the packet or a property is included
+ * more than once (MQTT 5.0 4.13). `cause` is the error that was found.
  */
 export function decode(
   buffer: Uint8Array,
   protocolVersion: Mqtt.ProtocolVersion = Mqtt.ProtocolVersion.MQTT_V5,
 ): AnyPacket {
-  let pos = 0;
-
   try {
-    // parse packetType
-    const packetType = buffer[pos] >> 4;
-    const packetFlags = buffer[pos++] & 0b00001111;
-
-    // parse remainingLength
-    const remainingLengthBytes = [];
-    let readLength = 0;
-    do {
-      const readValue = buffer[pos++];
-      readLength++;
-
-      remainingLengthBytes.push(readValue);
-
-      if ((readValue >> 7) == 0) {
-        break;
-      } else if (readLength == 4) {
-        throw new Error('malformed packet');
-      }
-    } while (readLength < 4);
-
-    const remainingLength = MqttUtils.variableByteIntegerToNum(
-      new Uint8Array([...remainingLengthBytes]),
-      0,
-    );
-
-    let variableHeaderAndPayload = new Uint8Array(0);
-    if (remainingLength.number > 0) {
-      variableHeaderAndPayload = new Uint8Array(buffer.slice(pos));
+    // fixed header
+    const header = new MqttUtils.ByteReader(buffer);
+    const firstByte = header.readByte();
+    const packetType = firstByte >> 4;
+    const packetFlags = firstByte & 0b00001111;
+    const remainingLength = header.readVariableByteInteger();
+    if (header.remaining > remainingLength) {
+      throw new MqttUtils.MqttUtilsError.MalformedDataError(
+        `${header.remaining - remainingLength} bytes are left after the Remaining Length of ${remainingLength} bytes`,
+      );
     }
+    // The parser of the packet throws if fewer than `remainingLength` bytes are left.
+    const variableHeaderAndPayload = buffer.subarray(buffer.length - header.remaining);
 
-    const packet = parsePacket(
+    return parsePacket(
       packetType,
       packetFlags,
-      remainingLength.number,
+      remainingLength,
       variableHeaderAndPayload,
       protocolVersion,
     );
-    return packet;
   } catch (err) {
     throw new MqttPacketsError.MqttPacketParseError('mqtt packet parse error.', { cause: err });
   }

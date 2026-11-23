@@ -1,6 +1,7 @@
 import * as Mqtt from '../mqtt/mod.ts';
 import * as MqttProperties from '../mqtt_properties/mod.ts';
-import { concatBytes, remainingLengthToBytes, variableByteIntegerToNum } from '../mqtt_utils/mod.ts';
+import { readProperties } from '../mqtt_properties/read_properties.ts';
+import { ByteReader, concatBytes, remainingLengthToBytes } from '../mqtt_utils/mod.ts';
 import type { AuthPacket } from './packet_types.ts';
 
 export function toBytes(
@@ -34,41 +35,24 @@ export function parse(
   remainingLength: number,
   _protocolVersion: Mqtt.ProtocolVersion,
 ): AuthPacket {
-  let pos = 0;
+  const reader = new ByteReader(buffer, remainingLength);
 
-  if (remainingLength == 0) {
+  // The Reason Code and the Property Length can be omitted when the Reason Code is 0x00 (Success) and there are no
+  // properties: the Remaining Length is 0 then (MQTT 5.0 3.15.2.1). Unlike DISCONNECT, the Property Length cannot be
+  // omitted alone.
+  if (reader.remaining === 0) {
     return {
       type: 'auth',
       reasonCode: Mqtt.ReasonCode.Success,
     };
   }
 
-  const reasonCode = buffer[pos++] & 0xFF;
-  if (remainingLength > pos) {
-    const properties = (() => {
-      const { number: length, size: consumedBytesSize } = variableByteIntegerToNum(buffer, pos);
-      pos += consumedBytesSize;
-
-      if (length > 0) {
-        const prop = MqttProperties.parseMqttProperties(buffer, pos, length);
-        pos += length;
-        return prop;
-      } else {
-        return undefined;
-      }
-    })();
-
-    if (properties) {
-      return {
-        type: 'auth',
-        reasonCode,
-        properties,
-      };
-    }
-  }
-
+  const reasonCode = reader.readByte();
+  const properties = readProperties(reader);
+  reader.expectEnd('AUTH');
   return {
     type: 'auth',
     reasonCode,
+    ...(properties && { properties }),
   };
 }

@@ -193,11 +193,11 @@ Deno.test({ name: '@receive U+FEFF at the start of a string', only: false }, asy
       await client.connect();
 
       // TextEncoder encodes U+FEFF as 0xEF 0xBB 0xBF.
-      await broker.sendRawBytes('cid', publishBytes('﻿topicA', { userProperties: [{ key: '﻿k', val: '﻿' }] }));
+      await broker.sendRawBytes('cid', publishBytes('\u{FEFF}topicA', { userProperties: [{ key: '\u{FEFF}k', val: '\u{FEFF}' }] }));
       await waitFor(() => recorded.topics.length === 1, 'the PUBLISH');
       // The leading U+FEFF is not stripped as a BOM.
-      assertEquals(recorded.topics, ['﻿topicA']);
-      assertEquals(recorded.userProperties, [[{ key: '﻿k', val: '﻿' }]]);
+      assertEquals(recorded.topics, ['\u{FEFF}topicA']);
+      assertEquals(recorded.userProperties, [[{ key: '\u{FEFF}k', val: '\u{FEFF}' }]]);
       assertEquals(recorded.disconnects, []);
     } finally {
       await client.disconnect(true);

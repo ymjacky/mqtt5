@@ -1,14 +1,8 @@
 import * as Mqtt from '../mqtt/mod.ts';
-import {
-  concatBytes,
-  numToQoS,
-  numToTwoByteInteger,
-  remainingLengthToBytes,
-  stringToUtfEncodedString,
-  utfEncodedStringToString,
-  variableByteIntegerToNum,
-} from '../mqtt_utils/mod.ts';
+import { ByteReader, concatBytes, numToQoS, numToTwoByteInteger, remainingLengthToBytes, stringToUtfEncodedString } from '../mqtt_utils/mod.ts';
+import { ProtocolViolationError } from '../mqtt_utils/error.ts';
 import * as MqttProperties from '../mqtt_properties/mod.ts';
+import { readProperties } from '../mqtt_properties/read_properties.ts';
 import type { SubscribePacket, Subscription } from './packet_types.ts';
 
 export function toBytes(
@@ -59,46 +53,36 @@ export function parse(
   remainingLength: number,
   protocolVersion: Mqtt.ProtocolVersion,
 ): SubscribePacket {
-  let pos = 0;
-  const packetId = (buffer[pos++] << 8) + buffer[pos++];
+  const reader = new ByteReader(buffer, remainingLength);
+  const packetId = reader.readTwoByteInteger();
 
   const properties = (() => {
-    if (protocolVersion > Mqtt.ProtocolVersion.MQTT_V3_1_1) {
-      const { number: length, size: consumedBytesSize } = variableByteIntegerToNum(buffer, pos);
-      pos += consumedBytesSize;
-      if (length > 0) {
-        const { subscriptionIdentifiers, ...props } = MqttProperties.parseMqttProperties(buffer, pos, length);
-        pos += length;
-        if (typeof subscriptionIdentifiers === 'undefined') {
-          return props;
-        }
-        // Unlike PUBLISH, SUBSCRIBE must not carry more than one Subscription Identifier (MQTT 5.0 section 3.8.2.1.2).
-        if (subscriptionIdentifiers.length > 1) {
-          throw new Error('SUBSCRIBE must not include the Subscription Identifier more than once.');
-        }
-        return { ...props, subscriptionIdentifier: subscriptionIdentifiers[0] };
-      } else {
-        return {}; // Return empty object if no properties
-      }
-    } else {
+    if (protocolVersion === Mqtt.ProtocolVersion.MQTT_V3_1_1) {
       return undefined;
     }
+    const { subscriptionIdentifiers, ...props } = readProperties(reader) ?? {};
+    if (typeof subscriptionIdentifiers === 'undefined') {
+      return props;
+    }
+    // Unlike PUBLISH, SUBSCRIBE must not carry more than one Subscription Identifier (MQTT 5.0 section 3.8.2.1.2).
+    if (subscriptionIdentifiers.length > 1) {
+      throw new ProtocolViolationError('SUBSCRIBE must not include the Subscription Identifier more than once');
+    }
+    return { ...props, subscriptionIdentifier: subscriptionIdentifiers[0] };
   })();
 
   const subscriptions: Subscription[] = [];
-
-  while (pos < remainingLength) {
-    const topicFilterInfo = utfEncodedStringToString(buffer, pos);
-    pos += topicFilterInfo.length;
+  while (reader.remaining > 0) {
+    const topicFilter = reader.readUtf8EncodedString();
 
     if (protocolVersion > Mqtt.ProtocolVersion.MQTT_V3_1_1) {
-      const subscribeOptions = buffer[pos++];
+      const subscribeOptions = reader.readByte();
 
       // Get RetainHandling from 5-4bit (0b00110000 = 0x30)
       const retainHandling = (subscribeOptions & 0b00110000) >> 4;
 
       subscriptions.push({
-        topicFilter: topicFilterInfo.value,
+        topicFilter,
         qos: numToQoS(subscribeOptions & 0b00000011), // QoS in lower 2 bits
         retainHandling: retainHandling as Mqtt.RetainHandling,
         retainAsPublished: !!(subscribeOptions & 0b00001000), // 3rd bit: retainAsPublished
@@ -106,8 +90,8 @@ export function parse(
       });
     } else {
       subscriptions.push({
-        topicFilter: topicFilterInfo.value,
-        qos: numToQoS(buffer[pos++]),
+        topicFilter,
+        qos: numToQoS(reader.readByte()),
       });
     }
   }

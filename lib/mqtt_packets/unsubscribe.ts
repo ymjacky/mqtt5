@@ -1,13 +1,7 @@
 import * as Mqtt from '../mqtt/mod.ts';
-import {
-  concatBytes,
-  numToTwoByteInteger,
-  remainingLengthToBytes,
-  stringToUtfEncodedString,
-  utfEncodedStringToString,
-  variableByteIntegerToNum,
-} from '../mqtt_utils/mod.ts';
+import { ByteReader, concatBytes, numToTwoByteInteger, remainingLengthToBytes, stringToUtfEncodedString } from '../mqtt_utils/mod.ts';
 import * as MqttProperties from '../mqtt_properties/mod.ts';
+import { readProperties } from '../mqtt_properties/read_properties.ts';
 import type { UnsubscribePacket } from './packet_types.ts';
 
 export function toBytes(
@@ -45,31 +39,13 @@ export function parse(
   remainingLength: number,
   protocolVersion: Mqtt.ProtocolVersion,
 ): UnsubscribePacket {
-  let pos = 0;
-  const packetId = (buffer[pos++] << 8) + buffer[pos++];
-
-  const properties = (() => {
-    if (protocolVersion > Mqtt.ProtocolVersion.MQTT_V3_1_1) {
-      const { number: length, size: consumedBytesSize } = variableByteIntegerToNum(buffer, pos);
-      pos += consumedBytesSize;
-      if (length > 0) {
-        const prop = MqttProperties.parseMqttProperties(buffer, pos, length);
-        pos += length;
-        return prop;
-      }
-      return undefined;
-    } else {
-      return undefined;
-    }
-  })();
+  const reader = new ByteReader(buffer, remainingLength);
+  const packetId = reader.readTwoByteInteger();
+  const properties = protocolVersion > Mqtt.ProtocolVersion.MQTT_V3_1_1 ? readProperties(reader) : undefined;
 
   const topicFilters: string[] = [];
-
-  while (pos < remainingLength) {
-    const topicFilter = utfEncodedStringToString(buffer, pos);
-    pos += topicFilter.length;
-
-    topicFilters.push(topicFilter.value);
+  while (reader.remaining > 0) {
+    topicFilters.push(reader.readUtf8EncodedString());
   }
 
   if (protocolVersion > Mqtt.ProtocolVersion.MQTT_V3_1_1) {

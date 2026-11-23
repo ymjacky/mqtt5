@@ -1,4 +1,5 @@
 import { assertEquals, assertThrows } from 'std/assert/mod.ts';
+import { MqttUtilsError } from '../../../lib/mqtt_utils/mod.ts';
 import type { SubscribePacket } from '../../../lib/mqtt_packets/packet_types.ts';
 import { parse, toBytes } from '../../../lib/mqtt_packets/subscribe.ts';
 import * as Mqtt from '../../../lib/mqtt/mod.ts';
@@ -292,7 +293,7 @@ Deno.test('decodeSubscribePacketMQTT5WithOptions', function () {
         43, // 'status/+'
         0x01, // subscription options (retain handling: 0 << 4 | QoS: 1)
       ]),
-      22, // remainingLength
+      26, // remainingLength
       Mqtt.ProtocolVersion.MQTT_V5,
     ),
     {
@@ -353,7 +354,7 @@ Deno.test('decodeSubscribePacketMQTT5WithSubscriptionIdentifier', function () {
         101, // 'device/temperature'
         0x00, // subscription options (QoS: 0)
       ]),
-      24, // remainingLength
+      26, // remainingLength
       Mqtt.ProtocolVersion.MQTT_V5,
     ),
     {
@@ -422,7 +423,7 @@ Deno.test('decodeSubscribePacketMQTT5WithUserProperties', function () {
         99, // 'test/topic'
         0x01, // subscription options (QoS: 1)
       ]),
-      37, // remainingLength
+      39, // remainingLength
       Mqtt.ProtocolVersion.MQTT_V5,
     ),
     {
@@ -469,10 +470,10 @@ Deno.test('decodeSubscribePacketMQTT5WithMultipleSubscriptionIdentifiers', funct
           98, // 'b'
           0x00, // subscription options (QoS: 0)
         ]),
-        12, // remainingLength
+        13, // remainingLength
         Mqtt.ProtocolVersion.MQTT_V5,
       ),
-    Error,
-    'SUBSCRIBE must not include the Subscription Identifier more than once.',
+    MqttUtilsError.ProtocolViolationError,
+    'SUBSCRIBE must not include the Subscription Identifier more than once',
   );
 });

@@ -314,7 +314,8 @@ Deno.test({ name: '@receive publish_qos1 ws', only: false }, async (context) => 
         broker.on('puback', (event) => {
           const packet = event.detail;
           assertEquals(packet.packetId, 1);
-          assertEquals(packet.reasonCode, undefined);
+          // The client omits the Reason Code 0x00 (Remaining Length 2), which is read as 0x00 (MQTT 5.0 3.4.2.1).
+          assertEquals(packet.reasonCode, Mqtt.ReasonCode.Success);
           assertEquals(packet.properties, undefined);
           resolve();
         });
@@ -504,7 +505,8 @@ Deno.test({ name: '@receive publish_qos2 ws', only: false }, async (context) => 
         broker.on('pubrec', (event) => {
           const packet = event.detail;
           assertEquals(packet.packetId, 1);
-          assertEquals(packet.reasonCode, undefined);
+          // The client omits the Reason Code 0x00 (Remaining Length 2), which is read as 0x00 (MQTT 5.0 3.4.2.1).
+          assertEquals(packet.reasonCode, Mqtt.ReasonCode.Success);
           assertEquals(packet.properties, undefined);
 
           broker.sendPubrel(
@@ -516,7 +518,8 @@ Deno.test({ name: '@receive publish_qos2 ws', only: false }, async (context) => 
         broker.on('pubcomp', (event) => {
           const packet = event.detail;
           assertEquals(packet.packetId, 1);
-          assertEquals(packet.reasonCode, undefined);
+          // The client omits the Reason Code 0x00 (Remaining Length 2), which is read as 0x00 (MQTT 5.0 3.4.2.1).
+          assertEquals(packet.reasonCode, Mqtt.ReasonCode.Success);
           assertEquals(packet.properties, undefined);
           resolve();
         });

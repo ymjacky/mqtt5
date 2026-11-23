@@ -1,16 +1,7 @@
 import * as Mqtt from '../mqtt/mod.ts';
-import {
-  concatBytes,
-  numToQoS,
-  numToTwoByteInteger,
-  remainingLengthToBytes,
-  stringToBytes,
-  stringToUtfEncodedString,
-  twoByteIntegerToNum,
-  utfEncodedStringToString,
-  variableByteIntegerToNum,
-} from '../mqtt_utils/mod.ts';
+import { ByteReader, concatBytes, numToQoS, numToTwoByteInteger, remainingLengthToBytes, stringToBytes, stringToUtfEncodedString } from '../mqtt_utils/mod.ts';
 import * as MqttProperties from '../mqtt_properties/mod.ts';
+import { readProperties } from '../mqtt_properties/read_properties.ts';
 import type { PublishPacket } from './packet_types.ts';
 
 export function toBytes(
@@ -62,38 +53,14 @@ export function parse(
   const qos = numToQoS((flags & 0b0110) >> 1);
   const retain = (flags & 0b0001) == 0b0001 ? true : false;
 
-  let pos = 0;
-  // Variable Header
-  const topicInfo = utfEncodedStringToString(buffer, pos);
-  const topic = topicInfo.value;
+  // variable header
+  const reader = new ByteReader(buffer, remainingLength);
+  const topic = reader.readUtf8EncodedString();
+  const packetId = qos === Mqtt.QoS.AT_MOST_ONCE ? undefined : reader.readTwoByteInteger();
+  const properties = protocolVersion > Mqtt.ProtocolVersion.MQTT_V3_1_1 ? readProperties(reader) : undefined;
 
-  pos += topicInfo.length;
-
-  const packetId = (() => {
-    if (qos === Mqtt.QoS.AT_LEAST_ONCE || qos == Mqtt.QoS.EXACTLY_ONCE) {
-      const id = twoByteIntegerToNum(buffer, pos);
-      pos += 2; // 2 = two byte Integer
-      return id;
-    } else {
-      return undefined;
-    }
-  })();
-
-  const properties = (() => {
-    if (protocolVersion > Mqtt.ProtocolVersion.MQTT_V3_1_1) {
-      const { number: length, size: consumedBytesSize } = variableByteIntegerToNum(buffer, pos);
-      pos += consumedBytesSize;
-
-      if (length > 0) {
-        const prop = MqttProperties.parseMqttProperties(buffer, pos, length);
-        pos += length;
-        return prop;
-      }
-      return undefined;
-    }
-  })();
-
-  const payload = buffer.slice(pos, remainingLength);
+  // payload: the rest of the packet
+  const payload = reader.readRest();
 
   return {
     type: 'publish',

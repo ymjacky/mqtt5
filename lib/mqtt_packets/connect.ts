@@ -1,16 +1,7 @@
-import {
-  binaryDataToString,
-  concatBytes,
-  numToQoS,
-  numToTwoByteInteger,
-  remainingLengthToBytes,
-  stringToUtfEncodedString,
-  twoByteIntegerToNum,
-  utfEncodedStringToString,
-  variableByteIntegerToNum,
-} from '../mqtt_utils/mod.ts';
+import { ByteReader, concatBytes, numToQoS, numToTwoByteInteger, remainingLengthToBytes, stringToUtfEncodedString } from '../mqtt_utils/mod.ts';
 import * as Mqtt from '../mqtt/mod.ts';
 import * as MqttProperties from '../mqtt_properties/mod.ts';
+import { readProperties } from '../mqtt_properties/read_properties.ts';
 import { InvalidProtocolVersionError } from './error.ts';
 import type { ConnectPacket } from './packet_types.ts';
 
@@ -89,16 +80,14 @@ export function toBytes(packet: ConnectPacket) {
 
 export function parse(
   buffer: Uint8Array,
-  _remainingLength: number,
+  remainingLength: number,
 ): ConnectPacket {
-  let pos = 0;
+  const reader = new ByteReader(buffer, remainingLength);
 
-  const protocolName = utfEncodedStringToString(buffer, pos);
-  pos += protocolName.length;
+  const protocolName = reader.readUtf8EncodedString();
+  const protocolVersion = reader.readByte();
 
-  const protocolVersion = buffer[pos++];
-
-  const connectFlags = buffer[pos++];
+  const connectFlags = reader.readByte();
   const usernameFlag = !!(connectFlags & 128);
   const passwordFlag = !!(connectFlags & 64);
   const willRetain = !!(connectFlags & 32);
@@ -112,82 +101,38 @@ export function parse(
   ) {
     throw new InvalidProtocolVersionError(`${protocolVersion}`);
   }
-
-  const keepAlive = twoByteIntegerToNum(buffer, pos);
-  pos += 2; // keepAlive is 2 bytes
-
   const pV = protocolVersion as Mqtt.ProtocolVersion;
+  const mqtt5 = pV > Mqtt.ProtocolVersion.MQTT_V3_1_1;
 
-  const properties = (() => {
-    if (pV > Mqtt.ProtocolVersion.MQTT_V3_1_1) {
-      const { number: length, size: consumedBytesSize } = variableByteIntegerToNum(buffer, pos);
-      pos += consumedBytesSize;
+  const keepAlive = reader.readTwoByteInteger();
+  const properties = mqtt5 ? readProperties(reader) : undefined;
 
-      if (length > 0) {
-        const prop = MqttProperties.parseMqttProperties(buffer, pos, length);
-        pos += length;
-        return prop;
-      }
-    }
-    return undefined;
-  })();
-
-  // parse payload
-  const clientId = utfEncodedStringToString(buffer, pos);
-  pos += clientId.length;
+  // payload
+  const clientId = reader.readUtf8EncodedString();
 
   // will
   let willProperties;
   let willTopic = '';
   let willPayload;
   if (willFlag) {
-    willProperties = (() => {
-      if (protocolVersion > Mqtt.ProtocolVersion.MQTT_V3_1_1) {
-        const { number: length, size: consumedBytesSize } = variableByteIntegerToNum(buffer, pos);
-        pos += consumedBytesSize;
-        if (length > 0) {
-          const prop = MqttProperties.parseMqttProperties(buffer, pos, length);
-          pos += length;
-          return prop;
-        }
-      }
-      return undefined;
-    })();
-    const willTopicInfo = utfEncodedStringToString(buffer, pos);
-    willTopic = willTopicInfo.value;
-    pos += willTopicInfo.length;
-
-    const payloadLength = twoByteIntegerToNum(buffer, pos);
-    pos += 2;
-    willPayload = buffer.slice(pos, pos + payloadLength);
-    pos += payloadLength;
+    willProperties = mqtt5 ? readProperties(reader) : undefined;
+    willTopic = reader.readUtf8EncodedString();
+    willPayload = reader.readBinaryData();
   }
 
-  let username;
-  let password;
+  const username = usernameFlag ? reader.readUtf8EncodedString() : undefined;
+  // The Password is Binary Data, not a UTF-8 Encoded String (MQTT 5.0 3.1.3.6, MQTT 3.1.1 3.1.3.5).
+  const password = passwordFlag ? reader.readBinaryDataAsString() : undefined;
+  reader.expectEnd('CONNECT');
 
-  // const usernameStart = clientIdStart + clientId.length;
-
-  if (usernameFlag) {
-    username = utfEncodedStringToString(buffer, pos);
-    pos += username.length;
-  }
-
-  if (passwordFlag) {
-    // const passwordStart = usernameStart + (username ? username.length : 0);
-    // The Password is Binary Data, not a UTF-8 Encoded String (MQTT 5.0 3.1.3.6, MQTT 3.1.1 3.1.3.5).
-    password = binaryDataToString(buffer, pos);
-    pos += password.length;
-  }
-
-  if (pV > Mqtt.ProtocolVersion.MQTT_V3_1_1) {
+  if (mqtt5) {
     return {
       type: 'connect',
-      protocolName: protocolName.value,
+      protocolName,
       protocolVersion: pV,
-      clientId: clientId.value,
-      username: username ? username.value : undefined,
-      password: password ? password.value : undefined,
+      clientId,
+      username,
+      password,
       will: willFlag
         ? {
           retain: willRetain,
@@ -204,11 +149,11 @@ export function parse(
   } else {
     return {
       type: 'connect',
-      protocolName: protocolName.value,
+      protocolName,
       protocolVersion: pV,
-      clientId: clientId.value,
-      username: username ? username.value : undefined,
-      password: password ? password.value : undefined,
+      clientId,
+      username,
+      password,
       will: willFlag
         ? {
           retain: willRetain,

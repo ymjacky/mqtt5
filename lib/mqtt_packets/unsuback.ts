@@ -1,6 +1,7 @@
 import * as Mqtt from '../mqtt/mod.ts';
-import { concatBytes, numToTwoByteInteger, remainingLengthToBytes, twoByteIntegerToNum, variableByteIntegerToNum } from '../mqtt_utils/mod.ts';
+import { ByteReader, concatBytes, numToTwoByteInteger, remainingLengthToBytes } from '../mqtt_utils/mod.ts';
 import * as MqttProperties from '../mqtt_properties/mod.ts';
+import { readProperties } from '../mqtt_properties/read_properties.ts';
 import type { UnsubackPacket } from './packet_types.ts';
 
 export function toBytes(
@@ -39,46 +40,23 @@ export function parse(
   remainingLength: number,
   protocolVersion: Mqtt.ProtocolVersion,
 ): UnsubackPacket {
-  let pos = 0;
+  const reader = new ByteReader(buffer, remainingLength);
+  const packetId = reader.readTwoByteInteger();
 
-  const packetId = twoByteIntegerToNum(buffer, pos);
-  pos += 2;
-
-  if (protocolVersion > Mqtt.ProtocolVersion.MQTT_V3_1_1) {
-    const properties = (() => {
-      const { number: length, size: consumedBytesSize } = variableByteIntegerToNum(buffer, pos);
-      pos += consumedBytesSize;
-
-      if (length > 0) {
-        const prop = MqttProperties.parseMqttProperties(buffer, pos, length);
-        pos += length;
-        return prop;
-      }
-      return undefined;
-    })();
-
-    const reasonCodes = [];
-    while (pos < remainingLength) {
-      reasonCodes.push(buffer[pos++]);
-    }
-    if (properties) {
-      return {
-        type: 'unsuback',
-        packetId: packetId,
-        reasonCodes: reasonCodes,
-        properties: properties,
-      };
-    } else {
-      return {
-        type: 'unsuback',
-        packetId: packetId,
-        reasonCodes: reasonCodes,
-      };
-    }
-  } else {
+  if (protocolVersion === Mqtt.ProtocolVersion.MQTT_V3_1_1) {
+    // MQTT 3.1.1 UNSUBACK has only the Packet Identifier.
+    reader.expectEnd('UNSUBACK');
     return {
       type: 'unsuback',
-      packetId: packetId,
+      packetId,
     };
   }
+
+  const properties = readProperties(reader);
+  return {
+    type: 'unsuback',
+    packetId,
+    reasonCodes: Array.from(reader.readRest()),
+    ...(properties && { properties }),
+  };
 }

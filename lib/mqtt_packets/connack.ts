@@ -1,6 +1,7 @@
 import * as Mqtt from '../mqtt/mod.ts';
 import * as MqttProperties from '../mqtt_properties/mod.ts';
-import { concatBytes, remainingLengthToBytes, variableByteIntegerToNum } from '../mqtt_utils/mod.ts';
+import { readProperties } from '../mqtt_properties/read_properties.ts';
+import { ByteReader, concatBytes, remainingLengthToBytes } from '../mqtt_utils/mod.ts';
 import type { ConnackPacket } from './packet_types.ts';
 
 export function toBytes(
@@ -32,50 +33,28 @@ export function parse(
   remainingLength: number,
   protocolVersion: Mqtt.ProtocolVersion,
 ): ConnackPacket {
-  let pos = 0;
-
-  if (remainingLength < 2) {
-    throw Error('malformed length');
-  }
-
-  const sessionPresent = (buffer[pos++] & 0b00000001) === 0 ? false : true;
-
-  const rc = buffer[pos++];
+  const reader = new ByteReader(buffer, remainingLength);
+  const sessionPresent = (reader.readByte() & 0b00000001) !== 0;
+  const rc = reader.readByte();
 
   if (protocolVersion === Mqtt.ProtocolVersion.MQTT_V3_1_1) {
-    const returnCode = rc as Mqtt.V3_1_1_ConnectReturnCode;
+    reader.expectEnd('CONNACK');
     return {
       type: 'connack',
       sessionPresent,
-      returnCode,
+      returnCode: rc as Mqtt.V3_1_1_ConnectReturnCode,
     };
   }
 
-  const reasonCode = rc as Mqtt.ReasonCode;
-  const properties = (() => {
-    const { number: length, size: consumedBytesSize } = variableByteIntegerToNum(buffer, pos);
-    pos += consumedBytesSize;
-
-    if (length > 0) {
-      const prop = MqttProperties.parseMqttProperties(buffer, pos, length);
-      pos += length;
-      return prop;
-    }
-    return undefined;
-  })();
-
-  if (properties) {
-    return {
-      type: 'connack',
-      sessionPresent: sessionPresent,
-      reasonCode: reasonCode,
-      properties: properties,
-    };
-  } else {
-    return {
-      type: 'connack',
-      sessionPresent: sessionPresent,
-      reasonCode: reasonCode,
-    };
-  }
+  // A broker that supports only MQTT 3.1.1 answers a CONNECT of MQTT 5.0 with a CONNACK of MQTT 3.1.1, which has no
+  // Property Length (e.g. the return code 0x01, unacceptable protocol version). It is read without properties, so that
+  // connect() gets the code.
+  const properties = reader.remaining === 0 ? undefined : readProperties(reader);
+  reader.expectEnd('CONNACK');
+  return {
+    type: 'connack',
+    sessionPresent,
+    reasonCode: rc as Mqtt.ReasonCode,
+    ...(properties && { properties }),
+  };
 }
