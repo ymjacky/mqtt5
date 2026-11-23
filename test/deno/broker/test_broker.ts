@@ -1,4 +1,4 @@
-import { ClientErrors, Mqtt, MqttPackets, MqttProperties } from '../../../deno/mod.ts';
+import { ClientErrors, Mqtt, MqttPackets, type MqttProperties } from '../../../deno/mod.ts';
 import * as MqttStream from '../../../lib/mqtt_stream_utils/mod.ts';
 
 interface CustomEventMap {
@@ -42,7 +42,11 @@ async function readPacketBytes(
 ): Promise<Uint8Array> {
   let receiveBytes: Uint8Array | undefined;
   while (!(receiveBytes = frameBuffer.takePacket())) {
-    frameBuffer.append(await MqttStream.readChunk(reader));
+    const { done, value } = await reader.read();
+    if (done) {
+      throw new ClientErrors.ConnectionClosed();
+    }
+    frameBuffer.append(value);
   }
   return receiveBytes;
 }
@@ -96,7 +100,7 @@ export class TestBroker extends EventTarget {
     });
   }
 
-  private async register(conn: Deno.Conn<Deno.Addr>) {
+  private async register(conn: Deno.Conn<Deno.Addr>): Promise<void> {
     const reader = conn.readable.getReader();
     const frameBuffer = new MqttStream.MqttFrameBuffer();
 
@@ -118,7 +122,7 @@ export class TestBroker extends EventTarget {
     }
   }
 
-  async listen(port: number = 1883) {
+  async listen(port: number = 1883): Promise<void> {
     this.listener = Deno.listen({ port: port, transport: 'tcp' });
     const { promise, resolve } = Promise.withResolvers<void>();
     this.closeDefer = promise;
@@ -134,7 +138,7 @@ export class TestBroker extends EventTarget {
     resolve(); // close complete
   }
 
-  async listenTls(port: number = 8883) {
+  async listenTls(port: number = 8883): Promise<void> {
     this.listener = Deno.listenTls({
       port: port,
       transport: 'tcp',
@@ -161,7 +165,7 @@ export class TestBroker extends EventTarget {
     this.addEventListener(type, callback as EventListener);
   };
 
-  async destroy() {
+  async destroy(): Promise<void> {
     if (this.listener) {
       try {
         this.listener.close();
@@ -180,7 +184,7 @@ export class TestBroker extends EventTarget {
   }
 
   // Read packets until the connection is closed and dispatch each one as the event of the same name.
-  private async readPackets(client: Client) {
+  private async readPackets(client: Client): Promise<void> {
     try {
       while (true) {
         const receiveBytes = await readPacketBytes(client.reader, client.frameBuffer);
@@ -208,7 +212,7 @@ export class TestBroker extends EventTarget {
     protocolVersion: Mqtt.ProtocolVersion,
     returnValue: number = 0, // success
     properties?: MqttProperties.Properties,
-  ) {
+  ): Promise<void> {
     const client = this.clients.get(clientId);
     if (client) { // found
       let packet: MqttPackets.ConnackPacket;
@@ -246,7 +250,7 @@ export class TestBroker extends EventTarget {
     dup: boolean = false,
     retain: boolean = false,
     properties?: MqttProperties.Properties,
-  ) {
+  ): Promise<void> {
     const client = this.clients.get(clientId);
     if (client) { // found
       let packet: MqttPackets.PublishPacket;
@@ -288,7 +292,7 @@ export class TestBroker extends EventTarget {
     protocolVersion: Mqtt.ProtocolVersion,
     returnValue: number = 0, // success
     properties?: MqttProperties.Properties,
-  ) {
+  ): Promise<void> {
     const client = this.clients.get(clientId);
     if (client) { // found
       let packet: MqttPackets.PubackPacket;
@@ -321,7 +325,7 @@ export class TestBroker extends EventTarget {
     protocolVersion: Mqtt.ProtocolVersion,
     returnValue: number = 0, // success
     properties?: MqttProperties.Properties,
-  ) {
+  ): Promise<void> {
     const client = this.clients.get(clientId);
     if (client) { // found
       let packet: MqttPackets.PubrecPacket;
@@ -354,7 +358,7 @@ export class TestBroker extends EventTarget {
     protocolVersion: Mqtt.ProtocolVersion,
     returnValue: number = 0, // success
     properties?: MqttProperties.Properties,
-  ) {
+  ): Promise<void> {
     const client = this.clients.get(clientId);
     if (client) { // found
       let packet: MqttPackets.PubrelPacket;
@@ -387,7 +391,7 @@ export class TestBroker extends EventTarget {
     protocolVersion: Mqtt.ProtocolVersion,
     returnValue: number = 0, // success
     properties?: MqttProperties.Properties,
-  ) {
+  ): Promise<void> {
     const client = this.clients.get(clientId);
     if (client) { // found
       let packet: MqttPackets.PubcompPacket;
@@ -420,7 +424,7 @@ export class TestBroker extends EventTarget {
     protocolVersion: Mqtt.ProtocolVersion,
     returnValues: number[] = [0], // success
     properties?: MqttProperties.Properties,
-  ) {
+  ): Promise<void> {
     const client = this.clients.get(clientId);
     if (client) { // found
       let packet: MqttPackets.SubackPacket;
@@ -454,7 +458,7 @@ export class TestBroker extends EventTarget {
     protocolVersion: Mqtt.ProtocolVersion,
     returnValues: number[] = [0], // success
     properties?: MqttProperties.Properties,
-  ) {
+  ): Promise<void> {
     const client = this.clients.get(clientId);
     if (client) { // found
       let packet: MqttPackets.UnsubackPacket;
@@ -484,7 +488,7 @@ export class TestBroker extends EventTarget {
   async sendPingresp(
     clientId: string,
     protocolVersion: Mqtt.ProtocolVersion,
-  ) {
+  ): Promise<void> {
     const client = this.clients.get(clientId);
     if (client) { // found
       const packet: MqttPackets.PingrespPacket = {
@@ -504,7 +508,7 @@ export class TestBroker extends EventTarget {
     clientId: string,
     reasonCode: Mqtt.ReasonCode,
     properties?: MqttProperties.DisconnectProperties,
-  ) {
+  ): Promise<void> {
     const client = this.clients.get(clientId);
     if (client) { // found
       const packet: MqttPackets.DisconnectPacket = {
@@ -524,7 +528,7 @@ export class TestBroker extends EventTarget {
     clientId: string,
     reasonCode: Mqtt.ReasonCode,
     properties?: MqttProperties.AuthProperties,
-  ) {
+  ): Promise<void> {
     const client = this.clients.get(clientId);
     if (client) { // found
       const packet: MqttPackets.AuthPacket = {
@@ -543,7 +547,7 @@ export class TestBroker extends EventTarget {
 
   async closeConnectionFromBroker(
     clientId: string,
-  ) {
+  ): Promise<void> {
     const client = this.clients.get(clientId);
     if (client) { // found
       await client.reader.cancel();
@@ -557,7 +561,7 @@ export class TestBroker extends EventTarget {
   async sendRawBytes(
     clientId: string,
     bytes: Uint8Array,
-  ) {
+  ): Promise<void> {
     const client = this.clients.get(clientId);
     if (client) { // found
       log(`sending raw bytes (length: ${bytes.length})`, bytes);

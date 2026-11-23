@@ -7,7 +7,7 @@ import type { PublishPacket } from './packet_types.ts';
 export function toBytes(
   packet: PublishPacket,
   protocolVersion: Mqtt.ProtocolVersion,
-) {
+): Uint8Array {
   const qos = packet.qos || Mqtt.QoS.AT_MOST_ONCE;
 
   const flags = // fixedHeader Flags
@@ -49,9 +49,9 @@ export function parse(
 ): PublishPacket {
   // fixed header
   const flags = packetFlags & 0x0f;
-  const dup = (flags & 0b1000) == 0b1000 ? true : false;
+  const dup = (flags & 0b1000) === 0b1000 ? true : false;
   const qos = numToQoS((flags & 0b0110) >> 1);
-  const retain = (flags & 0b0001) == 0b0001 ? true : false;
+  const retain = (flags & 0b0001) === 0b0001 ? true : false;
 
   // variable header
   const reader = new ByteReader(buffer, remainingLength);

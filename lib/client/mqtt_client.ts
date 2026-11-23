@@ -1,21 +1,6 @@
 import { BaseMqttClient } from './base_mqtt_client.ts';
-import type { ClientOptions, WriterFactory, WriterFunction } from './client_types.ts';
-import * as MqttStream from '../mqtt_stream_utils/mod.ts';
-import { ConnectionClosed, ConnectionReset, UnexpectedUrlProtocol } from './error.ts';
-
-// curry: generate write function
-const writerFactory: WriterFactory = (
-  conn: Deno.Conn,
-  log: (msg: string, ...args: unknown[]) => void,
-): WriterFunction => {
-  const writer: WritableStreamDefaultWriter = conn.writable.getWriter();
-
-  return async (bytes: Uint8Array) => {
-    log('writing bytes', bytes);
-    await writer.ready;
-    await writer.write(bytes);
-  };
-};
+import type { ClientOptions } from './client_types.ts';
+import { SendPacketError, UnexpectedUrlProtocol } from './error.ts';
 
 // The port to connect to when the URL has none.
 const defaultPorts: Record<string, number> = { 'mqtt:': 1883, 'mqtts:': 8883 };
@@ -70,6 +55,8 @@ export class MqttClient extends BaseMqttClient {
    * @ignore
    */
   protected conn?: Deno.Conn;
+  // Writes to and reads from `conn`. Set when it is opened.
+  private writer?: WritableStreamDefaultWriter<Uint8Array>;
   private reader?: ReadableStreamDefaultReader<Uint8Array>;
 
   /**
@@ -86,35 +73,22 @@ export class MqttClient extends BaseMqttClient {
    * @param signal when it aborts while the connection is being opened, rejects at once; the connection is closed when it opens.
    * @ignore
    */
-  protected async open(signal: AbortSignal): Promise<void> {
+  protected override async open(signal: AbortSignal): Promise<void> {
     const openSocket = async () => {
       // A URL without a port has the default port of its protocol.
       const port = this.url.port !== '' ? Number(this.url.port) : defaultPorts[this.url.protocol];
       if (this.url.protocol === 'mqtt:') {
-        return await Deno.connect({
+        return Deno.connect({
           hostname: this.url.hostname,
           port,
         });
       } else if (this.url.protocol === 'mqtts:') {
-        const tlsOpt: Deno.ConnectTlsOptions = {
+        const conn = await Deno.connectTls({
           hostname: this.url.hostname,
           port,
           caCerts: this.caCerts,
-        };
-        let conn: Deno.TlsConn;
-        if (this.privateKey && this.cert) {
-          type TlsType = Deno.ConnectTlsOptions & Deno.TlsCertifiedKeyPem;
-          const tls: TlsType = {
-            hostname: this.url.hostname,
-            port,
-            caCerts: this.caCerts,
-            cert: this.cert,
-            key: this.privateKey,
-          };
-          conn = await Deno.connectTls(tls);
-        } else {
-          conn = await Deno.connectTls(tlsOpt);
-        }
+          ...(this.privateKey && this.cert ? { cert: this.cert, key: this.privateKey } : {}),
+        });
         // Deno does the TLS handshake on the first read or write. Do it here: a failure, e.g. a certificate that is not
         // trusted, is then an error of opening the connection, and connect() rejects with it.
         try {
@@ -131,30 +105,29 @@ export class MqttClient extends BaseMqttClient {
 
     // Nothing of this client is changed until the connection is open: an aborted opening must not affect the next one.
     this.conn = await openUnlessAborted(openSocket(), signal);
-    this.write = writerFactory(this.conn, this.log);
+    this.writer = this.conn.writable.getWriter();
     // The receive loop reads this connection only, and reports its close only while it is the connection of the client:
     // a loop that outlives its connection must not touch the next one.
     const reader = this.conn.readable.getReader();
     this.reader = reader;
     // Not shared with a previous connection, which may have left a partial packet.
     const frameBuffer = this.createFrameBuffer();
-    const reportClosed = () => {
-      if (this.reader === reader) {
-        this.detectClosed();
-      }
-    };
 
     (async () => {
-      while (true) {
-        try {
-          frameBuffer.append(await MqttStream.readChunk(reader));
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) {
+            return;
+          }
+          frameBuffer.append(value);
 
           while (true) {
             let receiveBytes: Uint8Array | undefined;
             try {
               receiveBytes = frameBuffer.takePacket();
             } catch (streamError) {
-              // Rethrows non-framing errors.
+              // Rejects for an error that is not a framing error.
               await this.handleFramingError(streamError);
 
               // We can no longer safely read further packets on this
@@ -162,8 +135,7 @@ export class MqttClient extends BaseMqttClient {
               // started by handleMalformedPacket() won't help here because
               // nothing else awaits `reader` once we stop this loop.
               await reader.cancel();
-              reportClosed();
-              return; // stop the receive loop
+              return;
             }
             if (!receiveBytes) {
               break; // wait for the next chunk
@@ -171,37 +143,39 @@ export class MqttClient extends BaseMqttClient {
 
             await this.handleReceivedBytes(receiveBytes);
           }
-        } catch (e) {
-          reportClosed();
-          if (e instanceof ConnectionClosed) {
-            break; // while
-          } else if (e instanceof ConnectionReset) {
-            this.log('ConnectionReset.', e.message);
-            break;
-          } else {
-            this.log('fatal error in receive loop', e);
-            break;
-          }
+        }
+      } catch (err) {
+        // e.g. the connection was reset by the broker.
+        this.log('the receive loop ended with an error', err);
+      } finally {
+        // Reported however the loop ended: the client does not read this connection any more.
+        if (this.reader === reader) {
+          this.detectClosed();
         }
       }
-    })().catch((fatalError) => {
-      // Handle unexpected errors in receive loop
-      this.log('Unhandled error in receive loop:', fatalError);
-      this.close();
-    });
+    })();
+  }
+
+  /**
+   * Writes bytes to the open connection.
+   * @throws {SendPacketError} if no connection has been opened.
+   * @ignore
+   */
+  protected override async write(bytes: Uint8Array): Promise<void> {
+    const writer = this.writer;
+    if (!writer) {
+      return Promise.reject(new SendPacketError());
+    }
+    this.log('writing bytes', bytes);
+    await writer.ready;
+    await writer.write(bytes);
   }
 
   /**
    * Closes the connection.
    * @ignore
    */
-  protected async close(): Promise<void> {
-    if (this.conn) {
-      if (this.reader) {
-        await this.reader.cancel();
-      }
-    }
-
-    return Promise.resolve();
+  protected override async close(): Promise<void> {
+    await this.reader?.cancel();
   }
 }

@@ -6,8 +6,10 @@
  * @module
  */
 
-import { Mqtt, MqttProperties, MqttUtils } from '../mod.ts';
-import { ConnectOptions, SubscriptionOption } from './client_types.ts';
+import * as Mqtt from '../mqtt/mod.ts';
+import type * as MqttProperties from '../mqtt_properties/mod.ts';
+import * as MqttUtils from '../mqtt_utils/mod.ts';
+import type { ConnectOptions, SubscriptionOption } from './client_types.ts';
 import {
   InvalidArgumentError,
   InvalidPropertyError,

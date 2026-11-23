@@ -1,4 +1,4 @@
-import { assert, assertEquals, assertFalse, assertThrows } from 'std/assert/mod.ts';
+import { assert, assertEquals, assertFalse, assertThrows } from '@std/assert';
 
 import { ReuseIdProvider as IdProvider } from '../../../lib/id_provider/reuse_id_provider.ts';
 

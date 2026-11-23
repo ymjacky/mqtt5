@@ -1,6 +1,6 @@
 import { KvOutgoingStore, Mqtt, MqttPackets } from '../../../deno/mod.ts';
 import { kvStore, publishPacket, resendOrder } from './outgoing_store_contract.ts';
-import { assertEquals, assertRejects, assertThrows } from 'std/assert/mod.ts';
+import { assertEquals, assertRejects, assertThrows } from '@std/assert';
 
 /** A PUBLISH whose MQTT 5.0 encoding is `size` bytes. */
 function publishPacketOfSize(size: number): MqttPackets.PublishPacket {

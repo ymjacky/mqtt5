@@ -1,8 +1,8 @@
 import { BaseMqttClient } from './base_mqtt_client.ts';
-import { ClientOptions } from './client_types.ts';
+import type { ClientOptions } from './client_types.ts';
 import * as MqttStream from '../mqtt_stream_utils/mod.ts';
 import { Deferred } from './promise.ts';
-import { ConnectionClosed } from './error.ts';
+import { ConnectionClosed, InvalidArgumentError, SendPacketError } from './error.ts';
 
 // Time to wait for the peer to complete the WebSocket closing handshake, in milliseconds.
 const closingHandshakeTimeout = 1 * 1000;
@@ -41,11 +41,11 @@ export class WebSocketMqttClient extends BaseMqttClient {
   /**
    * Creates a client. It does not connect until {@link WebSocketMqttClient.connect} is called.
    * @param options client options. `url` is required and must use `ws:` or `wss:`.
-   * @throws {Error} if `url` is not specified.
+   * @throws {InvalidArgumentError} if `url` is not specified.
    */
   constructor(options?: ClientOptions) {
     if (!options?.url) {
-      throw new Error('uri required');
+      throw new InvalidArgumentError('url is required');
     }
     super(options);
   }
@@ -55,20 +55,13 @@ export class WebSocketMqttClient extends BaseMqttClient {
    * and the `close` event then reports it.
    * @ignore
    */
-  protected open(): Promise<void> {
+  protected override open(): Promise<void> {
     const deferred = new Deferred<void>();
 
     // Discard any partial packet left over from a previous connection.
     this.frameBuffer = this.createFrameBuffer();
     this.conn = new WebSocket(this.url, 'mqtt');
     this.conn.binaryType = 'arraybuffer';
-
-    this.write = async (bytes: Uint8Array) => {
-      if (this.conn) {
-        this.log('writing bytes', bytes);
-        await this.conn.send(bytes);
-      }
-    };
 
     const conn = this.conn;
     const closed = () => {
@@ -92,6 +85,11 @@ export class WebSocketMqttClient extends BaseMqttClient {
       closed();
     };
 
+    // An error thrown from an event handler is an uncaught error, which terminates the process.
+    const fatalError = (err: unknown) => {
+      this.log('fatal error handling a received message', err);
+      this.close();
+    };
     this.conn.onmessage = (e: MessageEvent<unknown>) => {
       try {
         this.frameBuffer.append(new Uint8Array(e.data as ArrayBuffer));
@@ -101,8 +99,8 @@ export class WebSocketMqttClient extends BaseMqttClient {
           try {
             receiveBytes = this.frameBuffer.takePacket();
           } catch (streamError) {
-            // Rethrows non-framing errors.
-            this.handleFramingError(streamError);
+            // Rejects for an error that is not a framing error.
+            this.handleFramingError(streamError).catch(fatalError);
 
             // We can no longer safely interpret further bytes on this
             // connection. `this.conn.onclose` will call detectClosed() once the
@@ -114,18 +112,17 @@ export class WebSocketMqttClient extends BaseMqttClient {
             return; // wait for the next message
           }
 
-          this.handleReceivedBytes(receiveBytes);
+          // Not awaited: the packets are dispatched in order when it returns, and a malformed one is handled meanwhile.
+          this.handleReceivedBytes(receiveBytes).catch(fatalError);
         }
-      } catch (fatalError) {
-        // An error thrown from an event handler is an uncaught error, which terminates the process.
-        this.log('fatal error handling a received message', fatalError);
-        this.close();
+      } catch (err) {
+        fatalError(err);
       }
     };
 
     this.conn.onerror = (e: Event) => {
       if (e instanceof ErrorEvent) {
-        this.log('error occured.', e.message);
+        this.log('error occurred.', e.message);
       }
       if (this.conn) {
         this.conn.close();
@@ -139,6 +136,25 @@ export class WebSocketMqttClient extends BaseMqttClient {
   }
 
   /**
+   * Writes bytes to the WebSocket. `WebSocket.send()` only queues them: the returned promise does not wait for them to be sent.
+   * @throws {SendPacketError} if no connection has been opened.
+   * @ignore
+   */
+  protected override write(bytes: Uint8Array): Promise<void> {
+    if (!this.conn) {
+      return Promise.reject(new SendPacketError());
+    }
+    try {
+      this.log('writing bytes', bytes);
+      // Throws e.g. when the WebSocket is not open.
+      this.conn.send(bytes);
+    } catch (err) {
+      return Promise.reject(err);
+    }
+    return Promise.resolve();
+  }
+
+  /**
    * Closes the connection.
    *
    * `WebSocket.close()` only starts the closing handshake, and the `close` event is emitted when the peer answers it.
@@ -147,7 +163,7 @@ export class WebSocketMqttClient extends BaseMqttClient {
    * of such a WebSocket; the runtime keeps it until the connection ends.
    * @ignore
    */
-  protected close(): Promise<void> {
+  protected override close(): Promise<void> {
     const closed = this.connectionClosed;
     if (this.conn && closed && this.closingTimer === undefined) {
       this.conn.close();

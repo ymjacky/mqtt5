@@ -1,4 +1,4 @@
-import { MqttPackets } from '../mod.ts';
+import type * as MqttPackets from '../mqtt_packets/mod.ts';
 
 /**
  * Keeps the packet IDs of received QoS 2 PUBLISH packets until PUBREL is received.
@@ -70,7 +70,7 @@ export interface OutgoingStore {
   resendIterator(): AsyncIterableIterator<MqttPackets.PublishPacket | MqttPackets.PubrelPacket>;
 
   /** Returns whether a packet with the packet ID is stored. */
-  has(packet: number): Promise<boolean>;
+  has(packetId: number): Promise<boolean>;
 
   /** Returns the number of stored packets. */
   count(): Promise<number>;

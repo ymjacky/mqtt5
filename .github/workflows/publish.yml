@@ -32,7 +32,7 @@ jobs:
 
       # Build before publishing so a broken bundle stops the release early.
       - name: build the browser bundle
-        run: deno task build_ems
+        run: deno task build_esm
 
       - name: Publish package
         run: deno publish

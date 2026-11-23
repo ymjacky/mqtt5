@@ -1,4 +1,4 @@
-import { assertEquals } from 'std/assert/mod.ts';
+import { assertEquals } from '@std/assert';
 import type { UnsubackPacket } from '../../../lib/mqtt_packets/packet_types.ts';
 import { parse, toBytes } from '../../../lib/mqtt_packets/unsuback.ts';
 import * as Mqtt from '../../../lib/mqtt/mod.ts';

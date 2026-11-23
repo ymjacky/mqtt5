@@ -1,6 +1,7 @@
 /** Received bytes could not be decoded as an MQTT packet. */
 export class MqttPacketParseError extends Error {
-  readonly #className = 'MqttPacketParseError';
+  /** The name of the error class. */
+  override readonly name = 'MqttPacketParseError' as const;
   /** Creates the error. Pass the underlying error as `options.cause`. */
   constructor(message: string, options?: ErrorOptions) {
     super(message, options);
@@ -9,7 +10,8 @@ export class MqttPacketParseError extends Error {
 
 /** A packet could not be encoded to bytes. */
 export class MqttPacketSerializeError extends Error {
-  readonly #className = 'MqttPacketSerializeError';
+  /** The name of the error class. */
+  override readonly name = 'MqttPacketSerializeError' as const;
   /** Creates the error. Pass the underlying error as `options.cause`. */
   constructor(message: string, options?: ErrorOptions) {
     super(message, options);
@@ -18,7 +20,8 @@ export class MqttPacketSerializeError extends Error {
 
 /** The packet type is not supported. */
 export class UnsupportedPacketError extends Error {
-  readonly #className = 'UnsupportedPacketError';
+  /** The name of the error class. */
+  override readonly name = 'UnsupportedPacketError' as const;
   /** Creates the error for the given packet type. */
   constructor(packetType: string) {
     super(`unsupported packet: ${packetType}`);
@@ -27,7 +30,8 @@ export class UnsupportedPacketError extends Error {
 
 /** The protocol version is not supported. */
 export class InvalidProtocolVersionError extends Error {
-  readonly #className = 'InvalidProtocolVersionError';
+  /** The name of the error class. */
+  override readonly name = 'InvalidProtocolVersionError' as const;
   /** Creates the error with the given details. */
   constructor(message: string) {
     super(`invalid protocol version: ${message}`);

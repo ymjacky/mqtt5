@@ -1,4 +1,5 @@
-import { Mqtt, MqttPackets } from '../mod.ts';
+import * as Mqtt from '../mqtt/mod.ts';
+import * as MqttPackets from '../mqtt_packets/mod.ts';
 import type { OutgoingStore } from './store.ts';
 
 type StoredPacket = MqttPackets.PublishPacket | MqttPackets.PubrelPacket;
@@ -86,7 +87,7 @@ export class KvOutgoingStore implements OutgoingStore {
   constructor(kv: Deno.Kv, options?: KvOutgoingStoreOptions) {
     this.kv = kv;
     this.prefix = options?.prefix ?? ['mqtt5'];
-    this.log = options?.logger || (() => {});
+    this.log = options?.logger ?? (() => {});
   }
 
   /**
@@ -216,7 +217,7 @@ export class KvOutgoingStore implements OutgoingStore {
     }
     try {
       const packet = MqttPackets.decode(entry.bytes, Mqtt.ProtocolVersion.MQTT_V5);
-      if ((packet.type === 'publish' || packet.type === 'pubrel') && packet.packetId === key[key.length - 1]) {
+      if ((packet.type === 'publish' || packet.type === 'pubrel') && packet.packetId === key.at(-1)) {
         return { seq: entry.seq, packet };
       }
     } catch {

@@ -5,7 +5,7 @@
  */
 
 import * as Mqtt from '../mqtt/mod.ts';
-import { ByteReader } from '../mqtt_utils/mod.ts';
+import type { ByteReader } from '../mqtt_utils/mod.ts';
 import { ProtocolViolationError } from '../mqtt_utils/error.ts';
 import { UnsupportedPropertyError } from './error.ts';
 import type { Properties } from './mod.ts';

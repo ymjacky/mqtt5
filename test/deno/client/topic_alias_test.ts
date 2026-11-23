@@ -1,4 +1,4 @@
-import { assert, assertEquals } from 'std/assert/mod.ts';
+import { assert, assertEquals } from '@std/assert';
 import { TopicAliasManager } from '../../../lib/client/topic_alias.ts';
 
 Deno.test('getTopicId generates an alias for a new topic and returns it again for the same topic', () => {

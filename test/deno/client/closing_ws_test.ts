@@ -1,6 +1,6 @@
-import { MqttProperties, WebSocketMqttClient } from '../../../deno/mod.ts';
+import { type MqttProperties, WebSocketMqttClient } from '../../../deno/mod.ts';
 import { TestWsBroker } from '../broker/test_ws_broker.ts';
-import { assertEquals, assertExists, fail } from 'std/assert/mod.ts';
+import { assertEquals, assertExists, fail } from '@std/assert';
 
 function logger(msg: string, ...args: unknown[]): void {
   console.log('[Test Client]', msg, ...args);

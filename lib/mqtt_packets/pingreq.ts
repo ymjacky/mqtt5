@@ -1,7 +1,7 @@
 import * as Mqtt from '../mqtt/mod.ts';
 import type { PingreqPacket } from './packet_types.ts';
 
-export function toBytes(_packet: PingreqPacket) {
+export function toBytes(_packet: PingreqPacket): Uint8Array {
   const fixedHeader = [
     (Mqtt.PacketType.PINGREQ << 4) + Mqtt.fixedHeaderFlag.PINGREQ,
     0, // remainingLength 0

@@ -9,7 +9,8 @@ const maxFixedHeaderBytes = 5;
  * of it is received.
  */
 export class PacketTooLargeToReceiveError extends Error {
-  readonly #className = 'PacketTooLargeToReceiveError';
+  /** The name of the error class. */
+  override readonly name = 'PacketTooLargeToReceiveError' as const;
   /** The size of the packet in bytes, from its fixed header. */
   readonly packetSize: number;
   /** The Maximum Packet Size of CONNECT. */

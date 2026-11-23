@@ -1,4 +1,4 @@
-import { assertEquals, assertThrows } from 'std/assert/mod.ts';
+import { assertEquals, assertThrows } from '@std/assert';
 import { parseMqttProperties, propertiesToBytes, UnsupportedPropertyError } from '../../../lib/mqtt_properties/mod.ts';
 import { testPropertyCases } from './test_helper.ts';
 

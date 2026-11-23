@@ -1,10 +1,16 @@
-import { ClientErrors, Mqtt, MqttProperties, WebSocketMqttClient } from '../../../deno/mod.ts';
+import { ClientErrors, Mqtt, type MqttProperties, WebSocketMqttClient } from '../../../deno/mod.ts';
 import { TestWsBroker } from '../broker/test_ws_broker.ts';
-import { assertEquals, assertExists, assertRejects } from 'std/assert/mod.ts';
+import { assertEquals, assertExists, assertRejects, assertThrows } from '@std/assert';
 
 function logger(msg: string, ...args: unknown[]): void {
   console.log('[Test Client]', msg, ...args);
 }
+
+Deno.test('a WebSocketMqttClient cannot be created without a url', () => {
+  assertThrows(() => new WebSocketMqttClient(), ClientErrors.InvalidArgumentError, 'url is required');
+  assertThrows(() => new WebSocketMqttClient({ clientId: 'cid' }), ClientErrors.InvalidArgumentError, 'url is required');
+});
+
 Deno.test({ name: '@connect', only: false }, async (context) => {
   await context.step(
     'connect default value (v5.0)',

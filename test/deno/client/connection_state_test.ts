@@ -1,7 +1,7 @@
-import { ClientErrors, Mqtt, MqttClient, MqttPackets, Store } from '../../../deno/mod.ts';
+import { ClientErrors, Mqtt, MqttClient, type MqttPackets, Store } from '../../../deno/mod.ts';
 import { TestBroker } from '../broker/test_broker.ts';
 import { connackBytes, RawServer, waitUntil } from '../broker/raw_server.ts';
-import { assert, assertEquals, assertRejects } from 'std/assert/mod.ts';
+import { assert, assertEquals, assertRejects } from '@std/assert';
 
 // How the client behaves when the connection is refused, cannot be established, is lost or has to be ended.
 
@@ -30,14 +30,18 @@ async function stateOf(promise: Promise<unknown>, ms = 50): Promise<'resolved' |
 // right after accepting it.
 class ConnectWriteFailingClient extends MqttClient {
   failNextConnect = false;
+  // Whether the writes on the connection that is open fail.
+  private failWrites = false;
   protected override async open(signal: AbortSignal): Promise<void> {
     await super.open(signal);
-    if (this.failNextConnect) {
-      this.failNextConnect = false;
-      this.write = () => {
-        throw new Error('write failed');
-      };
+    this.failWrites = this.failNextConnect;
+    this.failNextConnect = false;
+  }
+  protected override write(bytes: Uint8Array): Promise<void> {
+    if (this.failWrites) {
+      return Promise.reject(new Error('write failed'));
     }
+    return super.write(bytes);
   }
 }
 
@@ -681,10 +685,12 @@ Deno.test({ name: '@connection state: after DISCONNECT is sent', only: false }, 
     async () => {
       // The connection does not work any more, e.g. it has been reset, and the client has not noticed it yet.
       class WriteFailingClient extends MqttClient {
+        private writesFail = false;
         failWrites() {
-          this.write = () => {
-            throw new Error('write failed');
-          };
+          this.writesFail = true;
+        }
+        protected override write(bytes: Uint8Array): Promise<void> {
+          return this.writesFail ? Promise.reject(new Error('write failed')) : super.write(bytes);
         }
       }
 
@@ -763,10 +769,12 @@ Deno.test({ name: '@connection state: keep alive, PINGREQ cannot be written', on
     async () => {
       // The connection does not work any more, and the client has not noticed it yet.
       class WriteFailingClient extends MqttClient {
+        private writesFail = false;
         failWrites() {
-          this.write = () => {
-            throw new Error('write failed');
-          };
+          this.writesFail = true;
+        }
+        protected override write(bytes: Uint8Array): Promise<void> {
+          return this.writesFail ? Promise.reject(new Error('write failed')) : super.write(bytes);
         }
       }
 

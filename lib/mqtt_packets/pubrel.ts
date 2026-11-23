@@ -7,7 +7,7 @@ import { parsePublishAck } from './publish_ack.ts';
 export function toBytes(
   packet: PubrelPacket,
   protocolVersion: Mqtt.ProtocolVersion,
-) {
+): Uint8Array {
   const variableHeaderChunks: (Uint8Array | number[])[] = [numToTwoByteInteger(packet.packetId)]; //packetId
 
   if (protocolVersion > Mqtt.ProtocolVersion.MQTT_V3_1_1) {
@@ -16,7 +16,7 @@ export function toBytes(
       variableHeaderChunks.push([reasonCode & 0xFF]);
       variableHeaderChunks.push(MqttProperties.propertiesToBytes(packet.properties));
     } else {
-      if (reasonCode != 0x00) {
+      if (reasonCode !== 0x00) {
         variableHeaderChunks.push([reasonCode & 0xFF]);
       }
     }

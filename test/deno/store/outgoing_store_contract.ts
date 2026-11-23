@@ -1,6 +1,6 @@
-import { KvOutgoingStore, Mqtt, MqttPackets, Store } from '../../../deno/mod.ts';
+import { KvOutgoingStore, Mqtt, type MqttPackets, type Store } from '../../../deno/mod.ts';
 import type { KvOutgoingStoreOptions } from '../../../deno/mod.ts';
-import { assertEquals, assertRejects } from 'std/assert/mod.ts';
+import { assertEquals, assertRejects } from '@std/assert';
 
 type StoredPacket = MqttPackets.PublishPacket | MqttPackets.PubrelPacket;
 
@@ -31,7 +31,7 @@ export async function resendOrder(store: Store.OutgoingStore): Promise<string[]>
 export async function testOutgoingStoreContract(
   context: Deno.TestContext,
   createStore: () => Promise<{ store: Store.OutgoingStore; close?: () => void }>,
-) {
+): Promise<void> {
   async function step(name: string, fn: (store: Store.OutgoingStore) => Promise<void>) {
     await context.step(name, async () => {
       const { store, close } = await createStore();

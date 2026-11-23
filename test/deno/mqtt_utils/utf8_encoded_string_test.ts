@@ -1,4 +1,4 @@
-import { assertEquals, assertThrows } from 'std/assert/mod.ts';
+import { assertEquals, assertThrows } from '@std/assert';
 import { binaryDataToString, MqttUtilsError, stringToUtfEncodedString, utfEncodedStringToString } from '../../../lib/mqtt_utils/mod.ts';
 
 /** The bytes of a UTF-8 Encoded String or of Binary Data: a Two Byte Integer length and the data. */

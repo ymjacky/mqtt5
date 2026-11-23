@@ -1,12 +1,14 @@
-import * as Mqtt from '../mqtt/mod.ts';
+import type * as Mqtt from '../mqtt/mod.ts';
 
 export class InvalidQoSError extends Error {
+  /** The name of the error class. */
+  override readonly name = 'InvalidQoSError' as const;
   constructor(num: number) {
     super(`invalid qos: ${num}`);
   }
 }
 
-export function numToQoS(num: number) {
+export function numToQoS(num: number): Mqtt.QoS {
   if (num === 0 || num === 1 || num === 2) {
     return num as Mqtt.QoS;
   }

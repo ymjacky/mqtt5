@@ -1,7 +1,7 @@
-import { ClientErrors, KvOutgoingStore, Mqtt, MqttClient, MqttPackets, MqttProperties } from '../../../deno/mod.ts';
+import { ClientErrors, KvOutgoingStore, Mqtt, MqttClient, MqttPackets, type MqttProperties } from '../../../deno/mod.ts';
 import { TestBroker } from '../broker/test_broker.ts';
 import { kvStore } from '../store/outgoing_store_contract.ts';
-import { assertEquals, assertRejects, assertStringIncludes, assertThrows } from 'std/assert/mod.ts';
+import { assertEquals, assertRejects, assertStringIncludes, assertThrows } from '@std/assert';
 
 function logger(msg: string, ...args: unknown[]): void {
   console.log('[Test Client]', msg, ...args);

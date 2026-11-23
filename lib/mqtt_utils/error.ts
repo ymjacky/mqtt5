@@ -1,12 +1,14 @@
 export class NumIsOutOfRange extends Error {
-  readonly #className = 'NumIsOutOfRange';
+  /** The name of the error class. */
+  override readonly name = 'NumIsOutOfRange' as const;
   constructor() {
     super('num is out of range');
   }
 }
 
 export class RemainingLengthError extends Error {
-  readonly #className = 'RemainingLengthError';
+  /** The name of the error class. */
+  override readonly name = 'RemainingLengthError' as const;
   constructor(message: string) {
     super(`RemainingLengthError: ${message}`);
   }
@@ -14,7 +16,8 @@ export class RemainingLengthError extends Error {
 
 /** A received UTF-8 Encoded String is ill-formed UTF-8 or contains U+0000: the packet is a Malformed Packet. */
 export class InvalidUtf8EncodedStringError extends Error {
-  readonly #className = 'InvalidUtf8EncodedStringError';
+  /** The name of the error class. */
+  override readonly name = 'InvalidUtf8EncodedStringError' as const;
   constructor(message: string, options?: ErrorOptions) {
     super(`invalid UTF-8 Encoded String: ${message}`, options);
   }
@@ -25,7 +28,8 @@ export class InvalidUtf8EncodedStringError extends Error {
  * bytes are left after the last field, or a Variable Byte Integer is longer than 4 bytes. The packet is a Malformed Packet.
  */
 export class MalformedDataError extends Error {
-  readonly #className = 'MalformedDataError';
+  /** The name of the error class. */
+  override readonly name = 'MalformedDataError' as const;
   constructor(message: string) {
     super(`malformed data: ${message}`);
   }
@@ -36,7 +40,8 @@ export class MalformedDataError extends Error {
  * included more than once. The receiver ends the connection with DISCONNECT and the Reason Code 0x82 (Protocol Error).
  */
 export class ProtocolViolationError extends Error {
-  readonly #className = 'ProtocolViolationError';
+  /** The name of the error class. */
+  override readonly name = 'ProtocolViolationError' as const;
   constructor(message: string) {
     super(`protocol error: ${message}`);
   }

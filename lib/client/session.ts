@@ -1,21 +1,22 @@
-import { IdProvider, MqttPackets } from '../mod.ts';
-import { MemoryStore, OutgoingStore } from '../mqtt_store/mod.ts';
+import * as IdProvider from '../id_provider/mod.ts';
+import type * as MqttPackets from '../mqtt_packets/mod.ts';
+import { MemoryStore, type OutgoingStore } from '../mqtt_store/mod.ts';
 import { Deferred } from './promise.ts';
 import { ConnectionClosed, SessionLostError } from './error.ts';
-import { PublishResult, SubscribeResults, UnsubscribeResults } from './client_types.ts';
+import type { PublishResult, SubscribeResults, UnsubscribeResults } from './client_types.ts';
 
 // The Receive Maximum of a CONNACK that has none (MQTT 5.0 3.2.2.3.2), and of MQTT 3.1.1, which has no flow control.
 const defaultReceiveMaximum = 65535;
 
 export class Session {
-  private sessionId: string;
+  #sessionId: string;
 
-  private packetIdProvider: IdProvider.ReuseIdProvider;
-  private inflightPublish: Map<number, Deferred<PublishResult>>;
-  private inflightSubscribe: Map<number, Deferred<SubscribeResults>>;
-  private inflightUnsubscribe: Map<number, Deferred<UnsubscribeResults>>;
+  private readonly packetIdProvider = new IdProvider.ReuseIdProvider(1, 65535); // packetId range is 1 to 65535
+  private readonly inflightPublish = new Map<number, Deferred<PublishResult>>();
+  private readonly inflightSubscribe = new Map<number, Deferred<SubscribeResults>>();
+  private readonly inflightUnsubscribe = new Map<number, Deferred<UnsubscribeResults>>();
 
-  private outgoingStore: OutgoingStore;
+  private readonly outgoingStore: OutgoingStore;
 
   // The packet IDs of the QoS 1 / QoS 2 flows that use the send quota of the current connection (MQTT 5.0 4.9): their PUBLISH
   // has been sent on it, or is about to be, and no PUBACK, PUBCOMP, or PUBREC with an error Reason Code has been received for
@@ -28,24 +29,22 @@ export class Session {
   private sendQuotaWaiters: Deferred<void>[] = [];
 
   constructor(sessionId: string, outgoingStore?: OutgoingStore) {
-    this.sessionId = sessionId;
-    this.packetIdProvider = new IdProvider.ReuseIdProvider(1, 65535); // packetId range is 1 to 65535
-    this.outgoingStore = outgoingStore || new MemoryStore();
-    this.inflightPublish = new Map<number, Deferred<PublishResult>>();
-    this.inflightSubscribe = new Map<number, Deferred<SubscribeResults>>();
-    this.inflightUnsubscribe = new Map<number, Deferred<UnsubscribeResults>>();
+    this.#sessionId = sessionId;
+    this.outgoingStore = outgoingStore ?? new MemoryStore();
   }
 
-  public getSessionId() {
-    return this.sessionId;
+  /** The Client Identifier of the session: the one assigned by the broker, if any. */
+  get sessionId(): string {
+    return this.#sessionId;
   }
 
   /** The size in bytes of the largest packet the store can keep, if it has a limit. */
-  public get maximumStoredPacketSize(): number | undefined {
+  get maximumStoredPacketSize(): number | undefined {
     return this.outgoingStore.maximumPacketSize;
   }
 
-  public async acquirePacketId() {
+  // async on purpose: another packet ID allocator may have to wait, e.g. one that keeps the IDs in Deno KV.
+  async acquirePacketId(): Promise<number> {
     return await this.packetIdProvider.acquire();
   }
 
@@ -53,7 +52,7 @@ export class Session {
    * Acquires the packet ID of a QoS 1 / QoS 2 PUBLISH, which is sent on the current connection right after. Its flow uses
    * the send quota of the connection until it completes, or until the packet ID is released.
    */
-  public async acquirePublishPacketId() {
+  async acquirePublishPacketId(): Promise<number> {
     const packetId = await this.packetIdProvider.acquire();
     this.quotaFlows.add(packetId);
     return packetId;
@@ -64,7 +63,7 @@ export class Session {
    * @param receiveMaximum the Receive Maximum of CONNACK. 65,535 if absent. 0 is a Protocol Error of the broker: it is
    * treated as absent, as it would stop publishing for good.
    */
-  public resetSendQuota(receiveMaximum: number | undefined) {
+  resetSendQuota(receiveMaximum: number | undefined): void {
     this.receiveMaximum = receiveMaximum ? receiveMaximum : defaultReceiveMaximum;
     this.quotaFlows.clear();
     this.wakeSendQuotaWaiters();
@@ -75,7 +74,7 @@ export class Session {
    * A PUBREL is counted too: the broker keeps the flow in flight until it sends PUBCOMP.
    * @returns false if the flow has ended meanwhile, e.g. the broker has acknowledged it: its packet must not be resent then.
    */
-  public useSendQuota(packetId: number): boolean {
+  useSendQuota(packetId: number): boolean {
     if (!this.packetIdProvider.inUse(packetId)) {
       return false;
     }
@@ -90,7 +89,7 @@ export class Session {
    * after reconnecting, and nothing may be sent on a connection that is closed.
    * @param connectionOpen whether the connection is still open. It is checked again each time the wait ends.
    */
-  public async waitForSendQuota(connectionOpen: () => boolean) {
+  async waitForSendQuota(connectionOpen: () => boolean): Promise<void> {
     while (connectionOpen() && this.quotaFlows.size >= this.receiveMaximum) {
       const waiter = new Deferred<void>();
       this.sendQuotaWaiters.push(waiter);
@@ -99,7 +98,7 @@ export class Session {
   }
 
   /** Ends the wait in waitForSendQuota(): the waiting calls check again whether they can go on. */
-  public wakeSendQuotaWaiters() {
+  wakeSendQuotaWaiters(): void {
     const waiters = this.sendQuotaWaiters;
     this.sendQuotaWaiters = [];
     for (const waiter of waiters) {
@@ -107,9 +106,9 @@ export class Session {
     }
   }
 
-  public async clearAllStores(newSessionId?: string) {
+  async clearAllStores(newSessionId?: string): Promise<void> {
     if (newSessionId) {
-      this.sessionId = newSessionId;
+      this.#sessionId = newSessionId;
     }
 
     await this.outgoingStore.clear();
@@ -130,7 +129,7 @@ export class Session {
    * Releases a packet ID. If its flow used the send quota of the connection, it no longer does, and a waiting publish()
    * or resend may go on.
    */
-  private release(packetId: number) {
+  private release(packetId: number): void {
     this.packetIdProvider.release(packetId);
     if (this.quotaFlows.delete(packetId)) {
       this.wakeSendQuotaWaiters();
@@ -141,7 +140,7 @@ export class Session {
    * Rejects the SUBSCRIBE and UNSUBSCRIBE requests waiting for an acknowledgment and releases their packet IDs.
    * Called when the connection is closed: unlike PUBLISH and PUBREL, they are not resent after reconnecting.
    */
-  public abortSubscribeRequests() {
+  abortSubscribeRequests(): void {
     for (const [packetId, deferred] of [...this.inflightSubscribe, ...this.inflightUnsubscribe]) {
       deferred.reject(new ConnectionClosed());
       this.release(packetId);
@@ -151,7 +150,7 @@ export class Session {
   }
 
   /** Releases a packet ID that was acquired for a packet that is not sent. */
-  public releasePacketId(packetId: number) {
+  releasePacketId(packetId: number): void {
     this.release(packetId);
   }
 
@@ -159,20 +158,21 @@ export class Session {
    * Removes the stored PUBLISH or PUBREL of a flow that cannot be resent, releases its packet ID
    * and rejects its publish() with `reason`.
    */
-  public async discardPublishFlow(packetId: number, reason: Error) {
+  async discardPublishFlow(packetId: number, reason: Error): Promise<void> {
     await this.outgoingStore.discard(packetId);
     this.release(packetId);
     this.getPublishDeferred(packetId)?.reject(reason);
   }
 
   /** Removes a SUBSCRIBE or UNSUBSCRIBE that could not be sent, and releases its packet ID. */
-  public discardSubscribeRequest(packetId: number) {
+  discardSubscribeRequest(packetId: number): void {
     this.inflightSubscribe.delete(packetId);
     this.inflightUnsubscribe.delete(packetId);
     this.release(packetId);
   }
 
-  public async packetIdInUse(packetId: number) {
+  // async on purpose, as acquirePacketId().
+  async packetIdInUse(packetId: number): Promise<boolean> {
     return await this.packetIdProvider.inUse(packetId);
   }
 
@@ -184,7 +184,7 @@ export class Session {
    * If the store fails, nothing changes, as if the acknowledgment had not been received.
    * @returns the deferred of the publish() of the flow, if it is waiting.
    */
-  public async endPublishFlow(packetId: number): Promise<Deferred<PublishResult> | undefined> {
+  async endPublishFlow(packetId: number): Promise<Deferred<PublishResult> | undefined> {
     await this.outgoingStore.discard(packetId);
     const deferred = this.getPublishDeferred(packetId);
     this.release(packetId);
@@ -195,7 +195,7 @@ export class Session {
    * Iterates over the stored PUBLISH and PUBREL packets to resend after reconnecting, and registers their packet IDs as in use.
    * They use the send quota of the connection only when they are resent: see useSendQuota().
    */
-  public async *resendTargets(): AsyncIterable<MqttPackets.PublishPacket | MqttPackets.PubrelPacket> {
+  async *resendTargets(): AsyncIterable<MqttPackets.PublishPacket | MqttPackets.PubrelPacket> {
     for await (const packet of this.outgoingStore.resendIterator()) {
       if (packet.type === 'publish') {
         packet.dup = true;
@@ -212,10 +212,10 @@ export class Session {
    * If the store fails, the deferred is not kept; the caller still has to release the packet ID.
    * @param packet PUBLISH with its Topic Name and without a topic alias, which is valid only on the current connection.
    */
-  public async storePublish(
+  async storePublish(
     packet: MqttPackets.PublishPacket,
     deferred: Deferred<PublishResult>,
-  ) {
+  ): Promise<void> {
     this.inflightPublish.set(packet.packetId!, deferred);
     try {
       await this.outgoingStore.store(packet);
@@ -225,41 +225,41 @@ export class Session {
     }
   }
 
-  public async storePubrel(packet: MqttPackets.PubrelPacket) {
+  async storePubrel(packet: MqttPackets.PubrelPacket): Promise<void> {
     return await this.outgoingStore.store(packet);
   }
 
-  public getPublishDeferred(packetId: number) {
+  getPublishDeferred(packetId: number): Deferred<PublishResult> | undefined {
     const deferred = this.inflightPublish.get(packetId);
     this.inflightPublish.delete(packetId);
     return deferred;
   }
 
-  public storeSubscribe(
+  storeSubscribe(
     packet: MqttPackets.SubscribePacket,
     deferred: Deferred<SubscribeResults>,
-  ) {
+  ): void {
     this.inflightSubscribe.set(packet.packetId, deferred);
   }
-  public getSubscribeDeferred(packetId: number) {
+  getSubscribeDeferred(packetId: number): Deferred<SubscribeResults> | undefined {
     const deferred = this.inflightSubscribe.get(packetId);
     this.inflightSubscribe.delete(packetId);
     return deferred;
   }
 
-  public storeUnsubscribe(
+  storeUnsubscribe(
     packet: MqttPackets.UnsubscribePacket,
     deferred: Deferred<UnsubscribeResults>,
-  ) {
+  ): void {
     this.inflightUnsubscribe.set(packet.packetId, deferred);
   }
-  public getUnsubscribeDeferred(packetId: number) {
+  getUnsubscribeDeferred(packetId: number): Deferred<UnsubscribeResults> | undefined {
     const deferred = this.inflightUnsubscribe.get(packetId);
     this.inflightUnsubscribe.delete(packetId);
     return deferred;
   }
 
-  public async publishInflightCount() {
+  async publishInflightCount(): Promise<number> {
     return await this.outgoingStore.count();
   }
 }

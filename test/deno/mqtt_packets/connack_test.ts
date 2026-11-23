@@ -1,4 +1,4 @@
-import { assertEquals, assertThrows } from 'std/assert/mod.ts';
+import { assertEquals, assertThrows } from '@std/assert';
 
 import type { ConnackPacket } from '../../../lib/mqtt_packets/packet_types.ts';
 import { parse, toBytes } from '../../../lib/mqtt_packets/connack.ts';

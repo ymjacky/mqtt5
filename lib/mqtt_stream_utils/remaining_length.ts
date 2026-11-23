@@ -1,4 +1,4 @@
-import { MalformedPacketError } from '../client/error.ts';
+import { MalformedPacketError } from './error.ts';
 import * as MqttUtils from '../mqtt_utils/mod.ts';
 
 // The MQTT spec allows at most 4 bytes for a Variable Byte Integer.
@@ -17,7 +17,7 @@ export function decodeRemainingLength(bytes: Uint8Array, offset: number): { numb
     if (offset + i >= bytes.length) {
       return undefined;
     }
-    if ((bytes[offset + i] >> 7) == 0) {
+    if ((bytes[offset + i] >> 7) === 0) {
       return MqttUtils.variableByteIntegerToNum(bytes, offset);
     }
   }

@@ -3,9 +3,10 @@
  * @module
  */
 
-import { Mqtt, MqttProperties } from '../mod.ts';
-import { IncomingStore, OutgoingStore } from '../mqtt_store/mod.ts';
-import { Subscription } from '../mqtt_packets/mod.ts';
+import type * as Mqtt from '../mqtt/mod.ts';
+import type * as MqttProperties from '../mqtt_properties/mod.ts';
+import type { IncomingStore, OutgoingStore } from '../mqtt_store/mod.ts';
+import type { Subscription } from '../mqtt_packets/mod.ts';
 
 /**
  * Options for the {@link MqttClient} and {@link WebSocketMqttClient} constructors. All options are optional,
@@ -144,12 +145,6 @@ export type PublishOptions = {
  * It is the same type as {@link MqttPackets.Subscription}, which describes each field.
  */
 export type SubscriptionOption = Subscription;
-
-/** Writes bytes to the connection. Used internally by the clients. */
-export type WriterFunction = (bytes: Uint8Array) => Promise<void>;
-/** Creates a {@link WriterFunction}. Used internally by the clients. */
-// deno-lint-ignore no-explicit-any
-export type WriterFactory = (...args: any[]) => WriterFunction;
 
 /** Result of {@link MqttClient.publish} / {@link WebSocketMqttClient.publish}. */
 export type PublishResult = {
