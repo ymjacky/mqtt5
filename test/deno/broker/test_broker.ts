@@ -42,7 +42,11 @@ async function readPacketBytes(
 ): Promise<Uint8Array> {
   let receiveBytes: Uint8Array | undefined;
   while (!(receiveBytes = frameBuffer.takePacket())) {
-    frameBuffer.append(await MqttStream.readChunk(reader));
+    const { done, value } = await reader.read();
+    if (done) {
+      throw new ClientErrors.ConnectionClosed();
+    }
+    frameBuffer.append(value);
   }
   return receiveBytes;
 }

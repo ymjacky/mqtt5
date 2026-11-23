@@ -146,12 +146,6 @@ export type PublishOptions = {
  */
 export type SubscriptionOption = Subscription;
 
-/** Writes bytes to the connection. Used internally by the clients. */
-export type WriterFunction = (bytes: Uint8Array) => Promise<void>;
-/** Creates a {@link WriterFunction}. Used internally by the clients. */
-// deno-lint-ignore no-explicit-any
-export type WriterFactory = (...args: any[]) => WriterFunction;
-
 /** Result of {@link MqttClient.publish} / {@link WebSocketMqttClient.publish}. */
 export type PublishResult = {
   /**

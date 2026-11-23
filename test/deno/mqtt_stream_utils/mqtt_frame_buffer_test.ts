@@ -95,8 +95,8 @@ Deno.test('mqttFrameBufferWithPacketSplitAcrossChunks', function () {
   assertEquals(appendAndTake(frameBuffer, pingresp.slice(1)), [pingresp]);
 });
 
-// Regression test for receiving a payload beyond the argument-spread limit
-// (see readChunkWithLargePublishPacketSplitAcrossChunks).
+// Regression test for receiving a payload beyond the argument-spread limit, which used to throw
+// "RangeError: Maximum call stack size exceeded".
 Deno.test('mqttFrameBufferWithLargePublishPacket', function () {
   const publish = publishBytes(300_000);
   const frameBuffer = new MqttStream.MqttFrameBuffer();

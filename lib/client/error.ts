@@ -21,15 +21,6 @@ export class ConnectionClosed extends Error {
   }
 }
 
-/** The connection was reset. */
-export class ConnectionReset extends Error {
-  readonly #className = 'ConnectionReset';
-  /** Creates the error with the given details. */
-  constructor(message: string) {
-    super(message);
-  }
-}
-
 /** CONNACK was not received within `connectTimeoutMS`. Rejected by `connect()`. */
 export class ConnectTimeout extends Error {
   readonly #className = 'ConnectTimeout';
