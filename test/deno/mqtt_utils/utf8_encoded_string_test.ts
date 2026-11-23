@@ -19,11 +19,11 @@ Deno.test('utfEncodedStringToString reads the length and the string', () => {
 });
 
 Deno.test('utfEncodedStringToString keeps 0xEF 0xBB 0xBF as U+FEFF, also at the start [MQTT-1.5.4-3]', () => {
-  assertEquals(utfEncodedStringToString(new Uint8Array(lengthPrefixed([0xEF, 0xBB, 0xBF, 0x61])), 0), { length: 6, value: '﻿a' });
-  assertEquals(utfEncodedStringToString(new Uint8Array(lengthPrefixed([0x61, 0xEF, 0xBB, 0xBF])), 0), { length: 6, value: 'a﻿' });
-  assertEquals(utfEncodedStringToString(new Uint8Array(lengthPrefixed([0xEF, 0xBB, 0xBF])), 0), { length: 5, value: '﻿' });
+  assertEquals(utfEncodedStringToString(new Uint8Array(lengthPrefixed([0xEF, 0xBB, 0xBF, 0x61])), 0), { length: 6, value: '\u{FEFF}a' });
+  assertEquals(utfEncodedStringToString(new Uint8Array(lengthPrefixed([0x61, 0xEF, 0xBB, 0xBF])), 0), { length: 6, value: 'a\u{FEFF}' });
+  assertEquals(utfEncodedStringToString(new Uint8Array(lengthPrefixed([0xEF, 0xBB, 0xBF])), 0), { length: 5, value: '\u{FEFF}' });
   // A string that starts with U+FEFF is read back as it was sent.
-  assertEquals(utfEncodedStringToString(stringToUtfEncodedString('﻿topic'), 0).value, '﻿topic');
+  assertEquals(utfEncodedStringToString(stringToUtfEncodedString('\u{FEFF}topic'), 0).value, '\u{FEFF}topic');
 });
 
 Deno.test('utfEncodedStringToString throws for ill-formed UTF-8 instead of returning U+FFFD [MQTT-1.5.4-1]', () => {
@@ -62,9 +62,22 @@ Deno.test('binaryDataToString reads any bytes: the rules of UTF-8 Encoded String
   assertEquals(binaryDataToString(new Uint8Array(lengthPrefixed([0x70, 0x77])), 0), { length: 4, value: 'pw' });
   assertEquals(binaryDataToString(new Uint8Array(lengthPrefixed([0x61, 0x00])), 0), { length: 4, value: 'a\u0000' });
   // Bytes that are not UTF-8 become U+FFFD, as before: the Password is handled as a string.
-  assertEquals(binaryDataToString(new Uint8Array(lengthPrefixed([0xFF, 0x61])), 0), { length: 4, value: '�a' });
+  assertEquals(binaryDataToString(new Uint8Array(lengthPrefixed([0xFF, 0x61])), 0), { length: 4, value: '\u{FFFD}a' });
   // A leading 0xEF 0xBB 0xBF is kept.
-  assertEquals(binaryDataToString(new Uint8Array(lengthPrefixed([0xEF, 0xBB, 0xBF, 0x61])), 0), { length: 6, value: '﻿a' });
+  assertEquals(binaryDataToString(new Uint8Array(lengthPrefixed([0xEF, 0xBB, 0xBF, 0x61])), 0), { length: 6, value: '\u{FEFF}a' });
   // offset
   assertEquals(binaryDataToString(new Uint8Array([0xEE, 0xEE, ...lengthPrefixed([0x78])]), 2), { length: 3, value: 'x' });
+});
+
+Deno.test('utfEncodedStringToString and binaryDataToString throw instead of reading past the end of the buffer', () => {
+  const cases: [string, number[]][] = [
+    ['the length cut', [0x00]],
+    // The length is 10, but the buffer ends after 'abc': it was read as 'abc'.
+    ['the data shorter than its length', [0x00, 0x0A, 0x61, 0x62, 0x63]],
+  ];
+  for (const [name, bytes] of cases) {
+    for (const read of [utfEncodedStringToString, binaryDataToString]) {
+      assertThrows(() => read(new Uint8Array(bytes), 0), MqttUtilsError.MalformedDataError, 'are needed', `${read.name}: ${name}`);
+    }
+  }
 });

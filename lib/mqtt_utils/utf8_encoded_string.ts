@@ -1,6 +1,7 @@
 import { numToTwoByteInteger, twoByteIntegerToNum } from './two_byte_integer.ts';
 import { concatBytes } from './concat_bytes.ts';
 import { InvalidUtf8EncodedStringError } from './error.ts';
+import { requireBytes } from './bounds.ts';
 
 const encoder = new TextEncoder();
 
@@ -32,6 +33,7 @@ export function stringToBytes(str: string): Uint8Array {
  * @param buffer the bytes to read from.
  * @param offset where the length starts.
  * @returns the string, and the number of bytes read including the length.
+ * @throws {MalformedDataError} if `buffer` ends before the length or the string.
  * @throws {InvalidUtf8EncodedStringError} if the bytes are ill-formed UTF-8 or contain U+0000, which makes the packet a
  * Malformed Packet ([MQTT-1.5.4-1], [MQTT-1.5.4-2]; MQTT 3.1.1: [MQTT-1.5.3-1], [MQTT-1.5.3-2]).
  */
@@ -60,6 +62,7 @@ export function utfEncodedStringToString(
  * @param buffer the bytes to read from.
  * @param offset where the length starts.
  * @returns the string, and the number of bytes read including the length.
+ * @throws {MalformedDataError} if `buffer` ends before the length or the data.
  */
 export function binaryDataToString(
   buffer: Uint8Array,
@@ -69,9 +72,13 @@ export function binaryDataToString(
   return { length, value: binaryDataDecoder.decode(bytes) };
 }
 
-/** Reads a Two Byte Integer length and the bytes after it. `length` includes the 2 bytes of the length. */
+/**
+ * Reads a Two Byte Integer length and the bytes after it. `length` includes the 2 bytes of the length.
+ * @throws {MalformedDataError} if `buffer` ends before the length or the bytes.
+ */
 function readLengthPrefixed(buffer: Uint8Array, offset: number): { length: number; bytes: Uint8Array } {
   const dataLength = twoByteIntegerToNum(buffer, offset);
   const start = offset + 2; // 2 = Two Byte Integer
+  requireBytes(buffer, start, dataLength);
   return { length: dataLength + 2, bytes: buffer.subarray(start, start + dataLength) };
 }

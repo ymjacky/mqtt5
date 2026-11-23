@@ -658,7 +658,7 @@ Deno.test('decodeConnectPacketWithWill', function () {
         121,
         101, // "goodbye"
       ]),
-      41, // Remaining length
+      44, // Remaining length
     ),
     {
       type: 'connect',
@@ -715,7 +715,7 @@ Deno.test('decodeConnectPacketMQTTv5WithUsernameAndPassword', function () {
         115, // 's'
         115, // 's'
       ]),
-      26, // remainingLength
+      27, // remainingLength
     ),
     {
       type: 'connect',
@@ -998,7 +998,7 @@ Deno.test('decodeConnectPacketWithAPasswordThatIsNotUtf8', function () {
     protocolName: 'MQTT',
     protocolVersion: 4,
     username: 'u',
-    password: '﻿�\u0000',
+    password: '\u{FEFF}\u{FFFD}\u0000',
     will: undefined,
     clean: true,
     keepAlive: 0,

@@ -1,4 +1,5 @@
 import * as UtilsError from './error.ts';
+import { requireBytes } from './bounds.ts';
 
 /** The largest Variable Byte Integer. It is also the largest Remaining Length. */
 export const maxVariableByteInteger = 268_435_455;
@@ -36,23 +37,27 @@ export function remainingLengthToBytes(remainingLength: number): Uint8Array {
   return numToVariableByteInteger(remainingLength);
 }
 
-export function variableByteIntegerToNum(buffer: Uint8Array, offset: number) {
-  let i = offset;
-  let byte = 0;
+/** The most bytes a Variable Byte Integer may have (MQTT 5.0 1.5.5). */
+const maxVariableByteIntegerBytes = 4;
+
+/**
+ * Reads a Variable Byte Integer.
+ * @param buffer the bytes to read from.
+ * @param offset where the integer starts.
+ * @returns the value (`number`), and the number of bytes it takes (`size`).
+ * @throws {UtilsError.MalformedDataError} if `buffer` ends before its last byte, or it is longer than 4 bytes.
+ */
+export function variableByteIntegerToNum(buffer: Uint8Array, offset: number): { number: number; size: number } {
   let value = 0;
   let multiplier = 1;
-
-  do {
-    byte = buffer[i++];
-
+  for (let i = 0; i < maxVariableByteIntegerBytes; i++) {
+    requireBytes(buffer, offset + i, 1);
+    const byte = buffer[offset + i];
     value += (byte & 0b01111111) * multiplier;
-
-    if (multiplier > 128 * 128 * 128) {
-      throw new UtilsError.InvalidVariableByteInteger();
+    if ((byte & 0b10000000) === 0) {
+      return { number: value, size: i + 1 };
     }
-
     multiplier *= 128;
-  } while ((byte & 0b10000000) != 0);
-
-  return { number: value, size: i - offset };
+  }
+  throw new UtilsError.MalformedDataError(`the Variable Byte Integer at byte ${offset} is longer than ${maxVariableByteIntegerBytes} bytes`);
 }

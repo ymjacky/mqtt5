@@ -741,7 +741,7 @@ Deno.test('decodePublishPacketKeepsU+FEFFAtTheStartOfTheTopic', function () {
     Mqtt.ProtocolVersion.MQTT_V3_1_1,
   );
 
-  assertEquals(packet.topic, '﻿a');
+  assertEquals(packet.topic, '\u{FEFF}a');
   assertEquals(packet.payload, Uint8Array.from([120]));
 });
 

@@ -96,7 +96,20 @@ Deno.test('variableByteIntegerToNum', () => {
       size: 4,
     },
   );
-  assertThrows(() => variableByteIntegerToNum(Uint8Array.from([0xFF, 0xFF, 0xFF, 0xFF, 0x7F]), 0));
+  assertThrows(
+    () => variableByteIntegerToNum(Uint8Array.from([0xFF, 0xFF, 0xFF, 0xFF, 0x7F]), 0),
+    MqttUtilsError.MalformedDataError,
+    'longer than 4 bytes',
+  );
+  // offset
+  assertEquals(variableByteIntegerToNum(Uint8Array.from([0xEE, 0x80, 0x01, 0xEE]), 1), { number: 128, size: 2 });
+});
+
+Deno.test('variableByteIntegerToNum throws instead of reading past the end of the buffer', () => {
+  // The continuation bit is set in the last byte: it was read as if a 0 followed.
+  for (const bytes of [[], [0x80], [0xFF, 0xFF], [0x80, 0x80, 0x80]]) {
+    assertThrows(() => variableByteIntegerToNum(Uint8Array.from(bytes), 0), MqttUtilsError.MalformedDataError, 'are needed', JSON.stringify(bytes));
+  }
 });
 
 Deno.test('remainingLengthToBytes', () => {

@@ -46,6 +46,10 @@ export type PublishPacket = {
 export type PubackPacket = {
   type: 'puback';
   packetId: number;
+  /**
+   * MQTT 5.0: the Reason Code. A received PUBACK without one (Remaining Length 2) has `Mqtt.ReasonCode.Success` (0x00).
+   * Not set for MQTT 3.1.1. When sending, 0x00 is used if omitted.
+   */
   reasonCode?: number;
   properties?: MqttProperties.PubackProperties;
 };
@@ -54,6 +58,10 @@ export type PubackPacket = {
 export type PubrecPacket = {
   type: 'pubrec';
   packetId: number;
+  /**
+   * MQTT 5.0: the Reason Code. A received PUBREC without one (Remaining Length 2) has `Mqtt.ReasonCode.Success` (0x00).
+   * Not set for MQTT 3.1.1. When sending, 0x00 is used if omitted.
+   */
   reasonCode?: number;
   properties?: MqttProperties.PubrecProperties;
 };
@@ -62,6 +70,10 @@ export type PubrecPacket = {
 export type PubrelPacket = {
   type: 'pubrel';
   packetId: number;
+  /**
+   * MQTT 5.0: the Reason Code. A received PUBREL without one (Remaining Length 2) has `Mqtt.ReasonCode.Success` (0x00).
+   * Not set for MQTT 3.1.1. When sending, 0x00 is used if omitted.
+   */
   reasonCode?: number;
   properties?: MqttProperties.PubrelProperties;
 };
@@ -70,6 +82,10 @@ export type PubrelPacket = {
 export type PubcompPacket = {
   type: 'pubcomp';
   packetId: number;
+  /**
+   * MQTT 5.0: the Reason Code. A received PUBCOMP without one (Remaining Length 2) has `Mqtt.ReasonCode.Success` (0x00).
+   * Not set for MQTT 3.1.1. When sending, 0x00 is used if omitted.
+   */
   reasonCode?: number;
   properties?: MqttProperties.PubcompProperties;
 };
@@ -137,6 +153,10 @@ export type PingrespPacket = {
 /** DISCONNECT packet: sent before closing the connection. */
 export type DisconnectPacket = {
   type: 'disconnect';
+  /**
+   * MQTT 5.0: the Reason Code. A received DISCONNECT without one (Remaining Length 0) has
+   * `Mqtt.ReasonCode.NormalDisconnection` (0x00). Not set for MQTT 3.1.1. When sending, 0x00 is used if omitted.
+   */
   reasonCode?: number;
   properties?: MqttProperties.DisconnectProperties;
 };
@@ -144,6 +164,10 @@ export type DisconnectPacket = {
 /** AUTH packet: exchanges authentication data (MQTT 5.0 enhanced authentication). */
 export type AuthPacket = {
   type: 'auth';
+  /**
+   * The Reason Code. A received AUTH without one (Remaining Length 0) has `Mqtt.ReasonCode.Success` (0x00). When sending,
+   * 0x00 is used if omitted.
+   */
   reasonCode?: number;
   properties?: MqttProperties.AuthProperties;
 };

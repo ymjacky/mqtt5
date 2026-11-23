@@ -5,26 +5,11 @@
 
 import * as Mqtt from '../mqtt/mod.ts';
 
-import {
-  concatBytes,
-  fourByteIntegerToNum,
-  numToFourByteInteger,
-  numToQoS,
-  numToTwoByteInteger,
-  numToVariableByteInteger,
-  stringToUtfEncodedString,
-  twoByteIntegerToNum,
-  utfEncodedStringToString,
-  variableByteIntegerToNum,
-} from '../mqtt_utils/mod.ts';
+import { ByteReader, concatBytes, numToFourByteInteger, numToTwoByteInteger, numToVariableByteInteger, stringToUtfEncodedString } from '../mqtt_utils/mod.ts';
+import { readPropertyList } from './read_properties.ts';
 
-/** The property identifier is not supported. */
-export class UnsupportedPropertyError extends Error {
-  /** Creates the error for the given property identifier. */
-  constructor(propertyId: number) {
-    super(`unsupported property. propertyId: ${propertyId}`);
-  }
-}
+// `export *` keeps the error visible in the docs of the MqttProperties namespace.
+export * from './error.ts';
 
 /** A key-value pair of a user property. */
 export type StringPair = { key: string; val: string };
@@ -381,6 +366,12 @@ export function propertiesToBytes(properties?: Properties): Uint8Array {
  * @param offset the position of the first property in the buffer.
  * @param propertyLength the length of the properties in bytes.
  * @returns the decoded properties.
+ * @throws if the properties are malformed: a property goes past `propertyLength` or past the end of `buffer`, or a string is
+ * ill-formed UTF-8 or contains U+0000.
+ * @throws if the properties are a Protocol Error (MQTT 5.0 chapter 3): a property is included more than once (other than the
+ * User Property, the Subscription Identifier, and the Payload Format Indicator and Message Expiry Interval of PUBLISH), a
+ * property that is 0 or 1 (e.g. Retain Available, Maximum QoS) has another value, or the Receive Maximum, the Maximum Packet
+ * Size or a Subscription Identifier is 0.
  * @throws {UnsupportedPropertyError} if a property identifier is not supported.
  */
 export function parseMqttProperties(
@@ -388,169 +379,5 @@ export function parseMqttProperties(
   offset: number,
   propertyLength: number,
 ): Properties {
-  const properties: Properties = {};
-  let pos = offset;
-
-  while ((pos - offset) < propertyLength) {
-    const { number: propertyId, size: propertyIdLength } = variableByteIntegerToNum(buffer, pos);
-    pos += propertyIdLength;
-
-    switch (propertyId) {
-      case 0x01: // (1) Payload Format Indicator, type: Byte
-        properties.payloadFormatIndicator = buffer[pos] & 0xFF;
-        pos++;
-        break;
-      case 0x02: // (2) Message Expiry Interval , type: Four Byte Integer
-        properties.messageExpiryInterval = fourByteIntegerToNum(buffer, pos);
-        pos += 4;
-        break;
-      case 0x03: // (3) ContentType, type: UTF-8 Encoded String
-        {
-          const contentTypeInfo = utfEncodedStringToString(buffer, pos);
-          properties.contentType = contentTypeInfo.value;
-          pos += contentTypeInfo.length;
-        }
-        break;
-      case 0x08: // (8) Response Topic, UTF-8 Encoded String
-        {
-          const responseTopicInfo = utfEncodedStringToString(buffer, pos);
-          properties.responseTopic = responseTopicInfo.value;
-          pos += responseTopicInfo.length;
-        }
-        break;
-      case 0x09: // (9) Correlation Data, type: Binary Data
-        {
-          const correlationDataLength = twoByteIntegerToNum(buffer, pos);
-          pos += 2;
-          properties.correlationData = buffer.slice(pos, pos + correlationDataLength);
-          pos += correlationDataLength;
-        }
-        break;
-      case 0x0B: // (11) Subscription Identifier, type: Variable Byte Integer
-        {
-          const subscriptionIdentifierInfo = variableByteIntegerToNum(buffer, pos);
-          // PUBLISH carries one Subscription Identifier per matching subscription, so keep them all.
-          // SUBSCRIBE carries at most one; subscribe.ts converts the list to its single value.
-          if (properties.subscriptionIdentifiers) {
-            properties.subscriptionIdentifiers.push(subscriptionIdentifierInfo.number);
-          } else {
-            properties.subscriptionIdentifiers = [subscriptionIdentifierInfo.number];
-          }
-          pos += subscriptionIdentifierInfo.size;
-        }
-        break;
-      case 0x11: // (17) Session Expiry Interval, type: Four Byte Integer
-        properties.sessionExpiryInterval = fourByteIntegerToNum(buffer, pos);
-        pos += 4;
-        break;
-      case 0x12: // (18) Assigned Client Identifier, type: UTF-8 Encoded String
-        {
-          const assignedClientIdentifierInfo = utfEncodedStringToString(buffer, pos);
-          properties.assignedClientIdentifier = assignedClientIdentifierInfo.value;
-          pos += assignedClientIdentifierInfo.length;
-        }
-        break;
-      case 0x13: // (19) Server Keep Alive, type: Two Byte Integer
-        properties.serverKeepAlive = twoByteIntegerToNum(buffer, pos);
-        pos += 2;
-        break;
-      case 0x15: // (21) Authentication Method, type: UTF-8 Encoded String
-        {
-          const authenticationMethodInfo = utfEncodedStringToString(buffer, pos);
-          properties.authenticationMethod = authenticationMethodInfo.value;
-          pos += authenticationMethodInfo.length;
-        }
-        break;
-      case 0x16: // (22) Authentication Data, type: Binary Data
-        {
-          const authenticationDataLength = twoByteIntegerToNum(buffer, pos);
-          pos += 2;
-          properties.authenticationData = buffer.slice(pos, pos + authenticationDataLength);
-          pos += authenticationDataLength;
-        }
-        break;
-      case 0x17: // (23) Request Problem Information, type: Byte
-        properties.requestProblemInformation = buffer[pos++] === 1 ? true : false;
-        break;
-      case 0x18: // (24) Will Delay Interval, type: Four Byte Integer
-        properties.willDelayInterval = fourByteIntegerToNum(buffer, pos);
-        pos += 4;
-        break;
-      case 0x19: // (25) Request Response Information, type: Byte
-        properties.requestResponseInformation = buffer[pos++] === 1 ? true : false;
-        break;
-      case 0x1A: // (26) Response Information, type: UTF-8 Encoded String
-        {
-          const responseInformationTypeInfo = utfEncodedStringToString(buffer, pos);
-          properties.responseInformation = responseInformationTypeInfo.value;
-          pos += responseInformationTypeInfo.length;
-        }
-        break;
-      case 0x1C: // (28) Server Reference, type: UTF-8 Encoded String
-        {
-          const serverReferenceInfo = utfEncodedStringToString(buffer, pos);
-          properties.serverReference = serverReferenceInfo.value;
-          pos += serverReferenceInfo.length;
-        }
-        break;
-      case 0x1F: // (31) ReasonString, type: UTF-8 Encoded String
-        {
-          const reasonStringInfo = utfEncodedStringToString(buffer, pos);
-          properties.reasonString = reasonStringInfo.value;
-          pos += reasonStringInfo.length;
-        }
-        break;
-      case 0x21: // (33) ReceiveMaximum, type: Two Byte Integer
-        properties.receiveMaximum = twoByteIntegerToNum(buffer, pos);
-        pos += 2;
-        break;
-      case 0x22: // (34) TopicAliasMaximum,  type: Two Byte Integer
-        properties.topicAliasMaximum = twoByteIntegerToNum(buffer, pos);
-        pos += 2;
-        break;
-      case 0x23: // (35) TopicAlias , type: Two Byte Integer
-        properties.topicAlias = twoByteIntegerToNum(buffer, pos);
-        pos += 2;
-        break;
-      case 0x24: // (36) Maximum QoS , type: Byte
-        properties.maximumQoS = numToQoS(buffer[pos++]);
-        break;
-      case 0x25: // (37) Retain Available , type: Byte
-        properties.retainAvailable = buffer[pos++] === 1 ? true : false;
-        break;
-      case 0x26: // (38) UserPropertis , type: UserProperties
-        {
-          const keyInfo = utfEncodedStringToString(buffer, pos);
-          const key = keyInfo.value;
-          pos += keyInfo.length;
-          const valInfo = utfEncodedStringToString(buffer, pos);
-          const val = valInfo.value;
-          pos += valInfo.length;
-
-          if (properties.userProperties) {
-            properties.userProperties.push({ key, val });
-          } else {
-            properties.userProperties = [{ key, val }];
-          }
-        }
-        break;
-      case 0x27: // (39) Maximum Packet Size , type: Four Byte Integer
-        properties.maximumPacketSize = fourByteIntegerToNum(buffer, pos);
-        pos += 4;
-        break;
-      case 0x28: // (40) Wildcard Subscription Available , type: Byte
-        properties.wildcardSubscriptionAvailable = buffer[pos++] === 1 ? true : false;
-        break;
-      case 0x29: // (41) Subscription Identifiers Available , type: Byte
-        properties.subscriptionIdentifiersAvailable = buffer[pos++] === 1 ? true : false;
-        break;
-      case 0x2A: // (42) Shared Subscription Available , type: Byte
-        properties.sharedSubscriptionAvailable = buffer[pos++] === 1 ? true : false;
-        break;
-      default:
-        throw new UnsupportedPropertyError(propertyId);
-    }
-  }
-
-  return properties;
+  return readPropertyList(new ByteReader(buffer.subarray(offset), propertyLength));
 }

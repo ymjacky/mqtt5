@@ -1,6 +1,7 @@
 import * as Mqtt from '../mqtt/mod.ts';
-import { concatBytes, numToTwoByteInteger, remainingLengthToBytes, twoByteIntegerToNum, variableByteIntegerToNum } from '../mqtt_utils/mod.ts';
+import { ByteReader, concatBytes, numToTwoByteInteger, remainingLengthToBytes } from '../mqtt_utils/mod.ts';
 import * as MqttProperties from '../mqtt_properties/mod.ts';
+import { readProperties } from '../mqtt_properties/read_properties.ts';
 import type { SubackPacket } from './packet_types.ts';
 
 export function toBytes(
@@ -30,53 +31,22 @@ export function parse(
   remainingLength: number,
   protocolVersion: Mqtt.ProtocolVersion,
 ): SubackPacket {
-  let pos = 0;
+  const reader = new ByteReader(buffer, remainingLength);
+  const packetId = reader.readTwoByteInteger();
 
-  const packetId = twoByteIntegerToNum(buffer, pos);
-  pos += 2;
-
-  const properties = (() => {
-    if (protocolVersion > Mqtt.ProtocolVersion.MQTT_V3_1_1) {
-      const { number: length, size: consumedBytesSize } = variableByteIntegerToNum(buffer, pos);
-      pos += consumedBytesSize;
-
-      if (length > 0) {
-        const prop = MqttProperties.parseMqttProperties(buffer, pos, length);
-        pos += length;
-        return prop;
-      }
-      return undefined;
-    } else {
-      return undefined;
-    }
-  })();
-
-  const rc = [];
-  const payloadEnd = remainingLength;
-  for (let i = pos; i < payloadEnd; i++) {
-    rc.push(buffer[i]);
-  }
-
-  if (protocolVersion > Mqtt.ProtocolVersion.MQTT_V3_1_1) {
-    if (properties) {
-      return {
-        type: 'suback',
-        packetId: packetId,
-        reasonCodes: rc,
-        properties: properties,
-      };
-    } else {
-      return {
-        type: 'suback',
-        packetId: packetId,
-        reasonCodes: rc,
-      };
-    }
-  } else {
+  if (protocolVersion === Mqtt.ProtocolVersion.MQTT_V3_1_1) {
     return {
       type: 'suback',
-      packetId: packetId,
-      returnCodes: rc,
+      packetId,
+      returnCodes: Array.from(reader.readRest()),
     };
   }
+
+  const properties = readProperties(reader);
+  return {
+    type: 'suback',
+    packetId,
+    reasonCodes: Array.from(reader.readRest()),
+    ...(properties && { properties }),
+  };
 }

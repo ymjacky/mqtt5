@@ -1,5 +1,6 @@
 // filepath: /Users/jacky/develop/deno/mqtt5/test/deno/mqtt_packets/auth_test.ts
-import { assertEquals } from 'std/assert/mod.ts';
+import { assertEquals, assertThrows } from 'std/assert/mod.ts';
+import { MqttUtilsError } from '../../../lib/mqtt_utils/mod.ts';
 import type { AuthPacket } from '../../../lib/mqtt_packets/packet_types.ts';
 import { parse, toBytes } from '../../../lib/mqtt_packets/auth.ts';
 import * as Mqtt from '../../../lib/mqtt/mod.ts';
@@ -226,20 +227,31 @@ Deno.test('decodeAuthPacketBasic', function () {
   );
 });
 
-// Test Auth packet parsing with reason code only
+// Test Auth packet parsing with a reason code and no properties
 Deno.test('decodeAuthPacketWithReasonCode', function () {
   assertEquals<AuthPacket>(
     parse(
       new Uint8Array([
         0x18, // reasonCode = ContinueAuthentication (24)
+        0x00, // properties length
       ]),
-      1, // remainingLength
+      2, // remainingLength
       Mqtt.ProtocolVersion.MQTT_V5,
     ),
     {
       type: 'auth',
       reasonCode: Mqtt.ReasonCode.ContinueAuthentication,
     },
+  );
+});
+
+// Unlike DISCONNECT, AUTH can omit the Property Length only together with the Reason Code (Remaining Length 0,
+// MQTT 5.0 3.15.2.1): a Reason Code without a Property Length is a Malformed Packet.
+Deno.test('decodeAuthPacketWithReasonCodeAndNoPropertyLength', function () {
+  assertThrows(
+    () => parse(new Uint8Array([0x18]), 1, Mqtt.ProtocolVersion.MQTT_V5),
+    MqttUtilsError.MalformedDataError,
+    '1 bytes are needed at byte 1, but only 0 are left',
   );
 });
 
@@ -325,7 +337,7 @@ Deno.test('decodeAuthPacketWithProperties', function () {
         0x65,
         0x32, // 'value2'
       ]),
-      74, // remainingLength (1 + 73)
+      75, // remainingLength (1 + 1 + 73)
       Mqtt.ProtocolVersion.MQTT_V5,
     ),
     {

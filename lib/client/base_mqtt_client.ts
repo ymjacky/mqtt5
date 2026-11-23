@@ -1226,6 +1226,19 @@ export abstract class BaseMqttClient {
   }
 
   /**
+   * Handles a packet that can be read but is a Protocol Error, e.g. a property that is included more than once:
+   * sends DISCONNECT with the ProtocolError reason code (MQTT 5.0 4.13), or closes the connection (MQTT 3.1.1).
+   */
+  private async handleProtocolViolation(error: Error): Promise<void> {
+    try {
+      this.log('handling a packet that is a protocol error', error);
+      await this.disconnectWithError(Mqtt.ReasonCode.ProtocolError);
+    } catch (handlingError) {
+      this.log('Error while handling a packet that is a protocol error:', handlingError);
+    }
+  }
+
+  /**
    * Handles a packet larger than the Maximum Packet Size sent in CONNECT, which the broker must not send [MQTT-3.1.2-24]:
    * sends DISCONNECT with the PacketTooLarge reason code (MQTT 5.0 3.1.2.11.4). The packet is not received.
    */
@@ -1261,9 +1274,10 @@ export abstract class BaseMqttClient {
    * Called by subclasses once a packet has been framed off the transport.
    *
    * Decoding and dispatching are performed synchronously, so packets are
-   * processed in the order this method is called. A malformed packet is
-   * handled per protocol version and the returned promise settles when that
-   * handling completes; any other error is thrown synchronously.
+   * processed in the order this method is called. A malformed packet, or one
+   * that is a Protocol Error, is handled per protocol version and the returned
+   * promise settles when that handling completes; any other error is thrown
+   * synchronously.
    * @ignore
    */
   protected handleReceivedBytes(receiveBytes: Uint8Array): Promise<void> {
@@ -1277,6 +1291,12 @@ export abstract class BaseMqttClient {
       if (!(decodeError instanceof MqttPackets.MqttPacketsError.MqttPacketParseError)) {
         // Not caused by malformed data from the peer; treat as a fatal/unexpected error.
         throw decodeError;
+      }
+
+      if (decodeError.cause instanceof MqttUtils.MqttUtilsError.ProtocolViolationError) {
+        this.log(`Packet that is a protocol error received: ${decodeError.cause.message}`);
+        this.log(`Raw bytes (first 20): ${receiveBytes.slice(0, 20)}`);
+        return this.handleProtocolViolation(decodeError);
       }
 
       this.log(`Malformed packet received: ${decodeError.message}`);

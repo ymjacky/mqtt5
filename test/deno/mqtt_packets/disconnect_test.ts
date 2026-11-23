@@ -351,7 +351,7 @@ Deno.test('decodeDisconnectPacketMQTT5WithProperties', function () {
         0x61,
         0x64, // 'high-load'
       ]),
-      72, // remainingLength (1 + 71)
+      73, // remainingLength (1 + 1 + 71)
       Mqtt.ProtocolVersion.MQTT_V5, // ProtocolVersion
     ),
     {
@@ -399,7 +399,7 @@ Deno.test('decodeDisconnectPacketMQTT5WithServerReference', function () {
         0x6f,
         0x6d, // 'server2.example.com'
       ]),
-      23, // remainingLength (1 + 22)
+      24, // remainingLength (1 + 1 + 22)
       Mqtt.ProtocolVersion.MQTT_V5, // ProtocolVersion
     ),
     {
