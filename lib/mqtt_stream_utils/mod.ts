@@ -1,7 +1,7 @@
 import { ConnectionClosed, ConnectionReset } from '../client/error.ts';
 
 export { decodeRemainingLength } from './remaining_length.ts';
-export { MqttFrameBuffer } from './frame_buffer.ts';
+export { MqttFrameBuffer, PacketTooLargeToReceiveError } from './frame_buffer.ts';
 
 /**
  * Read the next chunk of bytes from the stream. The chunk may hold any part

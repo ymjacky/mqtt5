@@ -53,7 +53,12 @@ export type ConnectProperties = {
   topicAliasMaximum?: number;
   /** Application-defined key-value pairs. (id: 0x26) */
   userProperties?: UserProperties;
-  /** Maximum packet size in bytes the client accepts. (id: 0x27) */
+  /**
+   * Maximum packet size in bytes the client accepts. (id: 0x27)
+   *
+   * The broker must not send a larger packet. If it does, the client does not receive it: it sends DISCONNECT with the
+   * Reason Code 0x95 (Packet too large) as soon as the fixed header tells the size of the packet.
+   */
   maximumPacketSize?: number;
 };
 

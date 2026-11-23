@@ -137,7 +137,7 @@ export class MqttClient extends BaseMqttClient {
     const reader = this.conn.readable.getReader();
     this.reader = reader;
     // Not shared with a previous connection, which may have left a partial packet.
-    const frameBuffer = new MqttStream.MqttFrameBuffer();
+    const frameBuffer = this.createFrameBuffer();
     const reportClosed = () => {
       if (this.reader === reader) {
         this.detectClosed();
