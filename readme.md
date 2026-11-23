@@ -169,6 +169,9 @@ const connack = await client.connect({
 console.log(connack.sessionPresent);
 ```
 
+`maximumPacketSize` (MQTT 5.0) limits the size of the packets the broker sends. If the broker sends a larger one, the client does not receive it: it
+sends DISCONNECT with the Reason Code 0x95 (Packet too large), as soon as the fixed header tells the size of the packet, and the connection is closed.
+
 ## Publishing
 
 `publish()` resolves when the flow for the QoS level completes: immediately after sending for QoS 0, on PUBACK for QoS 1, and on PUBCOMP for QoS 2.

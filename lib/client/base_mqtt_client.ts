@@ -27,6 +27,7 @@ import {
 } from './validation.ts';
 import { IncomingMemoryStore, IncomingStore } from '../mqtt_store/mod.ts';
 import { createCustomEvent, CustomEventListener, CustomEventMap } from './events.ts';
+import * as MqttStream from '../mqtt_stream_utils/mod.ts';
 
 import {
   type AnyPacket,
@@ -1225,6 +1226,19 @@ export abstract class BaseMqttClient {
   }
 
   /**
+   * Handles a packet larger than the Maximum Packet Size sent in CONNECT, which the broker must not send [MQTT-3.1.2-24]:
+   * sends DISCONNECT with the PacketTooLarge reason code (MQTT 5.0 3.1.2.11.4). The packet is not received.
+   */
+  private async handlePacketTooLarge(error: Error): Promise<void> {
+    try {
+      this.log('handling a packet larger than the Maximum Packet Size', error);
+      await this.disconnectWithError(Mqtt.ReasonCode.PacketTooLarge);
+    } catch (handlingError) {
+      this.log('Error while handling a packet larger than the Maximum Packet Size:', handlingError);
+    }
+  }
+
+  /**
    * Ends the connection because of an error: sends DISCONNECT with `reasonCode` (MQTT 5.0),
    * or closes the connection (MQTT 3.1.1). The broker publishes the Will Message.
    */
@@ -1276,17 +1290,34 @@ export abstract class BaseMqttClient {
   }
 
   /**
+   * Creates the buffer that splits the bytes received on a new connection into packets. With MQTT 5.0, a packet larger than
+   * the Maximum Packet Size sent in CONNECT is not received: the buffer throws, and handleFramingError() ends the connection.
+   * Called by subclasses when they open a connection, after CONNECT has been encoded.
+   * @ignore
+   */
+  protected createFrameBuffer(): MqttStream.MqttFrameBuffer {
+    // MQTT 3.1.1 CONNECT has no properties: the broker does not know of a limit.
+    const maximumPacketSize = this.protocolVersion > Mqtt.ProtocolVersion.MQTT_V3_1_1 ? this.connectProperties?.maximumPacketSize : undefined;
+    return new MqttStream.MqttFrameBuffer(maximumPacketSize);
+  }
+
+  /**
    * Handle an error raised while framing packets off the transport.
    *
    * A MalformedPacketError means the byte stream framing is desynchronized
-   * (e.g. an invalid Remaining Length), so it is handled per protocol version
-   * and the returned promise settles when that handling completes. Subclasses
-   * must stop interpreting further bytes on the connection afterwards. Any
-   * other error is not caused by malformed data from the peer and is thrown
-   * synchronously.
+   * (e.g. an invalid Remaining Length), and a PacketTooLargeToReceiveError that
+   * the next packet is larger than the Maximum Packet Size of CONNECT. Both are
+   * handled per protocol version and the returned promise settles when that
+   * handling completes. Subclasses must stop interpreting further bytes on the
+   * connection afterwards. Any other error is not caused by data from the peer
+   * and is thrown synchronously.
    * @ignore
    */
   protected handleFramingError(streamError: unknown): Promise<void> {
+    if (streamError instanceof MqttStream.PacketTooLargeToReceiveError) {
+      this.log(`Packet too large received (framing error): ${streamError.message}`);
+      return this.handlePacketTooLarge(streamError);
+    }
     if (!(streamError instanceof MalformedPacketError)) {
       throw streamError;
     }

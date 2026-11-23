@@ -59,7 +59,7 @@ export class WebSocketMqttClient extends BaseMqttClient {
     const deferred = new Deferred<void>();
 
     // Discard any partial packet left over from a previous connection.
-    this.frameBuffer = new MqttStream.MqttFrameBuffer();
+    this.frameBuffer = this.createFrameBuffer();
     this.conn = new WebSocket(this.url, 'mqtt');
     this.conn.binaryType = 'arraybuffer';
 
