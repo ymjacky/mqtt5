@@ -1,6 +1,6 @@
 {
   "name": "@ymjacky/mqtt5",
-  "version": "0.2.2",
+  "version": "0.3.0",
   "exports": {
     ".": "./deno/mod.ts",
     "./browser": "./browser/mod.ts"
