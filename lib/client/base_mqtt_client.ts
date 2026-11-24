@@ -531,7 +531,8 @@ export abstract class BaseMqttClient {
    * Receive Maximum (MQTT 5.0, 65,535 if it has none), so a call waits until the PUBACK or PUBCOMP of an earlier message
    * arrives, and the calls after it wait too. If the connection is closed while waiting, the call rejects with `StateIsNotOnlineError`.
    * After reconnecting, the messages in flight kept in the session are resent first, also within the Receive Maximum, and the
-   * calls wait for them.
+   * calls wait for them. A QoS 1 or 2 message whose connection is closed while it is being stored in the session is in flight
+   * too: it is not sent then, and is resent after reconnecting.
    * A QoS higher than the Maximum QoS of the broker, and `retain` when the broker does not support retained messages
    * (Retain Available is 0), are rejected with {@link QoSNotSupportedError} and {@link RetainNotSupportedError}: the broker
    * would close the connection.
@@ -621,11 +622,13 @@ export abstract class BaseMqttClient {
       // Checked here, not before waiting for the turn: the connection may have been closed and opened again meanwhile,
       // and the PUBLISH is sent on the current one.
       validatePublishCapabilities(qos, retain, this.brokerCapabilities);
+      // The PUBLISH is written on this connection or not at all: it may be closed while waiting below, and the client may
+      // connect again meanwhile.
+      const connectionOpen = this.connectionOpen();
 
       if (qos !== Mqtt.QoS.AT_MOST_ONCE) {
         // Do not send more QoS 1 / QoS 2 PUBLISH packets than the Receive Maximum of the broker allows [MQTT-3.3.4-7]:
         // wait until an acknowledgment ends one. The turn is kept, so the publish() calls after this one wait too, in order.
-        const connectionOpen = this.connectionOpen();
         await this.session.waitForSendQuota(connectionOpen);
         // The connection may have been closed while waiting.
         if (!connectionOpen()) {
@@ -663,6 +666,14 @@ export abstract class BaseMqttClient {
           // Not stored, so not sent either.
           this.session.releasePacketId(packetId);
           throw err;
+        }
+        if (!connectionOpen()) {
+          // The connection has been closed while the packet ID was acquired or the packet was stored. The client may be
+          // online again on another connection, whose CONNACK is handled after this turn: do not write the packet on it.
+          // It is kept in the session as if it had been written before the close: it is resent after reconnecting,
+          // or its flow fails with SessionLostError if the broker has not kept the session.
+          this.log('the connection was closed while PUBLISH was stored: it is kept in the session to be resent', packet);
+          return;
         }
       }
 
@@ -1043,7 +1054,8 @@ export abstract class BaseMqttClient {
    *
    * Normally sends DISCONNECT and waits for the connection to close (closes it after `disconnectTimeoutMS`).
    * DISCONNECT is sent after the PUBLISH packets of the publish() calls made before, so they are not lost;
-   * their QoS 1 and 2 flows may not complete before the connection closes.
+   * their QoS 1 and 2 flows may not complete before the connection closes. If the connection is closed while DISCONNECT waits
+   * for them, nothing is sent, also when the client has connected again meanwhile: the new connection stays open.
    * Nothing is sent after DISCONNECT: until the connection is closed, publish(), subscribe() and unsubscribe() reject with
    * `StateIsNotOnlineError` as when the client is not connected, and received messages are not acknowledged
    * (the broker sends QoS 1 and 2 messages again after reconnecting, if it keeps the session).
@@ -1150,7 +1162,11 @@ export abstract class BaseMqttClient {
         // publish() calls made before are sent first, and the calls made after wait until DISCONNECT is sent, and reject.
         const publishTurnFinished = await this.waitForPublishTurn();
         try {
-          await this.doDisconnect(false, undefined, properties);
+          // The connection may have been closed while waiting, which resolved this call. Leave alone the connection that
+          // the client may have opened since then.
+          if (this.isCurrent(connection)) {
+            await this.doDisconnect(false, undefined, properties);
+          }
         } finally {
           publishTurnFinished();
         }
