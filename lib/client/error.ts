@@ -138,6 +138,7 @@ export class InvalidPropertyError extends Error {
 /**
  * Another argument or option is invalid, e.g. a QoS other than 0, 1 or 2, or an empty list of topic filters.
  * The call rejects with it and nothing is sent.
+ * The client constructors throw it for an invalid option, e.g. a `keepAlive` that is not an integer from 0 to 65,535.
  */
 export class InvalidArgumentError extends Error {
   /** The name of the error class. */

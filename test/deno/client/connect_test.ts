@@ -1,6 +1,6 @@
 import { ClientErrors, Mqtt, MqttClient, MqttPackets, type MqttProperties } from '../../../deno/mod.ts';
 import { TestBroker } from '../broker/test_broker.ts';
-import { assert, assertEquals, assertExists, assertRejects } from '@std/assert';
+import { assert, assertEquals, assertExists, assertRejects, assertThrows } from '@std/assert';
 
 function logger(msg: string, ...args: unknown[]): void {
   console.log('[Test Client]', msg, ...args);
@@ -428,6 +428,68 @@ Deno.test({ name: '@connect encoding failure', only: false }, async (context) =>
     },
   );
 }); // @connect encoding failure
+
+Deno.test({ name: '@connect options that are Two Byte Integers', only: false }, async (context) => {
+  await context.step(
+    'the constructor throws for a value that is not an integer from 0 to 65535',
+    () => {
+      for (const value of [65_536, 70_000, -1, 1.5, NaN]) {
+        assertThrows(() => new MqttClient({ clientId: 'cid', keepAlive: value }), ClientErrors.InvalidArgumentError, 'keepAlive', `${value}`);
+        assertThrows(
+          () => new MqttClient({ clientId: 'cid', protocolVersion: Mqtt.ProtocolVersion.MQTT_V3_1_1, keepAlive: value }),
+          ClientErrors.InvalidArgumentError,
+          'keepAlive',
+          `${value}`,
+        );
+        assertThrows(
+          () => new MqttClient({ clientId: 'cid', topicAliasMaximumAboutSend: value }),
+          ClientErrors.InvalidArgumentError,
+          'topicAliasMaximumAboutSend',
+          `${value}`,
+        );
+        assertThrows(
+          () => new MqttClient({ clientId: 'cid', topicAliasMaximumAboutReceive: value }),
+          ClientErrors.InvalidArgumentError,
+          'topicAliasMaximumAboutReceive',
+          `${value}`,
+        );
+      }
+      // MQTT 3.1.1 has no topic aliases: the options are not used, so they are not checked.
+      new MqttClient({
+        clientId: 'cid',
+        protocolVersion: Mqtt.ProtocolVersion.MQTT_V3_1_1,
+        topicAliasMaximumAboutSend: -1,
+        topicAliasMaximumAboutReceive: 70_000,
+      });
+    },
+  );
+
+  await context.step(
+    'the largest values are sent as they are',
+    async () => {
+      const broker = new TestBroker();
+
+      try {
+        broker.listen();
+        const { promise: connectReceived, resolve } = Promise.withResolvers<MqttPackets.ConnectPacket>();
+        broker.on('connect', (event) => {
+          const packet = event.detail;
+          resolve(packet);
+          broker.sendConnack(packet.clientId, false, packet.protocolVersion);
+        });
+
+        const client = new MqttClient({ clientId: 'cid', logger: logger, keepAlive: 65_535, topicAliasMaximumAboutReceive: 65_535 });
+        await client.connect();
+        const connect = await connectReceived;
+        assertEquals(connect.keepAlive, 65_535);
+        assertEquals(connect.properties?.topicAliasMaximum, 65_535);
+        await client.disconnect();
+      } finally {
+        await broker.destroy();
+      }
+    },
+  );
+}); // @connect options that are Two Byte Integers
 
 Deno.test({ name: '@connect failure leaves the client offline', only: false }, async (context) => {
   await context.step(

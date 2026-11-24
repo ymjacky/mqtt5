@@ -22,6 +22,7 @@ import {
   type BrokerCapabilities,
   brokerCapabilitiesOf,
   unrestrictedBroker,
+  validateClientOptions,
   validateConnect,
   validateDisconnect,
   validatePublish,
@@ -213,16 +214,22 @@ export abstract class BaseMqttClient {
   // Settles when the PUBLISH of the last publish() call has been written or has failed (see waitForPublishTurn()).
   private publishQueue: Promise<void> = Promise.resolve();
 
-  /** Creates a client. Use {@link MqttClient} or {@link WebSocketMqttClient}. */
+  /**
+   * Creates a client. Use {@link MqttClient} or {@link WebSocketMqttClient}.
+   * @throws {InvalidArgumentError} if `keepAlive`, `topicAliasMaximumAboutSend` or `topicAliasMaximumAboutReceive`
+   * is not an integer from 0 to 65,535, or if the `outgoingStore` cannot be used with the `clientId`.
+   */
   constructor(options?: ClientOptions) {
+    this.protocolVersion = options?.protocolVersion ?? Mqtt.ProtocolVersion.MQTT_V5;
+    validateClientOptions(options, this.protocolVersion);
+
     this.url = options?.url ?? new URL('mqtt://127.0.0.1:1883');
     this.log = options?.logger ?? (() => {});
     this.userName = options?.username;
     this.password = options?.password;
     this.clientId = options?.clientId ?? '';
-    this.keepAlive = options?.keepAlive === undefined ? defaultKeepAlive : Math.max(options.keepAlive, 0);
+    this.keepAlive = options?.keepAlive ?? defaultKeepAlive;
     this.currentKeepAlive = this.keepAlive;
-    this.protocolVersion = options?.protocolVersion ?? Mqtt.ProtocolVersion.MQTT_V5;
     this.clean = options?.clean ?? true;
     this.connectTimeout = positiveOrDefault(options?.connectTimeoutMS, defaultConnectTimeout);
     this.disconnectTimeout = positiveOrDefault(options?.disconnectTimeoutMS, defaultDisconnectTimeout);

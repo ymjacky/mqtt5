@@ -30,8 +30,9 @@ export type ClientOptions = {
    */
   clean?: boolean;
   /**
-   * Keep alive interval in seconds. 0 disables keep alive (no PINGREQ is sent).
+   * Keep alive interval in seconds: an integer from 0 to 65,535. 0 disables keep alive (no PINGREQ is sent).
    * If the broker's CONNACK has a Server Keep Alive (MQTT 5.0), that value is used for the connection instead.
+   * Another value makes the constructor throw `InvalidArgumentError`.
    * @default {10}
    */
   keepAlive?: number;
@@ -91,11 +92,13 @@ export type ClientOptions = {
    * MQTT 5.0 only. When set, topic aliases are assigned to outgoing PUBLISH packets automatically,
    * up to the smaller of this value and the broker's Topic Alias Maximum.
    * If the broker's CONNACK has no Topic Alias Maximum (or it is 0), no topic aliases are sent.
+   * An integer from 0 to 65,535 (0 sends no topic aliases); another value makes the constructor throw `InvalidArgumentError`.
    */
   topicAliasMaximumAboutSend?: number;
   /**
    * MQTT 5.0 only. When set, it is sent to the broker as the Topic Alias Maximum property of CONNECT,
    * and topic aliases in incoming PUBLISH packets are resolved automatically.
+   * An integer from 0 to 65,535 (0 accepts no topic aliases); another value makes the constructor throw `InvalidArgumentError`.
    */
   topicAliasMaximumAboutReceive?: number;
 };

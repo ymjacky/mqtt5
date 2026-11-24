@@ -323,6 +323,18 @@ Deno.test({ name: '@session in Deno KV: client options', only: false }, async (c
     }
   });
 
+  await context.step('a client with an invalid option does not take the store', async () => {
+    const kv = await Deno.openKv(':memory:');
+    try {
+      const store = new KvOutgoingStore(kv);
+      assertThrows(() => new MqttClient({ clientId: 'clientA', keepAlive: -1, outgoingStore: store }), ClientErrors.InvalidArgumentError, 'keepAlive');
+      // The store was not given the Client Identifier of the client that could not be created, so another client can use it.
+      new MqttClient({ clientId: 'clientB', outgoingStore: store });
+    } finally {
+      kv.close();
+    }
+  });
+
   await context.step('the store keeps the packets under the Client Identifier of its client', async () => {
     const kv = await Deno.openKv(':memory:');
     const b = recordingBroker();

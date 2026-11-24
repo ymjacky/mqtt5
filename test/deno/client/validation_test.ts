@@ -2,6 +2,7 @@ import { assertThrows } from '@std/assert';
 import { Mqtt } from '../../../deno/mod.ts';
 import { InvalidArgumentError, InvalidPropertyError, InvalidTopicFilterError, InvalidTopicNameError } from '../../../lib/client/error.ts';
 import {
+  validateClientOptions,
   validateConnect,
   validateDisconnect,
   validateProperties,
@@ -306,4 +307,50 @@ Deno.test('validateConnect does not check the properties in MQTT 3.1.1: they are
   assertThrows(() => validateConnect({ will: { topic: 'a/+' } }, V3), InvalidTopicNameError, 'will.topic');
   assertThrows(() => validateConnect({ will: { topic: 'a', qos: 3 as Mqtt.QoS } }, V3), InvalidArgumentError, 'will.qos');
   assertThrows(() => validateConnect({ will: { topic: 'a', payload: new Uint8Array(65_536) } }, V3), InvalidArgumentError, 'will.payload');
+});
+
+/** Values that a Two Byte Integer cannot hold. The string is what JavaScript callers may pass. */
+const notTwoByteIntegers = [65_536, 70_000, -1, 1.5, NaN, Infinity, -Infinity, '30' as unknown as number];
+
+Deno.test('validateClientOptions accepts integers from 0 to 65535', () => {
+  validateClientOptions(undefined, V5);
+  validateClientOptions({}, V5);
+  for (const value of [0, 1, 65_535]) {
+    validateClientOptions({ keepAlive: value, topicAliasMaximumAboutSend: value, topicAliasMaximumAboutReceive: value }, V5);
+    validateClientOptions({ keepAlive: value }, V3);
+  }
+});
+
+Deno.test('validateClientOptions rejects a keepAlive that is not an integer from 0 to 65535', () => {
+  for (const value of notTwoByteIntegers) {
+    for (const protocolVersion of [V5, V3]) {
+      assertThrows(
+        () => validateClientOptions({ keepAlive: value }, protocolVersion),
+        InvalidArgumentError,
+        'keepAlive must be an integer from 0 to 65535',
+        `${value} (${protocolVersion})`,
+      );
+    }
+  }
+});
+
+Deno.test('validateClientOptions rejects topic alias maximums that are not integers from 0 to 65535 (MQTT 5.0)', () => {
+  for (const value of notTwoByteIntegers) {
+    assertThrows(
+      () => validateClientOptions({ topicAliasMaximumAboutSend: value }, V5),
+      InvalidArgumentError,
+      'topicAliasMaximumAboutSend must be an integer from 0 to 65535',
+      `${value}`,
+    );
+    assertThrows(
+      () => validateClientOptions({ topicAliasMaximumAboutReceive: value }, V5),
+      InvalidArgumentError,
+      'topicAliasMaximumAboutReceive must be an integer from 0 to 65535',
+      `${value}`,
+    );
+  }
+});
+
+Deno.test('validateClientOptions does not check the topic alias maximums in MQTT 3.1.1: they are not used', () => {
+  validateClientOptions({ topicAliasMaximumAboutSend: -1, topicAliasMaximumAboutReceive: 70_000 }, V3);
 });

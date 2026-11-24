@@ -41,7 +41,8 @@ export class WebSocketMqttClient extends BaseMqttClient {
   /**
    * Creates a client. It does not connect until {@link WebSocketMqttClient.connect} is called.
    * @param options client options. `url` is required and must use `ws:` or `wss:`.
-   * @throws {InvalidArgumentError} if `url` is not specified.
+   * @throws {InvalidArgumentError} if `url` is not specified, if `keepAlive`, `topicAliasMaximumAboutSend` or
+   * `topicAliasMaximumAboutReceive` is not an integer from 0 to 65,535, or if the `outgoingStore` cannot be used with the `clientId`.
    */
   constructor(options?: ClientOptions) {
     if (!options?.url) {
