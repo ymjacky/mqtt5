@@ -1,6 +1,7 @@
-import { ClientErrors, Mqtt, MqttClient, type MqttPackets, Store } from '../../../deno/mod.ts';
+import { ClientErrors, Mqtt, MqttClient, MqttPackets, type PublishResult, Store } from '../../../deno/mod.ts';
+import * as MqttStream from '../../../lib/mqtt_stream_utils/mod.ts';
 import { TestBroker } from '../broker/test_broker.ts';
-import { connackBytes, RawServer, waitUntil } from '../broker/raw_server.ts';
+import { connackBytes, type RawConnection, RawServer, waitUntil } from '../broker/raw_server.ts';
 import { assert, assertEquals, assertRejects } from '@std/assert';
 
 // How the client behaves when the connection is refused, cannot be established, is lost or has to be ended.
@@ -42,6 +43,33 @@ class ConnectWriteFailingClient extends MqttClient {
       return Promise.reject(new Error('write failed'));
     }
     return super.write(bytes);
+  }
+}
+
+// The MQTT 5.0 packets that the client has sent on a raw connection.
+function receivedPackets(connection: RawConnection): MqttPackets.AnyPacket[] {
+  const frames = new MqttStream.MqttFrameBuffer();
+  frames.append(connection.received);
+  const packets: MqttPackets.AnyPacket[] = [];
+  for (let bytes = frames.takePacket(); bytes; bytes = frames.takePacket()) {
+    packets.push(MqttPackets.decode(bytes, Mqtt.ProtocolVersion.MQTT_V5));
+  }
+  return packets;
+}
+
+// The types of the packets that the client has sent on a raw connection, e.g. ['connect', 'publish'].
+function receivedPacketTypes(connection: RawConnection): string[] {
+  return receivedPackets(connection).map((packet) => packet.type);
+}
+
+// An outgoing store whose store() takes time, as with a store on a database, and completes when the test says so.
+class GatedStore extends Store.MemoryStore {
+  storing = Promise.withResolvers<void>();
+  gate = Promise.withResolvers<void>();
+  override async store(packet: MqttPackets.PublishPacket | MqttPackets.PubrelPacket): Promise<void> {
+    this.storing.resolve();
+    await this.gate.promise;
+    await super.store(packet);
   }
 }
 
@@ -723,6 +751,156 @@ Deno.test({ name: '@connection state: after DISCONNECT is sent', only: false }, 
     },
   );
 }); // @connection state: after DISCONNECT is sent
+
+Deno.test({ name: '@connection state: disconnect() and the next connection', only: false }, async (context) => {
+  await context.step(
+    'disconnect() that waits for an earlier publish() sends nothing on the connection opened after its own was closed',
+    async () => {
+      const server = new RawServer({ port: 1883 });
+      const store = new GatedStore();
+      const client = new MqttClient({ clientId: 'cid', logger: logger, outgoingStore: store, disconnectTimeoutMS: 300 });
+      try {
+        // Reconnects when the first connection is closed.
+        let reconnecting: Promise<MqttPackets.ConnackPacket> | undefined;
+        let closedCount = 0;
+        client.on('closed', () => {
+          if (++closedCount === 1) {
+            reconnecting = client.connect();
+          }
+        });
+
+        const connecting = client.connect();
+        const first = await server.connection(0);
+        await waitUntil(() => first.received.length > 0, 'CONNECT on the first connection');
+        await first.send(connackBytes());
+        await settleWithin(connecting, 'the first connect()');
+
+        // publish() waits for the store, and disconnect() waits for the publish() made before it.
+        const publishing = client.publish('topicA', 'x', { qos: Mqtt.QoS.AT_LEAST_ONCE });
+        publishing.catch(() => {
+          // How the publish() ends does not matter here.
+        });
+        await settleWithin(store.storing.promise, 'store()');
+        const disconnecting = client.disconnect();
+
+        // Meanwhile the first connection is closed, and the client reconnects: it is online on the second connection.
+        first.close();
+        const second = await server.connection(1);
+        await waitUntil(() => second.received.length > 0, 'CONNECT on the second connection');
+        await second.send(connackBytes());
+        await delay(100);
+
+        // The store completes: the turn of disconnect() comes, after its connection has been closed.
+        store.gate.resolve();
+        await settleWithin(disconnecting, 'disconnect()');
+        assert(reconnecting);
+        await settleWithin(reconnecting, 'the second connect()');
+
+        // Nothing is sent for that disconnect() on the second connection, which stays open (longer than disconnectTimeoutMS).
+        await delay(500);
+        assertEquals(receivedPacketTypes(second).filter((type) => type === 'disconnect'), []);
+        assertEquals(second.isClosed, false);
+        assertEquals(closedCount, 1);
+      } finally {
+        store.gate.resolve();
+        await client.disconnect(true);
+        await server.close();
+      }
+    },
+  );
+}); // @connection state: disconnect() and the next connection
+
+Deno.test({ name: '@connection state: publish() and the next connection', only: false }, async (context) => {
+  // Calls publish() with QoS 1 and closes the connection while the message is being stored; the client reconnects.
+  // The store completes when the client is online on the second connection, whose CONNACK has `sessionPresent`.
+  async function closeWhileStoring(
+    server: RawServer,
+    store: GatedStore,
+    client: MqttClient,
+    sessionPresent: boolean,
+  ): Promise<{ publishing: Promise<PublishResult>; first: RawConnection; second: RawConnection }> {
+    let reconnecting: Promise<MqttPackets.ConnackPacket> | undefined;
+    let closedCount = 0;
+    client.on('closed', () => {
+      if (++closedCount === 1) {
+        reconnecting = client.connect();
+      }
+    });
+
+    const connecting = client.connect();
+    const first = await server.connection(0);
+    await waitUntil(() => first.received.length > 0, 'CONNECT on the first connection');
+    await first.send(connackBytes());
+    await settleWithin(connecting, 'the first connect()');
+
+    const publishing = client.publish('topicA', 'x', { qos: Mqtt.QoS.AT_LEAST_ONCE });
+    // Settled by the test that awaits it.
+    publishing.catch(() => {});
+    await settleWithin(store.storing.promise, 'store()');
+
+    first.close();
+    const second = await server.connection(1);
+    await waitUntil(() => second.received.length > 0, 'CONNECT on the second connection');
+    await second.send(connackBytes(sessionPresent));
+    await delay(100);
+
+    store.gate.resolve();
+    assert(reconnecting);
+    await settleWithin(reconnecting, 'the second connect()');
+    return { publishing, first, second };
+  }
+
+  await context.step(
+    'a message stored while its connection is closed is sent once on the next connection, resent from the session',
+    async () => {
+      const server = new RawServer({ port: 1883 });
+      const store = new GatedStore();
+      const client = new MqttClient({ clientId: 'cid', logger: logger, clean: false, outgoingStore: store });
+      try {
+        const { publishing, first, second } = await closeWhileStoring(server, store, client, true);
+        await delay(100);
+
+        // Not written on the second connection by publish() before its CONNACK was handled, and then resent:
+        // sent once, after the CONNACK.
+        assertEquals(receivedPacketTypes(first), ['connect']);
+        assertEquals(receivedPacketTypes(second), ['connect', 'publish']);
+        const publish = receivedPackets(second)[1];
+        assert(publish.type === 'publish');
+        assertEquals(publish.topic, 'topicA');
+
+        // The flow completes on the second connection.
+        await second.send(MqttPackets.packetToBytes({ type: 'puback', packetId: publish.packetId! }, Mqtt.ProtocolVersion.MQTT_V5));
+        assertEquals((await settleWithin(publishing, 'publish()')).result, 0);
+      } finally {
+        store.gate.resolve();
+        await client.disconnect(true);
+        await server.close();
+      }
+    },
+  );
+
+  await context.step(
+    'a message stored while its connection is closed is not sent on the next connection when the broker has a new session',
+    async () => {
+      const server = new RawServer({ port: 1883 });
+      const store = new GatedStore();
+      const client = new MqttClient({ clientId: 'cid', logger: logger, outgoingStore: store });
+      try {
+        const { publishing, first, second } = await closeWhileStoring(server, store, client, false);
+
+        // The session is cleared on the CONNACK of the second connection: the flow cannot complete.
+        await assertRejects(() => settleWithin(publishing, 'publish()'), ClientErrors.SessionLostError);
+        await delay(100);
+        assertEquals(receivedPacketTypes(first), ['connect']);
+        assertEquals(receivedPacketTypes(second), ['connect']);
+      } finally {
+        store.gate.resolve();
+        await client.disconnect(true);
+        await server.close();
+      }
+    },
+  );
+}); // @connection state: publish() and the next connection
 
 Deno.test({ name: '@connection state: QoS 2 PUBLISH sent again by the broker', only: false }, async (context) => {
   await context.step(

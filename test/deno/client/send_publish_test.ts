@@ -1612,7 +1612,7 @@ Deno.test({ name: '@publish order', only: false }, async (context) => {
   );
 
   await context.step(
-    'a publish() waiting for an earlier one rejects when the connection closes meanwhile, and is not stored',
+    'a publish() waiting for an earlier one rejects when the connection closes meanwhile, and is not stored; the earlier one stays in flight',
     async () => {
       const broker = new TestBroker();
       try {
@@ -1627,13 +1627,17 @@ Deno.test({ name: '@publish order', only: false }, async (context) => {
         client.on('closed', () => closed.resolve());
 
         const first = client.publish('topicA', '1', { qos: Mqtt.QoS.AT_LEAST_ONCE }); // takes time to store
+        let firstSettled = false;
+        first.then(() => firstSettled = true, () => firstSettled = true);
         const second = client.publish('topicA', '2', { qos: Mqtt.QoS.AT_LEAST_ONCE });
-        first.catch(() => {}); // stored before the close, then cannot be sent
         await broker.closeConnectionFromBroker('cid');
         await closed.promise;
 
         await assertRejects(() => settleWithin(second, "publish() of '2'"), ClientErrors.StateIsNotOnlineError);
-        await first.catch(() => {});
+        // The 1st was being stored when the connection closed: it is in flight, as if it had been written before the close,
+        // and settles with its flow after reconnecting.
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        assertEquals(firstSettled, false);
         assertEquals(await client.publishInflightCount(), 1); // only the 1st, to be resent after reconnecting
       } catch (err) {
         fail(`error occured: ${err}`);
