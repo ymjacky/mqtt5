@@ -577,6 +577,29 @@ async function publishOnce(): Promise<void> {
 }
 ```
 
+### Vue
+
+Keep the client out of the deep reactivity of Vue 3: hold it in a `shallowRef()`, or mark it with `markRaw()`. `ref()` and `reactive()` wrap an object, and
+the objects in it, in a `Proxy`. The methods of the client then run on the proxy, which cannot read the private (`#`) fields of the client and of the objects it
+keeps: they throw a `TypeError` such as "Cannot read private member from an object whose class did not declare it".
+
+```ts ignore
+import { markRaw, reactive, shallowRef } from 'vue';
+import { Mqtt, WebSocketMqttClient } from '@ymjacky/mqtt5/browser';
+
+// shallowRef(): `client.value` is the client itself, not a proxy.
+const client = shallowRef(new WebSocketMqttClient({ url: new URL('wss://broker.example.com:8081') }));
+await client.value.connect();
+await client.value.subscribe('topicA', Mqtt.QoS.AtLeastOnce);
+
+// markRaw(): the client is not wrapped, also in a reactive object.
+const state = reactive({
+  client: markRaw(new WebSocketMqttClient({ url: new URL('wss://broker.example.com:8081') })),
+  messages: [] as string[], // the received messages can be reactive
+});
+state.client.on('publish', (event) => state.messages.push(new TextDecoder().decode(event.detail.payload)));
+```
+
 ## Features
 
 - MQTT 3.1.1 and MQTT 5.0
