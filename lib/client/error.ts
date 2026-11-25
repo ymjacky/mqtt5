@@ -14,6 +14,9 @@ export * from '../error/mod.ts';
 // `export *` keeps it visible in the docs of the ClientErrors namespace.
 export * from '../mqtt_stream_utils/error.ts';
 
+// Thrown below the client, by the packet ID provider, and re-exported here as well.
+export * from '../id_provider/error.ts';
+
 /**
  * The connection was closed. Rejected by `connect()` when the connection is closed before CONNACK is received
  * (`WebSocketMqttClient` also when the connection cannot be opened), and by `subscribe()` and `unsubscribe()` when it is

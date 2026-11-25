@@ -576,6 +576,7 @@ export abstract class BaseMqttClient {
    * with it, to be resent after reconnecting. They are also rejected when resent after reconnecting and larger than
    * the Maximum Packet Size of the new connection; the message is removed from the session.
    * @throws {MqttPacketSerializeError} if PUBLISH cannot be encoded. Nothing is sent.
+   * @throws {PacketIdsExhaustedError} QoS 1 and 2: if all the packet IDs are in use by requests that have not completed. Nothing is sent.
    * @throws {SessionLostError} QoS 1 and 2: if the broker did not keep the session when reconnecting before the flow completed.
    * @example
    * ```ts
@@ -795,6 +796,7 @@ export abstract class BaseMqttClient {
    * @throws {SharedSubscriptionsNotSupportedError} if a topic filter is a shared subscription and the broker does not support them. Nothing is sent.
    * @throws {SubscriptionIdentifiersNotSupportedError} if a Subscription Identifier is set and the broker does not support them. Nothing is sent.
    * @throws {PacketTooLargeError} if SUBSCRIBE is larger than the Maximum Packet Size of the broker or than MQTT allows. Nothing is sent.
+   * @throws {PacketIdsExhaustedError} if all the packet IDs are in use by requests that have not completed. Nothing is sent.
    * @throws {ConnectionClosed} if the connection is closed before SUBACK is received.
    * @example
    * ```ts
@@ -826,6 +828,7 @@ export abstract class BaseMqttClient {
    * @throws {SharedSubscriptionsNotSupportedError} if a topic filter is a shared subscription and the broker does not support them. Nothing is sent.
    * @throws {SubscriptionIdentifiersNotSupportedError} if a Subscription Identifier is set and the broker does not support them. Nothing is sent.
    * @throws {PacketTooLargeError} if SUBSCRIBE is larger than the Maximum Packet Size of the broker or than MQTT allows. Nothing is sent.
+   * @throws {PacketIdsExhaustedError} if all the packet IDs are in use by requests that have not completed. Nothing is sent.
    * @throws {ConnectionClosed} if the connection is closed before SUBACK is received.
    * @example
    * ```ts
@@ -857,6 +860,7 @@ export abstract class BaseMqttClient {
    * @throws {SharedSubscriptionsNotSupportedError} if a topic filter is a shared subscription and the broker does not support them. Nothing is sent.
    * @throws {SubscriptionIdentifiersNotSupportedError} if a Subscription Identifier is set and the broker does not support them. Nothing is sent.
    * @throws {PacketTooLargeError} if SUBSCRIBE is larger than the Maximum Packet Size of the broker or than MQTT allows. Nothing is sent.
+   * @throws {PacketIdsExhaustedError} if all the packet IDs are in use by requests that have not completed. Nothing is sent.
    * @throws {ConnectionClosed} if the connection is closed before SUBACK is received.
    * @example
    * ```ts
@@ -888,6 +892,7 @@ export abstract class BaseMqttClient {
    * @throws {SharedSubscriptionsNotSupportedError} if a topic filter is a shared subscription and the broker does not support them. Nothing is sent.
    * @throws {SubscriptionIdentifiersNotSupportedError} if a Subscription Identifier is set and the broker does not support them. Nothing is sent.
    * @throws {PacketTooLargeError} if SUBSCRIBE is larger than the Maximum Packet Size of the broker or than MQTT allows. Nothing is sent.
+   * @throws {PacketIdsExhaustedError} if all the packet IDs are in use by requests that have not completed. Nothing is sent.
    * @throws {ConnectionClosed} if the connection is closed before SUBACK is received.
    * @example
    * ```ts
@@ -976,6 +981,7 @@ export abstract class BaseMqttClient {
    * @throws {InvalidArgumentError} if no topic filter is given. Nothing is sent.
    * @throws {InvalidPropertyError} if a property is invalid. Nothing is sent.
    * @throws {PacketTooLargeError} if UNSUBSCRIBE is larger than the Maximum Packet Size of the broker or than MQTT allows. Nothing is sent.
+   * @throws {PacketIdsExhaustedError} if all the packet IDs are in use by requests that have not completed. Nothing is sent.
    * @throws {ConnectionClosed} if the connection is closed before UNSUBACK is received.
    * @example
    * ```ts
@@ -1008,6 +1014,7 @@ export abstract class BaseMqttClient {
    * @throws {InvalidArgumentError} if no topic filter is given. Nothing is sent.
    * @throws {InvalidPropertyError} if a property is invalid. Nothing is sent.
    * @throws {PacketTooLargeError} if UNSUBSCRIBE is larger than the Maximum Packet Size of the broker or than MQTT allows. Nothing is sent.
+   * @throws {PacketIdsExhaustedError} if all the packet IDs are in use by requests that have not completed. Nothing is sent.
    * @throws {ConnectionClosed} if the connection is closed before UNSUBACK is received.
    * @example
    * ```ts

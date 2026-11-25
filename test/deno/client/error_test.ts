@@ -16,6 +16,7 @@ const errors: Record<string, ErrorFactory> = {
   StateIsNotOfflineError: (options) => new ClientErrors.StateIsNotOfflineError('m', options),
   StateIsNotOnlineError: (options) => new ClientErrors.StateIsNotOnlineError('m', options),
   SessionLostError: (options) => new ClientErrors.SessionLostError(options),
+  PacketIdsExhaustedError: (options) => new ClientErrors.PacketIdsExhaustedError('m', options),
   SendPacketError: (options) => new ClientErrors.SendPacketError(options),
   InvalidTopicNameError: (options) => new ClientErrors.InvalidTopicNameError('m', options),
   InvalidTopicFilterError: (options) => new ClientErrors.InvalidTopicFilterError('m', options),

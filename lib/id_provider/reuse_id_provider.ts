@@ -1,3 +1,5 @@
+import { PacketIdsExhaustedError } from './error.ts';
+
 /**
  * Hands out the IDs from `start` to `end`, reusing the released ones first so that the IDs stay small.
  *
@@ -30,6 +32,10 @@ export class ReuseIdProvider {
     this.#next = this.#start;
   }
 
+  /**
+   * Hands out a free ID.
+   * @throws {PacketIdsExhaustedError} if all the IDs are in use.
+   */
   acquire(): number {
     const reusable = this.#reusable.values().next();
     if (!reusable.done) {
@@ -44,7 +50,7 @@ export class ReuseIdProvider {
       this.#next++;
     }
     if (this.#next > this.#end) {
-      throw new Error('Unable to obtain ID because the limit has been reached');
+      throw new PacketIdsExhaustedError(`all the IDs from ${this.#start} to ${this.#end} are in use`);
     }
     const id = this.#next++;
     this.#inUse.add(id);
