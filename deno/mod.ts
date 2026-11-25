@@ -231,9 +231,9 @@
  * import { KvOutgoingStore, Mqtt, MqttClient } from '@ymjacky/mqtt5';
  *
  * // Run with `deno run --unstable-kv`. Deno KV is an unstable API of Deno.
- * const kv = await Deno.openKv();
+ * using kv = await Deno.openKv();
  *
- * const client = new MqttClient({
+ * await using client = new MqttClient({
  *   clientId: 'clientA', // required with the store
  *   clean: false,
  *   outgoingStore: new KvOutgoingStore(kv),
@@ -243,8 +243,8 @@
  * await client.connect({ properties: { sessionExpiryInterval: 3600 } });
  * await client.publish('topicA', 'payload', { qos: Mqtt.QoS.AT_LEAST_ONCE });
  *
- * await client.disconnect();
- * kv.close(); // after the client has disconnected
+ * // At the end of the module, client.disconnect() is called, then kv.close(): what is declared later is disposed of
+ * // first, so the database is closed after the client has disconnected.
  * ```
  *
  * @module
