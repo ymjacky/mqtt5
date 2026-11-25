@@ -2,9 +2,13 @@ import { KvOutgoingStore, Mqtt, type MqttPackets, type Store } from '../../../de
 import type { KvOutgoingStoreOptions } from '../../../deno/mod.ts';
 import { assertEquals, assertRejects } from '@std/assert';
 
-type StoredPacket = MqttPackets.PublishPacket | MqttPackets.PubrelPacket;
+type StoredPacket = MqttPackets.PublishPacketWithId | MqttPackets.PubrelPacket;
 
-export function publishPacket(packetId: number, payload: string, qos: Mqtt.QoS = Mqtt.QoS.AT_LEAST_ONCE): MqttPackets.PublishPacket {
+export function publishPacket(
+  packetId: number,
+  payload: string,
+  qos: MqttPackets.PublishPacketWithId['qos'] = Mqtt.QoS.AT_LEAST_ONCE,
+): MqttPackets.PublishPacketWithId {
   return { type: 'publish', topic: 'topicA', payload: new TextEncoder().encode(payload), dup: false, retain: false, qos, packetId };
 }
 
@@ -44,7 +48,7 @@ export async function testOutgoingStoreContract(
   }
 
   await step('a stored packet is returned with the same content', async (store) => {
-    const packet: MqttPackets.PublishPacket = {
+    const packet: MqttPackets.PublishPacketWithId = {
       type: 'publish',
       topic: 'topic/日本語',
       payload: new Uint8Array([0, 1, 2, 255]),
@@ -141,7 +145,8 @@ export async function testOutgoingStoreContract(
   });
 
   await step('a packet without a packet ID is rejected', async (store) => {
-    await assertRejects(() => store.store({ ...publishPacket(1, 'A'), packetId: undefined }));
+    // The type does not allow it, but a JavaScript caller can pass one.
+    await assertRejects(() => store.store({ ...publishPacket(1, 'A'), packetId: undefined } as unknown as StoredPacket));
     await assertRejects(() => store.store({ ...publishPacket(1, 'A'), packetId: 0 }));
     assertEquals(await store.count(), 0);
   });

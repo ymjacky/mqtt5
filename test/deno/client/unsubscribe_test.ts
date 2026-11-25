@@ -36,13 +36,13 @@ Deno.test({ name: '@unsubscribe', only: false }, async (context) => {
 
           broker.sendUnsuback(
             'cid',
-            packet.packetId!,
+            packet.packetId,
             Mqtt.ProtocolVersion.MQTT_V5,
             [Mqtt.ReasonCode.Success],
           );
         });
         const result = await client.unsubscribe('topicA');
-        assertEquals(result.reasonCodes![0], Mqtt.ReasonCode.Success);
+        assertEquals(result.reasonCodes?.[0], Mqtt.ReasonCode.Success);
       } catch (err) {
         fail(`error occured: ${err}`);
       } finally {
@@ -81,7 +81,7 @@ Deno.test({ name: '@unsubscribe', only: false }, async (context) => {
 
           broker.sendUnsuback(
             'cid',
-            packet.packetId!,
+            packet.packetId,
             Mqtt.ProtocolVersion.MQTT_V3_1_1,
           );
         });
@@ -128,7 +128,7 @@ Deno.test({ name: '@unsubscribe', only: false }, async (context) => {
 
           broker.sendUnsuback(
             'cid',
-            packet.packetId!,
+            packet.packetId,
             Mqtt.ProtocolVersion.MQTT_V5,
             [Mqtt.ReasonCode.Success, Mqtt.ReasonCode.Success, Mqtt.ReasonCode.Success, Mqtt.ReasonCode.UnspecifiedError],
           );
@@ -142,10 +142,10 @@ Deno.test({ name: '@unsubscribe', only: false }, async (context) => {
             'unspecified',
           ],
         );
-        assertEquals(result.reasonCodes![0], Mqtt.ReasonCode.Success);
-        assertEquals(result.reasonCodes![1], Mqtt.ReasonCode.Success);
-        assertEquals(result.reasonCodes![2], Mqtt.ReasonCode.Success);
-        assertEquals(result.reasonCodes![3], Mqtt.ReasonCode.UnspecifiedError);
+        assertEquals(result.reasonCodes?.[0], Mqtt.ReasonCode.Success);
+        assertEquals(result.reasonCodes?.[1], Mqtt.ReasonCode.Success);
+        assertEquals(result.reasonCodes?.[2], Mqtt.ReasonCode.Success);
+        assertEquals(result.reasonCodes?.[3], Mqtt.ReasonCode.UnspecifiedError);
       } catch (err) {
         fail(`error occured: ${err}`);
       } finally {
@@ -188,7 +188,7 @@ Deno.test({ name: '@unsubscribe', only: false }, async (context) => {
 
           broker.sendUnsuback(
             'cid',
-            packet.packetId!,
+            packet.packetId,
             Mqtt.ProtocolVersion.MQTT_V3_1_1,
           );
         });
@@ -257,13 +257,13 @@ Deno.test({ name: '@unsubscribe', only: false }, async (context) => {
 
           broker.sendUnsuback(
             'cid',
-            packet.packetId!,
+            packet.packetId,
             Mqtt.ProtocolVersion.MQTT_V5,
             [Mqtt.ReasonCode.Success],
           );
         });
         const result = await client.unsubscribe('topicA', properties);
-        assertEquals(result.reasonCodes![0], Mqtt.ReasonCode.Success);
+        assertEquals(result.reasonCodes?.[0], Mqtt.ReasonCode.Success);
       } catch (err) {
         fail(`error occured: ${err}`);
       } finally {
@@ -330,7 +330,7 @@ Deno.test({ name: '@unsubscribe', only: false }, async (context) => {
           };
           broker.sendUnsuback(
             'cid',
-            packet.packetId!,
+            packet.packetId,
             Mqtt.ProtocolVersion.MQTT_V5,
             [Mqtt.ReasonCode.Success, Mqtt.ReasonCode.Success, Mqtt.ReasonCode.Success, Mqtt.ReasonCode.UnspecifiedError],
             unsubackProperties,
@@ -342,10 +342,10 @@ Deno.test({ name: '@unsubscribe', only: false }, async (context) => {
           properties,
         );
 
-        assertEquals(result.reasonCodes![0], Mqtt.ReasonCode.Success);
-        assertEquals(result.reasonCodes![1], Mqtt.ReasonCode.Success);
-        assertEquals(result.reasonCodes![2], Mqtt.ReasonCode.Success);
-        assertEquals(result.reasonCodes![3], Mqtt.ReasonCode.UnspecifiedError);
+        assertEquals(result.reasonCodes?.[0], Mqtt.ReasonCode.Success);
+        assertEquals(result.reasonCodes?.[1], Mqtt.ReasonCode.Success);
+        assertEquals(result.reasonCodes?.[2], Mqtt.ReasonCode.Success);
+        assertEquals(result.reasonCodes?.[3], Mqtt.ReasonCode.UnspecifiedError);
         assertEquals(result.reason, 'unspecified error');
       } catch (err) {
         fail(`error occured: ${err}`);
@@ -416,8 +416,8 @@ Deno.test({ name: '@receive malformed unsuback', only: false }, async (context) 
           const malformedPacket = new Uint8Array([
             0xB0, // Fixed header: UNSUBACK packet type
             0x04, // Remaining length: 4 bytes (Packet ID 2 bytes + Properties Length 1 byte + Property ID 1 byte)
-            (packet.packetId! >> 8) & 0xFF, // Packet ID high byte
-            packet.packetId! & 0xFF, // Packet ID low byte
+            (packet.packetId >> 8) & 0xFF, // Packet ID high byte
+            packet.packetId & 0xFF, // Packet ID low byte
             0x01, // Properties Length: 1 byte
             0xFF, // Property ID: 0xFF (INVALID)
             // Missing Reason Codes payload but that's okay for malformed packet test

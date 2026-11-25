@@ -15,7 +15,6 @@ function publishBytes(payloadSize: number): Uint8Array {
       dup: false,
       retain: false,
       qos: 0,
-      packetId: 0,
     },
     Mqtt.ProtocolVersion.MQTT_V3_1_1,
   );

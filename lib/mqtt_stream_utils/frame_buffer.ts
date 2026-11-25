@@ -78,10 +78,11 @@ export class MqttFrameBuffer {
       throw this.error;
     }
     try {
-      if (this.packetSize === undefined && !this.readFixedHeader()) {
+      const packetSize = this.packetSize ?? this.readFixedHeader();
+      if (packetSize === undefined) {
         return undefined;
       }
-      return this.takeRestOfPacket();
+      return this.takeRestOfPacket(packetSize);
     } catch (err) {
       this.error = err as Error;
       this.chunks = [];
@@ -92,11 +93,11 @@ export class MqttFrameBuffer {
 
   /**
    * Reads the fixed header of the next packet, which tells its size.
-   * @returns false if more bytes are needed.
+   * @returns the size of the packet, or undefined if more bytes are needed.
    * @throws {MalformedPacketError} if the Remaining Length is longer than 4 bytes.
    * @throws {PacketTooLargeToReceiveError} if the packet is larger than the Maximum Packet Size.
    */
-  private readFixedHeader(): boolean {
+  private readFixedHeader(): number | undefined {
     while (this.buffered > 0) {
       this.header[this.headerLength++] = this.chunks[0][this.offset];
       this.consume(1);
@@ -111,17 +112,17 @@ export class MqttFrameBuffer {
         throw new PacketTooLargeToReceiveError(packetSize, this.maximumPacketSize);
       }
       this.packetSize = packetSize;
-      return true;
+      return packetSize;
     }
-    return false;
+    return undefined;
   }
 
   /**
    * Copies the packet out of the chunks when all of its bytes after the fixed header have been received.
+   * @param packetSize the size of the packet, read from its fixed header.
    * @returns the packet, or undefined if more bytes are needed.
    */
-  private takeRestOfPacket(): Uint8Array | undefined {
-    const packetSize = this.packetSize!;
+  private takeRestOfPacket(packetSize: number): Uint8Array | undefined {
     if (this.buffered < packetSize - this.headerLength) {
       return undefined;
     }

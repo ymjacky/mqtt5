@@ -16,7 +16,11 @@ export function toBytes(
 
   const variableHeader = concatBytes(variableHeaderChunks);
 
-  const payload: number[] = (protocolVersion > Mqtt.ProtocolVersion.MQTT_V3_1_1) ? packet.reasonCodes! : packet.returnCodes!;
+  // MQTT 5.0 SUBACK has Reason Codes, MQTT 3.1.1 SUBACK has Return Codes.
+  const payload = (protocolVersion > Mqtt.ProtocolVersion.MQTT_V3_1_1) ? packet.reasonCodes : packet.returnCodes;
+  if (payload === undefined) {
+    throw new Error(`SUBACK has no ${protocolVersion > Mqtt.ProtocolVersion.MQTT_V3_1_1 ? 'reasonCodes' : 'returnCodes'}`);
+  }
 
   const fixedHeader = [
     (Mqtt.PacketType.SUBACK << 4) + Mqtt.fixedHeaderFlag.SUBACK,

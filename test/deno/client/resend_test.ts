@@ -1,5 +1,5 @@
 import { ClientErrors, type ClientTypes, Mqtt, MqttClient, type MqttPackets, type MqttProperties, Store } from '../../../deno/mod.ts';
-import { TestBroker } from '../broker/test_broker.ts';
+import { packetIdOf, TestBroker } from '../broker/test_broker.ts';
 import { assertEquals, assertExists, assertFalse, assertRejects, fail } from '@std/assert';
 
 function logger(msg: string, ...args: unknown[]): void {
@@ -65,7 +65,7 @@ Deno.test({ name: '@resend from MemoryStore', only: false }, async (context) => 
 
             broker.sendPuback(
               'cid',
-              packet.packetId!,
+              packetIdOf(packet),
               Mqtt.ProtocolVersion.MQTT_V5,
             );
           } else {
@@ -174,7 +174,7 @@ Deno.test({ name: '@resend from MemoryStore', only: false }, async (context) => 
 
             broker.sendPuback(
               'cid',
-              packet.packetId!,
+              packetIdOf(packet),
               Mqtt.ProtocolVersion.MQTT_V3_1_1,
             );
           } else {
@@ -284,7 +284,7 @@ Deno.test({ name: '@resend from MemoryStore', only: false }, async (context) => 
 
             broker.sendPuback(
               'cid',
-              packet.packetId!,
+              packetIdOf(packet),
               Mqtt.ProtocolVersion.MQTT_V5,
             );
           } else {
@@ -393,7 +393,7 @@ Deno.test({ name: '@resend from MemoryStore', only: false }, async (context) => 
 
             broker.sendPuback(
               'cid',
-              packet.packetId!,
+              packetIdOf(packet),
               Mqtt.ProtocolVersion.MQTT_V3_1_1,
             );
           } else {
@@ -503,7 +503,7 @@ Deno.test({ name: '@resend from MemoryStore', only: false }, async (context) => 
 
           broker.sendPubrec(
             'cid',
-            packet.packetId!,
+            packetIdOf(packet),
             Mqtt.ProtocolVersion.MQTT_V5,
           );
         });
@@ -515,7 +515,7 @@ Deno.test({ name: '@resend from MemoryStore', only: false }, async (context) => 
 
             broker.sendPubcomp(
               'cid',
-              packet.packetId!,
+              packet.packetId,
               Mqtt.ProtocolVersion.MQTT_V5,
             );
           } else {
@@ -618,7 +618,7 @@ Deno.test({ name: '@resend from MemoryStore', only: false }, async (context) => 
 
           broker.sendPubrec(
             'cid',
-            packet.packetId!,
+            packetIdOf(packet),
             Mqtt.ProtocolVersion.MQTT_V5,
           );
         });
@@ -630,7 +630,7 @@ Deno.test({ name: '@resend from MemoryStore', only: false }, async (context) => 
 
             broker.sendPubcomp(
               'cid',
-              packet.packetId!,
+              packet.packetId,
               Mqtt.ProtocolVersion.MQTT_V5,
             );
           } else {
@@ -739,7 +739,7 @@ Deno.test({ name: '@resend from MemoryStore', only: false }, async (context) => 
 
             broker.sendPuback(
               'cid',
-              packet.packetId!,
+              packetIdOf(packet),
               Mqtt.ProtocolVersion.MQTT_V5,
             );
 
@@ -774,7 +774,7 @@ Deno.test({ name: '@resend from MemoryStore', only: false }, async (context) => 
               // Only the first message returns puback
               broker.sendPuback(
                 'cid',
-                packet.packetId!,
+                packet.packetId,
                 Mqtt.ProtocolVersion.MQTT_V5,
               );
             } else {
@@ -895,7 +895,7 @@ Deno.test({ name: '@resend from MemoryStore', only: false }, async (context) => 
 
             broker.sendPuback(
               'cid',
-              packet.packetId!,
+              packetIdOf(packet),
               Mqtt.ProtocolVersion.MQTT_V5,
             );
           } else {
@@ -903,7 +903,7 @@ Deno.test({ name: '@resend from MemoryStore', only: false }, async (context) => 
               assertEquals(packet.packetId, 1);
               broker.sendPuback(
                 'cid',
-                packet.packetId!,
+                packetIdOf(packet),
                 Mqtt.ProtocolVersion.MQTT_V5,
               );
 
@@ -982,7 +982,7 @@ Deno.test({ name: '@resend too large', only: false }, async (context) => {
           const packet = event.detail;
           received.push({ packetId: packet.packetId, size: packet.payload.length, dup: packet.dup });
           if (reconnected) {
-            broker.sendPuback('cid', packet.packetId!, Mqtt.ProtocolVersion.MQTT_V5);
+            broker.sendPuback('cid', packetIdOf(packet), Mqtt.ProtocolVersion.MQTT_V5);
           } else if (received.length === 2) {
             resolve();
           }
@@ -1026,7 +1026,7 @@ Deno.test({ name: '@resend from a store with packets of a previous process', onl
       // Reading the stored packets takes time, as with a database.
       const resendStarted = Promise.withResolvers<void>();
       class RestoredStore extends Store.MemoryStore {
-        override async *resendIterator(): AsyncIterableIterator<MqttPackets.PublishPacket | MqttPackets.PubrelPacket> {
+        override async *resendIterator(): AsyncIterableIterator<MqttPackets.PublishPacketWithId | MqttPackets.PubrelPacket> {
           resendStarted.resolve();
           for (const packet of [...this.packets.values()]) {
             await new Promise((resolve) => setTimeout(resolve, 20));
@@ -1059,7 +1059,7 @@ Deno.test({ name: '@resend from a store with packets of a previous process', onl
         broker.on('publish', (event) => {
           const packet = event.detail;
           received.push({ payload: new TextDecoder().decode(packet.payload), packetId: packet.packetId, dup: packet.dup });
-          broker.sendPuback('cid', packet.packetId!, Mqtt.ProtocolVersion.MQTT_V5);
+          broker.sendPuback('cid', packetIdOf(packet), Mqtt.ProtocolVersion.MQTT_V5);
         });
 
         const client = new MqttClient({ clientId: 'cid', logger: logger, clean: false, outgoingStore: store });
@@ -1125,9 +1125,9 @@ Deno.test({ name: '@resend: the payload and properties given to publish()', only
               return;
             }
             if (qos === Mqtt.QoS.AT_LEAST_ONCE) {
-              broker.sendPuback('cid', packet.packetId!, Mqtt.ProtocolVersion.MQTT_V5);
+              broker.sendPuback('cid', packetIdOf(packet), Mqtt.ProtocolVersion.MQTT_V5);
             } else {
-              broker.sendPubrec('cid', packet.packetId!, Mqtt.ProtocolVersion.MQTT_V5);
+              broker.sendPubrec('cid', packetIdOf(packet), Mqtt.ProtocolVersion.MQTT_V5);
             }
           });
           broker.on('pubrel', (event) => {
@@ -1138,19 +1138,18 @@ Deno.test({ name: '@resend: the payload and properties given to publish()', only
           await client.connect();
 
           const payload = encoder.encode('payloadA');
-          const properties: MqttProperties.UserPublishProperties = {
-            correlationData: encoder.encode('correlationA'),
-            userProperties: [{ key: 'key1', val: 'val1' }],
-            contentType: 'text/plain',
-          };
+          const correlationData = encoder.encode('correlationA');
+          const userProperty = { key: 'key1', val: 'val1' };
+          const userProperties = [userProperty];
+          const properties: MqttProperties.UserPublishProperties = { correlationData, userProperties, contentType: 'text/plain' };
           const publishing = client.publish('topicA', payload, { qos }, properties);
           await written.promise;
 
           // The application reuses the objects for its next message while the flow is not complete yet.
           payload.set(encoder.encode('payloadB'));
-          properties.correlationData!.set(encoder.encode('correlationB'));
-          properties.userProperties![0].val = 'val2';
-          properties.userProperties!.push({ key: 'key3', val: 'val3' });
+          correlationData.set(encoder.encode('correlationB'));
+          userProperty.val = 'val2';
+          userProperties.push({ key: 'key3', val: 'val3' });
           properties.contentType = 'application/json';
 
           const closed = Promise.withResolvers<void>();
@@ -1197,9 +1196,9 @@ Deno.test({ name: '@resend: the payload and properties given to publish()', only
             received.push(summary(packet));
             written.resolve();
             if (qos === Mqtt.QoS.AT_LEAST_ONCE) {
-              broker.sendPuback('cid', packet.packetId!, Mqtt.ProtocolVersion.MQTT_V5);
+              broker.sendPuback('cid', packetIdOf(packet), Mqtt.ProtocolVersion.MQTT_V5);
             } else if (qos === Mqtt.QoS.EXACTLY_ONCE) {
-              broker.sendPubrec('cid', packet.packetId!, Mqtt.ProtocolVersion.MQTT_V5);
+              broker.sendPubrec('cid', packetIdOf(packet), Mqtt.ProtocolVersion.MQTT_V5);
             }
           });
           broker.on('pubrel', (event) => {
@@ -1210,17 +1209,16 @@ Deno.test({ name: '@resend: the payload and properties given to publish()', only
           await client.connect();
 
           const payload = encoder.encode('payloadA');
-          const properties: MqttProperties.UserPublishProperties = {
-            correlationData: encoder.encode('correlationA'),
-            userProperties: [{ key: 'key1', val: 'val1' }],
-            contentType: 'text/plain',
-          };
+          const correlationData = encoder.encode('correlationA');
+          const userProperty = { key: 'key1', val: 'val1' };
+          const userProperties = [userProperty];
+          const properties: MqttProperties.UserPublishProperties = { correlationData, userProperties, contentType: 'text/plain' };
           const publishing = client.publish('topicA', payload, { qos }, properties);
           // The application does not wait for publish() and reuses the objects for its next message.
           payload.set(encoder.encode('payloadB'));
-          properties.correlationData!.set(encoder.encode('correlationB'));
-          properties.userProperties![0].val = 'val2';
-          properties.userProperties!.push({ key: 'key3', val: 'val3' });
+          correlationData.set(encoder.encode('correlationB'));
+          userProperty.val = 'val2';
+          userProperties.push({ key: 'key3', val: 'val3' });
           properties.contentType = 'application/json';
 
           assertEquals((await publishing).result, Mqtt.ReasonCode.Success);

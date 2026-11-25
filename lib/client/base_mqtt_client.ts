@@ -44,6 +44,7 @@ import type {
   PubackPacket,
   PubcompPacket,
   PublishPacket,
+  PublishPacketWithId,
   PubrecPacket,
   PubrelPacket,
   SubackPacket,
@@ -88,7 +89,7 @@ type ConnectionState =
   | { kind: 'disconnecting'; connection: Connection };
 
 /** A packet kept in the session, read to be resent after reconnecting, and its bytes. */
-type ResendTarget = { packet: PublishPacket | PubrelPacket; bytes: Uint8Array };
+type ResendTarget = { packet: PublishPacketWithId | PubrelPacket; bytes: Uint8Array };
 
 const defaultKeepAlive = 10; // 10 sec
 const defaultConnectTimeout = 10 * 1000;
@@ -659,21 +660,14 @@ export abstract class BaseMqttClient {
         }
       }
 
-      const packetId = qos === Mqtt.QoS.AT_MOST_ONCE ? 0 : await this.session.acquirePublishPacketId();
       // Without a topic alias: it is set right before writing.
-      const packet: PublishPacket = {
-        type: 'publish',
-        topic,
-        payload: buffer,
-        dup,
-        retain,
-        qos,
-        packetId,
-        properties: publishProperties,
-      };
-
+      let packet: PublishPacket;
       let bytes: Uint8Array | undefined;
-      if (qos !== Mqtt.QoS.AT_MOST_ONCE) {
+      if (qos === Mqtt.QoS.AT_MOST_ONCE) {
+        packet = { type: 'publish', topic, payload: buffer, dup, retain, qos, properties: publishProperties };
+      } else {
+        const packetId = await this.session.acquirePublishPacketId();
+        packet = { type: 'publish', topic, payload: buffer, dup, retain, qos, packetId, properties: publishProperties };
         // The session keeps the packet with its Topic Name and without a topic alias, which is valid only on the current
         // connection, to resend it after reconnecting. Encode it in that form before storing it: a packet that cannot be
         // encoded or is too large must not stay there to be resent.
@@ -1677,7 +1671,7 @@ export abstract class BaseMqttClient {
         targets.push({ packet, bytes: this.encodePacket(packet) });
       } catch (err) {
         this.log(`can't resend ${packet.type} packet, removing it from the session`, packet, err);
-        unsendable.push({ packetId: packet.packetId!, err: err as Error });
+        unsendable.push({ packetId: packet.packetId, err: err as Error });
       }
     }
     if (!connectPending()) {
@@ -1707,7 +1701,7 @@ export abstract class BaseMqttClient {
         return;
       }
       // False if the flow has ended meanwhile: then the packet is not resent.
-      if (this.session.useSendQuota(packet.packetId!)) {
+      if (this.session.useSendQuota(packet.packetId)) {
         this.sendPacketInBackground(packet, bytes);
       }
     }
@@ -1739,7 +1733,7 @@ export abstract class BaseMqttClient {
       this.sendPacketInBackground(
         {
           type: 'puback',
-          packetId: packet.packetId!,
+          packetId: packet.packetId,
         },
       );
 
@@ -1750,16 +1744,16 @@ export abstract class BaseMqttClient {
       // A PUBLISH with DUP whose packet ID is stored is a message that has been emitted already: the broker sends it
       // again when it has not received PUBREC, e.g. the connection was closed. It is answered again, and not emitted again.
       const emitMessage = !packet.dup ||
-        !(await this.incomingStore.has(packet.packetId!));
+        !(await this.incomingStore.has(packet.packetId));
 
       if (emitMessage) {
-        await this.incomingStore.store(packet.packetId!);
+        await this.incomingStore.store(packet.packetId);
       }
 
       this.sendPacketInBackground(
         {
           type: 'pubrec',
-          packetId: packet.packetId!,
+          packetId: packet.packetId,
         },
       );
 
@@ -1894,14 +1888,15 @@ export abstract class BaseMqttClient {
   /** Handles SUBACK: resolves `subscribe()`. */
   private async handleSuback(packet: SubackPacket): Promise<void> {
     if (await this.session.packetIdInUse(packet.packetId)) {
-      const rvList = packet.reasonCodes ? packet.reasonCodes : packet.returnCodes;
+      // MQTT 5.0 SUBACK has Reason Codes, MQTT 3.1.1 SUBACK has Return Codes: the decoder sets one of them.
+      const rvList = packet.reasonCodes ?? packet.returnCodes ?? [];
 
       // Take the deferred before releasing the packet ID: a subscribe() that gets the ID again must not lose its own.
       const deferred = this.session.getSubscribeDeferred(packet.packetId);
       this.session.releasePacketId(packet.packetId);
       if (deferred) {
         const reason = packet.properties?.reasonString;
-        deferred.resolve({ reasons: rvList!, reason });
+        deferred.resolve({ reasons: rvList, reason });
       }
     } else {
       this.log(`Unknown packetId received, ignoring it. (packetId:${packet.packetId})`, 'suback');

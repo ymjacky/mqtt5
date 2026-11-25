@@ -2,7 +2,7 @@ import * as Mqtt from '../mqtt/mod.ts';
 import * as MqttPackets from '../mqtt_packets/mod.ts';
 import type { OutgoingStore } from './store.ts';
 
-type StoredPacket = MqttPackets.PublishPacket | MqttPackets.PubrelPacket;
+type StoredPacket = MqttPackets.PublishPacketWithId | MqttPackets.PubrelPacket;
 
 /** The value kept in Deno KV for a packet. */
 type Entry = {
@@ -189,7 +189,7 @@ export class KvOutgoingStore implements OutgoingStore {
         for await (const { key, value } of this.kv.list({ prefix: this.keyPrefix() })) {
           const read = this.read(key, value);
           if (read) {
-            sequences.set(read.packet.packetId!, read.seq);
+            sequences.set(read.packet.packetId, read.seq);
             this.nextSeq = Math.max(this.nextSeq, read.seq + 1);
           } else {
             this.log('removing an entry that cannot be read from the store', key);
@@ -209,7 +209,7 @@ export class KvOutgoingStore implements OutgoingStore {
     return this.sequences;
   }
 
-  /** Decodes an entry. Returns undefined if it is not a PUBLISH or PUBREL stored under its packet ID. */
+  /** Decodes an entry. Returns undefined if it is not a QoS 1 / QoS 2 PUBLISH or a PUBREL stored under its packet ID. */
   private read(key: Deno.KvKey, value: unknown): { seq: number; packet: StoredPacket } | undefined {
     const entry = value as Partial<Entry> | null;
     if (typeof entry?.seq !== 'number' || !(entry.bytes instanceof Uint8Array)) {
@@ -217,7 +217,8 @@ export class KvOutgoingStore implements OutgoingStore {
     }
     try {
       const packet = MqttPackets.decode(entry.bytes, Mqtt.ProtocolVersion.MQTT_V5);
-      if ((packet.type === 'publish' || packet.type === 'pubrel') && packet.packetId === key.at(-1)) {
+      const stored = packet.type === 'pubrel' || (packet.type === 'publish' && packet.qos !== Mqtt.QoS.AT_MOST_ONCE);
+      if (stored && packet.packetId === key.at(-1)) {
         return { seq: entry.seq, packet };
       }
     } catch {

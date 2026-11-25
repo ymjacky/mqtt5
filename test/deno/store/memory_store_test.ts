@@ -127,7 +127,7 @@ Deno.test({ name: '@MemoryStore', only: false }, async (context) => {
 
       const packetIds: number[] = [];
       for await (const packet of store.resendIterator()) {
-        packetIds.push(packet.packetId!);
+        packetIds.push(packet.packetId);
       }
 
       assertEquals(packetIds.sort(), [1, 3]);

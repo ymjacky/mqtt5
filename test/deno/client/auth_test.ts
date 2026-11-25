@@ -54,7 +54,7 @@ Deno.test({ name: '@auth', only: false }, async (context) => {
           const response = new Uint8Array([...new TextEncoder().encode(`myData:${salt}`)]);
 
           const authPropertie: MqttProperties.AuthProperties = {
-            authenticationMethod: packet.properties!.authenticationMethod,
+            authenticationMethod: packet.properties?.authenticationMethod,
             authenticationData: response,
           };
           client.auth(Mqtt.ReasonCode.ContinueAuthentication, authPropertie);

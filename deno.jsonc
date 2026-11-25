@@ -36,7 +36,7 @@
 
     "rules": {
       "tags": ["recommended", "jsr"],
-      "include": ["eqeqeq", "explicit-module-boundary-types"]
+      "include": ["eqeqeq", "explicit-module-boundary-types", "no-non-null-assertion"]
     },
 
     "report": "pretty"

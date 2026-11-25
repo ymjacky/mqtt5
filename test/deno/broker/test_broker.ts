@@ -1,5 +1,12 @@
 import { ClientErrors, Mqtt, MqttPackets, type MqttProperties } from '../../../deno/mod.ts';
 import * as MqttStream from '../../../lib/mqtt_stream_utils/mod.ts';
+import { assert } from '@std/assert';
+
+/** The packet ID of a received PUBLISH, e.g. to acknowledge it. Fails the test for QoS 0, which has no packet ID. */
+export function packetIdOf(packet: MqttPackets.PublishPacket): number {
+  assert(packet.qos !== Mqtt.QoS.AT_MOST_ONCE, 'a QoS 0 PUBLISH has no packet ID');
+  return packet.packetId;
+}
 
 interface CustomEventMap {
   'accept': CustomEvent<Deno.Conn<Deno.Addr>>;
@@ -253,13 +260,14 @@ export class TestBroker extends EventTarget {
   ): Promise<void> {
     const client = this.clients.get(clientId);
     if (client) { // found
+      // Only QoS 1 and QoS 2 have a packet ID.
+      const qosAndPacketId = qos === Mqtt.QoS.AT_MOST_ONCE ? { qos } : { qos, packetId };
       let packet: MqttPackets.PublishPacket;
       if (protocolVersion > Mqtt.ProtocolVersion.MQTT_V3_1_1) {
         packet = {
           type: 'publish',
-          packetId,
+          ...qosAndPacketId,
           topic,
-          qos,
           dup,
           retain,
           payload,
@@ -268,9 +276,8 @@ export class TestBroker extends EventTarget {
       } else {
         packet = {
           type: 'publish',
-          packetId,
+          ...qosAndPacketId,
           topic,
-          qos,
           dup,
           retain,
           payload,

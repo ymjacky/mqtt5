@@ -1,6 +1,6 @@
 import { ClientErrors, Mqtt, MqttClient, type MqttProperties } from '../../../deno/mod.ts';
 import { TestBroker } from '../broker/test_broker.ts';
-import { assertEquals, assertInstanceOf, assertRejects } from '@std/assert';
+import { assertEquals, assertExists, assertInstanceOf, assertRejects } from '@std/assert';
 
 function logger(msg: string, ...args: unknown[]): void {
   console.log('[Test Client]', msg, ...args);
@@ -35,8 +35,14 @@ function recordingBroker() {
     packetIds: new Map<string, number>(),
     sessionPresent: false,
     connackProperties: undefined as MqttProperties.Properties | undefined,
+    /** The packet ID the message (its payload) was last received with. */
+    packetId(payload: string): number {
+      const packetId = state.packetIds.get(payload);
+      assertExists(packetId, `${payload} has not been received`);
+      return packetId;
+    },
     puback(payload: string) {
-      return broker.sendPuback('cid', state.packetIds.get(payload)!, v5);
+      return broker.sendPuback('cid', state.packetId(payload), v5);
     },
   };
   broker.listen();
@@ -152,23 +158,23 @@ Deno.test({ name: '@CONNACK Receive Maximum', only: false }, async (context) => 
       await waitFor(() => b.received.length === 1, 'A');
 
       // PUBREC does not end the flow: PUBREL is sent, and B still waits.
-      b.broker.sendPubrec('cid', b.packetIds.get('A')!, v5);
+      b.broker.sendPubrec('cid', b.packetId('A'), v5);
       await waitFor(() => b.received.length === 2, 'PUBREL of A');
       await assertStays(b.received, ['PUBLISH A', `PUBREL ${b.packetIds.get('A')}`]);
 
-      b.broker.sendPubcomp('cid', b.packetIds.get('A')!, v5);
+      b.broker.sendPubcomp('cid', b.packetId('A'), v5);
       await waitFor(() => b.received.length === 3, 'B after the PUBCOMP of A');
       assertEquals((await publishingA).result, Mqtt.ReasonCode.Success);
 
       // A PUBREC with an error Reason Code ends the flow.
-      b.broker.sendPubrec('cid', b.packetIds.get('B')!, v5, Mqtt.ReasonCode.UnspecifiedError);
+      b.broker.sendPubrec('cid', b.packetId('B'), v5, Mqtt.ReasonCode.UnspecifiedError);
       assertEquals((await publishingB).result, Mqtt.ReasonCode.UnspecifiedError);
       await waitFor(() => b.received.length === 4, 'C after the error PUBREC of B');
       assertEquals(b.received.slice(2), ['PUBLISH B', 'PUBLISH C']);
 
-      b.broker.sendPubrec('cid', b.packetIds.get('C')!, v5);
+      b.broker.sendPubrec('cid', b.packetId('C'), v5);
       await waitFor(() => b.received.length === 5, 'PUBREL of C');
-      b.broker.sendPubcomp('cid', b.packetIds.get('C')!, v5);
+      b.broker.sendPubcomp('cid', b.packetId('C'), v5);
       assertEquals((await publishingC).result, Mqtt.ReasonCode.Success);
       await client.disconnect();
     } finally {
@@ -319,7 +325,7 @@ Deno.test({ name: '@CONNACK Receive Maximum when resending after reconnecting', 
       // A (QoS 2) has got PUBREC: PUBREL is kept in the session. B (QoS 1) is in flight.
       const publishingA = client.publish('topicA', 'A', qos2);
       await waitFor(() => b.received.length === 1, 'A');
-      b.broker.sendPubrec('cid', b.packetIds.get('A')!, v5);
+      b.broker.sendPubrec('cid', b.packetId('A'), v5);
       await waitFor(() => b.received.length === 2, 'PUBREL of A');
       const publishingB = client.publish('topicA', 'B', qos1);
       await waitFor(() => b.received.length === 3, 'B');
@@ -335,7 +341,7 @@ Deno.test({ name: '@CONNACK Receive Maximum when resending after reconnecting', 
       await waitFor(() => b.received.length === 1, 'the resent PUBREL of A');
       await assertStays(b.received, [pubrelA]);
 
-      b.broker.sendPubcomp('cid', b.packetIds.get('A')!, v5);
+      b.broker.sendPubcomp('cid', b.packetId('A'), v5);
       assertEquals((await publishingA).result, Mqtt.ReasonCode.Success);
       await waitFor(() => b.received.length === 2, 'B after the PUBCOMP of A');
       assertEquals(b.received, [pubrelA, 'PUBLISH B dup']);

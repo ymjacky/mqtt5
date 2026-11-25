@@ -16,7 +16,6 @@ Deno.test('encodePublishPacket', function () {
         dup: false,
         retain: false,
         qos: 0,
-        packetId: 0,
       },
       Mqtt.ProtocolVersion.MQTT_V3_1_1,
     ),
@@ -92,7 +91,6 @@ Deno.test('encodePublishPacketMQTT5WithTopicAlias', function () {
         dup: false,
         retain: false,
         qos: 0,
-        packetId: 0,
         properties: {
           topicAlias: 5,
         },
@@ -137,7 +135,6 @@ Deno.test('encodePublishPacketMQTT5WithPayloadFormatIndicator', function () {
         dup: false,
         retain: false,
         qos: 0,
-        packetId: 0,
         properties: {
           payloadFormatIndicator: 1, // 1 = UTF-8 encoded data
         },
@@ -314,7 +311,6 @@ Deno.test('decodePublishPacket', function () {
       dup: false,
       qos: 0,
       retain: false,
-      packetId: undefined,
       topic: 'a/b',
       payload: Uint8Array.from([
         112, // 'p'
@@ -411,7 +407,6 @@ Deno.test('decodePublishPacketMQTT5WithTopicAlias', function () {
       dup: false,
       qos: 0,
       retain: false,
-      packetId: undefined,
       topic: 'a/b',
       payload: Uint8Array.from([
         112, // 'p'
@@ -580,7 +575,6 @@ Deno.test('decodePublishPacketWithExtraBytes', function () {
       dup: false,
       qos: 0,
       retain: false,
-      packetId: undefined,
       topic: 'a/b',
       payload: Uint8Array.from([
         112, // 'p'
@@ -617,7 +611,6 @@ Deno.test('encodeAndDecodePublishPacketWithLargePayload', function () {
       dup: false,
       retain: false,
       qos: 0,
-      packetId: 0,
     },
     Mqtt.ProtocolVersion.MQTT_V3_1_1,
   );
@@ -681,7 +674,6 @@ Deno.test('encodePublishPacketMQTT5WithMultipleSubscriptionIdentifiers', functio
         dup: false,
         retain: false,
         qos: 0,
-        packetId: 0,
         properties: {
           subscriptionIdentifiers: [1, 42],
         },
@@ -715,7 +707,7 @@ Deno.test('encodePublishPacketTooLarge', function () {
   assertThrows(
     () =>
       toBytes(
-        { type: 'publish', topic: 't', payload: new Uint8Array(268_435_455), dup: false, retain: false, qos: 0, packetId: 0 },
+        { type: 'publish', topic: 't', payload: new Uint8Array(268_435_455), dup: false, retain: false, qos: 0 },
         Mqtt.ProtocolVersion.MQTT_V5,
       ),
     MqttUtilsError.RemainingLengthError,

@@ -1,4 +1,4 @@
-import { assert, assertEquals, assertFalse, assertThrows } from '@std/assert';
+import { assert, assertEquals, assertExists, assertFalse, assertThrows } from '@std/assert';
 
 import { ReuseIdProvider as IdProvider } from '../../../lib/id_provider/reuse_id_provider.ts';
 
@@ -315,14 +315,17 @@ Deno.test('the IDs become small again once a burst is acknowledged', () => {
   const inFlight: number[] = [];
   const handedOut: number[] = [];
   for (let i = 0; i < 2000; i++) {
-    if (burst.length > 0) {
-      assert(idProvider.release(burst.shift()!));
+    const acknowledged = burst.shift();
+    if (acknowledged !== undefined) {
+      assert(idProvider.release(acknowledged));
     }
     const id = idProvider.acquire();
     handedOut.push(id);
     inFlight.push(id);
     if (inFlight.length > 10) {
-      assert(idProvider.release(inFlight.shift()!));
+      const oldest = inFlight.shift();
+      assertExists(oldest);
+      assert(idProvider.release(oldest));
     }
   }
 

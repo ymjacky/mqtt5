@@ -17,7 +17,10 @@ export function toBytes(
   const variableHeader = concatBytes(variableHeaderChunks);
 
   if (protocolVersion > Mqtt.ProtocolVersion.MQTT_V3_1_1) {
-    const payload = packet.reasonCodes!;
+    const payload = packet.reasonCodes;
+    if (payload === undefined) {
+      throw new Error('UNSUBACK has no reasonCodes');
+    }
 
     const fixedHeader = [
       (Mqtt.PacketType.UNSUBACK << 4) + Mqtt.fixedHeaderFlag.UNSUBACK,

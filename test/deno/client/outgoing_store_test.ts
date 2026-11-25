@@ -1,5 +1,5 @@
 import { Mqtt, MqttClient, type MqttPackets, Store } from '../../../deno/mod.ts';
-import { TestBroker } from '../broker/test_broker.ts';
+import { packetIdOf, TestBroker } from '../broker/test_broker.ts';
 import { assertEquals, assertRejects, fail } from '@std/assert';
 
 function logger(msg: string, ...args: unknown[]): void {
@@ -72,11 +72,11 @@ Deno.test({ name: '@slow outgoing store', only: false }, async (context) => {
               return;
             }
             if (ending === 'PUBACK') {
-              broker.sendPuback('cid', packet.packetId!, Mqtt.ProtocolVersion.MQTT_V5);
+              broker.sendPuback('cid', packetIdOf(packet), Mqtt.ProtocolVersion.MQTT_V5);
             } else if (ending === 'PUBCOMP') {
-              broker.sendPubrec('cid', packet.packetId!, Mqtt.ProtocolVersion.MQTT_V5);
+              broker.sendPubrec('cid', packetIdOf(packet), Mqtt.ProtocolVersion.MQTT_V5);
             } else {
-              broker.sendPubrec('cid', packet.packetId!, Mqtt.ProtocolVersion.MQTT_V5, Mqtt.ReasonCode.UnspecifiedError);
+              broker.sendPubrec('cid', packetIdOf(packet), Mqtt.ProtocolVersion.MQTT_V5, Mqtt.ReasonCode.UnspecifiedError);
             }
           });
           broker.on('pubrel', (event) => {
@@ -118,7 +118,7 @@ Deno.test({ name: '@slow outgoing store', only: false }, async (context) => {
       const events: string[] = [];
       // Storing PUBREL takes time.
       class SlowPubrelStore extends Store.MemoryStore {
-        override async store(packet: MqttPackets.PublishPacket | MqttPackets.PubrelPacket): Promise<void> {
+        override async store(packet: MqttPackets.PublishPacketWithId | MqttPackets.PubrelPacket): Promise<void> {
           if (packet.type === 'pubrel') {
             await delay(100);
           }
@@ -132,7 +132,7 @@ Deno.test({ name: '@slow outgoing store', only: false }, async (context) => {
         connectBroker(broker);
         broker.on('publish', (event) => {
           events.push('broker received PUBLISH');
-          broker.sendPubrec('cid', event.detail.packetId!, Mqtt.ProtocolVersion.MQTT_V5);
+          broker.sendPubrec('cid', packetIdOf(event.detail), Mqtt.ProtocolVersion.MQTT_V5);
         });
         broker.on('pubrel', (event) => {
           events.push('broker received PUBREL');
@@ -165,7 +165,7 @@ Deno.test({ name: '@failing outgoing store', only: false }, async (context) => {
     async () => {
       // Fails to store the PUBLISH with the payload 'A'.
       class FailingStore extends Store.MemoryStore {
-        override store(packet: MqttPackets.PublishPacket | MqttPackets.PubrelPacket): Promise<void> {
+        override store(packet: MqttPackets.PublishPacketWithId | MqttPackets.PubrelPacket): Promise<void> {
           if (packet.type === 'publish' && new TextDecoder().decode(packet.payload) === 'A') {
             return Promise.reject(new Error('store failed'));
           }
@@ -180,7 +180,7 @@ Deno.test({ name: '@failing outgoing store', only: false }, async (context) => {
         broker.on('publish', (event) => {
           const packet = event.detail;
           received.push({ message: new TextDecoder().decode(packet.payload), packetId: packet.packetId });
-          broker.sendPuback('cid', packet.packetId!, Mqtt.ProtocolVersion.MQTT_V5);
+          broker.sendPuback('cid', packetIdOf(packet), Mqtt.ProtocolVersion.MQTT_V5);
         });
 
         const client = new MqttClient({ clientId: 'cid', logger: logger, clean: false, outgoingStore: new FailingStore() });
@@ -209,7 +209,7 @@ Deno.test({ name: '@failing outgoing store', only: false }, async (context) => {
       // Fails to store PUBREL the first time.
       let pubrelFailures = 0;
       class FailingPubrelStore extends Store.MemoryStore {
-        override store(packet: MqttPackets.PublishPacket | MqttPackets.PubrelPacket): Promise<void> {
+        override store(packet: MqttPackets.PublishPacketWithId | MqttPackets.PubrelPacket): Promise<void> {
           if (packet.type === 'pubrel' && pubrelFailures++ === 0) {
             return Promise.reject(new Error('store failed'));
           }
@@ -230,7 +230,7 @@ Deno.test({ name: '@failing outgoing store', only: false }, async (context) => {
         broker.on('publish', (event) => {
           const packet = event.detail;
           received.push(`PUBLISH dup=${packet.dup}`);
-          broker.sendPubrec('cid', packet.packetId!, Mqtt.ProtocolVersion.MQTT_V5);
+          broker.sendPubrec('cid', packetIdOf(packet), Mqtt.ProtocolVersion.MQTT_V5);
         });
         broker.on('pubrel', (event) => {
           received.push('PUBREL');
@@ -311,11 +311,11 @@ Deno.test({ name: '@failing outgoing store', only: false }, async (context) => {
             const packet = event.detail;
             received.push(`PUBLISH dup=${packet.dup}`);
             if (ending === 'PUBACK') {
-              broker.sendPuback('cid', packet.packetId!, Mqtt.ProtocolVersion.MQTT_V5);
+              broker.sendPuback('cid', packetIdOf(packet), Mqtt.ProtocolVersion.MQTT_V5);
             } else if (ending === 'PUBCOMP') {
-              broker.sendPubrec('cid', packet.packetId!, Mqtt.ProtocolVersion.MQTT_V5);
+              broker.sendPubrec('cid', packetIdOf(packet), Mqtt.ProtocolVersion.MQTT_V5);
             } else {
-              broker.sendPubrec('cid', packet.packetId!, Mqtt.ProtocolVersion.MQTT_V5, Mqtt.ReasonCode.UnspecifiedError);
+              broker.sendPubrec('cid', packetIdOf(packet), Mqtt.ProtocolVersion.MQTT_V5, Mqtt.ReasonCode.UnspecifiedError);
             }
           });
           broker.on('pubrel', (event) => {

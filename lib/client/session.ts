@@ -195,7 +195,7 @@ export class Session {
    * Iterates over the stored PUBLISH and PUBREL packets to resend after reconnecting, and registers their packet IDs as in use.
    * They use the send quota of the connection only when they are resent: see useSendQuota().
    */
-  async *resendTargets(): AsyncIterable<MqttPackets.PublishPacket | MqttPackets.PubrelPacket> {
+  async *resendTargets(): AsyncIterable<MqttPackets.PublishPacketWithId | MqttPackets.PubrelPacket> {
     for await (const packet of this.outgoingStore.resendIterator()) {
       if (packet.type === 'publish') {
         packet.dup = true;
@@ -213,14 +213,14 @@ export class Session {
    * @param packet PUBLISH with its Topic Name and without a topic alias, which is valid only on the current connection.
    */
   async storePublish(
-    packet: MqttPackets.PublishPacket,
+    packet: MqttPackets.PublishPacketWithId,
     deferred: Deferred<PublishResult>,
   ): Promise<void> {
-    this.inflightPublish.set(packet.packetId!, deferred);
+    this.inflightPublish.set(packet.packetId, deferred);
     try {
       await this.outgoingStore.store(packet);
     } catch (err) {
-      this.inflightPublish.delete(packet.packetId!);
+      this.inflightPublish.delete(packet.packetId);
       throw err;
     }
   }

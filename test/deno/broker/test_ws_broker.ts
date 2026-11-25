@@ -252,13 +252,14 @@ export class TestWsBroker extends EventTarget {
   ): Promise<void> {
     const client = this.clients.get(clientId);
     if (client) { // found
+      // Only QoS 1 and QoS 2 have a packet ID.
+      const qosAndPacketId = qos === Mqtt.QoS.AT_MOST_ONCE ? { qos } : { qos, packetId };
       let packet: MqttPackets.PublishPacket;
       if (protocolVersion > Mqtt.ProtocolVersion.MQTT_V3_1_1) {
         packet = {
           type: 'publish',
-          packetId,
+          ...qosAndPacketId,
           topic,
-          qos,
           dup,
           retain,
           payload,
@@ -267,9 +268,8 @@ export class TestWsBroker extends EventTarget {
       } else {
         packet = {
           type: 'publish',
-          packetId,
+          ...qosAndPacketId,
           topic,
-          qos,
           dup,
           retain,
           payload,

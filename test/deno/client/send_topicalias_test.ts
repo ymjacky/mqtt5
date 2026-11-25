@@ -1,5 +1,5 @@
 import { Mqtt, MqttClient, type MqttPackets, type MqttProperties, Store } from '../../../deno/mod.ts';
-import { TestBroker } from '../broker/test_broker.ts';
+import { packetIdOf, TestBroker } from '../broker/test_broker.ts';
 import { assertEquals, fail } from '@std/assert';
 
 function logger(msg: string, ...args: unknown[]): void {
@@ -290,7 +290,7 @@ Deno.test({ name: '@send topic alias', only: false }, async (context) => {
           broker.on('publish', (event) => {
             const packet = event.detail;
             received.push({ topic: packet.topic, topicAlias: packet.properties?.topicAlias });
-            broker.sendPuback('cid', packet.packetId!, Mqtt.ProtocolVersion.MQTT_V5);
+            broker.sendPuback('cid', packetIdOf(packet), Mqtt.ProtocolVersion.MQTT_V5);
           });
 
           const qos = { qos: Mqtt.QoS.AT_LEAST_ONCE };
@@ -344,7 +344,7 @@ Deno.test({ name: '@send topic alias', only: false }, async (context) => {
         broker.on('publish', (event) => {
           const packet = event.detail;
           received.push({ topic: packet.topic, topicAlias: packet.properties?.topicAlias });
-          broker.sendPuback('cid', packet.packetId!, Mqtt.ProtocolVersion.MQTT_V5);
+          broker.sendPuback('cid', packetIdOf(packet), Mqtt.ProtocolVersion.MQTT_V5);
         });
 
         const properties: MqttProperties.UserPublishProperties = { contentType: 'text/plain' };
@@ -404,7 +404,7 @@ Deno.test({ name: '@send topic alias', only: false }, async (context) => {
           const message = new TextDecoder().decode(packet.payload);
           received.push({ message, topic: packet.topic, topicAlias: packet.properties?.topicAlias });
           if (sendPuback) {
-            broker.sendPuback('cid', packet.packetId!, Mqtt.ProtocolVersion.MQTT_V5);
+            broker.sendPuback('cid', packetIdOf(packet), Mqtt.ProtocolVersion.MQTT_V5);
           }
         });
 
@@ -487,7 +487,7 @@ Deno.test({ name: '@send topic alias, concurrent publishes', only: false }, asyn
           const packet = event.detail;
           received.push({ message: new TextDecoder().decode(packet.payload), topic: packet.topic, topicAlias: packet.properties?.topicAlias });
           if (packet.qos === Mqtt.QoS.AT_LEAST_ONCE) {
-            broker.sendPuback('cid', packet.packetId!, Mqtt.ProtocolVersion.MQTT_V5);
+            broker.sendPuback('cid', packet.packetId, Mqtt.ProtocolVersion.MQTT_V5);
           }
         });
 
@@ -522,7 +522,7 @@ Deno.test({ name: '@send topic alias, concurrent publishes', only: false }, asyn
 
         // Takes time to store the 1st PUBLISH, but not the 2nd.
         class SlowStore extends Store.MemoryStore {
-          override async store(packet: MqttPackets.PublishPacket | MqttPackets.PubrelPacket): Promise<void> {
+          override async store(packet: MqttPackets.PublishPacketWithId | MqttPackets.PubrelPacket): Promise<void> {
             if (packet.type === 'publish' && new TextDecoder().decode(packet.payload) === '1st') {
               await new Promise((resolve) => setTimeout(resolve, 100));
             }
@@ -552,7 +552,7 @@ Deno.test({ name: '@send topic alias, concurrent publishes', only: false }, asyn
         broker.on('publish', (event) => {
           const packet = event.detail;
           received.push({ message: new TextDecoder().decode(packet.payload), topic: packet.topic, topicAlias: packet.properties?.topicAlias });
-          broker.sendPuback('cid', packet.packetId!, Mqtt.ProtocolVersion.MQTT_V5);
+          broker.sendPuback('cid', packetIdOf(packet), Mqtt.ProtocolVersion.MQTT_V5);
         });
 
         await Promise.all([

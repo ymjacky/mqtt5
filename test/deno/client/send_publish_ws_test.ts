@@ -1,4 +1,5 @@
 import { type ClientTypes, Mqtt, type MqttProperties, WebSocketMqttClient } from '../../../deno/mod.ts';
+import { packetIdOf } from '../broker/test_broker.ts';
 import { TestWsBroker } from '../broker/test_ws_broker.ts';
 import { assertEquals, fail } from '@std/assert';
 
@@ -196,7 +197,7 @@ Deno.test({ name: '@publish_qos0 ws', only: false }, async (context) => {
           assertEquals(packet.payload, new TextEncoder().encode('payloadA'));
 
           assertEquals(packet.properties, undefined);
-          broker.sendPuback('cid', packet.packetId!, Mqtt.ProtocolVersion.MQTT_V5);
+          broker.sendPuback('cid', packetIdOf(packet), Mqtt.ProtocolVersion.MQTT_V5);
           resolve();
         });
         await client.publish(
@@ -346,7 +347,7 @@ Deno.test({ name: '@publish_qos1 ws', only: false }, async (context) => {
 
           broker.sendPuback(
             'cid',
-            packet.packetId!,
+            packetIdOf(packet),
             Mqtt.ProtocolVersion.MQTT_V3_1_1,
           );
           resolve();
@@ -411,7 +412,7 @@ Deno.test({ name: '@publish_qos1 ws', only: false }, async (context) => {
 
           broker.sendPuback(
             'cid',
-            packet.packetId!,
+            packetIdOf(packet),
             Mqtt.ProtocolVersion.MQTT_V5,
           );
           resolve();
@@ -478,7 +479,7 @@ Deno.test({ name: '@publish_qos1 ws', only: false }, async (context) => {
           };
           broker.sendPuback(
             'cid',
-            packet.packetId!,
+            packetIdOf(packet),
             Mqtt.ProtocolVersion.MQTT_V5,
             Mqtt.ReasonCode.QuotaExceeded,
             pubAckProperties,
@@ -573,7 +574,7 @@ Deno.test({ name: '@publish_qos1 ws', only: false }, async (context) => {
 
           broker.sendPuback(
             'cid',
-            packet.packetId!,
+            packetIdOf(packet),
             Mqtt.ProtocolVersion.MQTT_V5,
           );
           resolve();
@@ -642,7 +643,7 @@ Deno.test({ name: '@publish_qos2 ws', only: false }, async (context) => {
 
           broker.sendPubrec(
             'cid',
-            packet.packetId!,
+            packetIdOf(packet),
             Mqtt.ProtocolVersion.MQTT_V3_1_1,
           );
         });
@@ -654,7 +655,7 @@ Deno.test({ name: '@publish_qos2 ws', only: false }, async (context) => {
 
           broker.sendPubcomp(
             'cid',
-            packet.packetId!,
+            packet.packetId,
             Mqtt.ProtocolVersion.MQTT_V3_1_1,
           );
           resolve();
@@ -720,7 +721,7 @@ Deno.test({ name: '@publish_qos2 ws', only: false }, async (context) => {
 
           broker.sendPubrec(
             'cid',
-            packet.packetId!,
+            packetIdOf(packet),
             Mqtt.ProtocolVersion.MQTT_V5,
           );
         });
@@ -732,7 +733,7 @@ Deno.test({ name: '@publish_qos2 ws', only: false }, async (context) => {
 
           broker.sendPubcomp(
             'cid',
-            packet.packetId!,
+            packet.packetId,
             Mqtt.ProtocolVersion.MQTT_V3_1_1,
           );
           resolve();
@@ -801,7 +802,7 @@ Deno.test({ name: '@publish_qos2 ws', only: false }, async (context) => {
           };
           broker.sendPubrec(
             'cid',
-            packet.packetId!,
+            packetIdOf(packet),
             Mqtt.ProtocolVersion.MQTT_V5,
             Mqtt.ReasonCode.QuotaExceeded,
             pubAckProperties,
@@ -897,7 +898,7 @@ Deno.test({ name: '@publish_qos2 ws', only: false }, async (context) => {
 
           broker.sendPubrec(
             'cid',
-            packet.packetId!,
+            packetIdOf(packet),
             Mqtt.ProtocolVersion.MQTT_V5,
           );
         });
@@ -909,7 +910,7 @@ Deno.test({ name: '@publish_qos2 ws', only: false }, async (context) => {
 
           broker.sendPubcomp(
             'cid',
-            packet.packetId!,
+            packet.packetId,
             Mqtt.ProtocolVersion.MQTT_V3_1_1,
           );
           resolve();
@@ -969,7 +970,7 @@ Deno.test({ name: '@publish_qos2 ws', only: false }, async (context) => {
 
           broker.sendPubrec(
             'cid',
-            packet.packetId!,
+            packetIdOf(packet),
             Mqtt.ProtocolVersion.MQTT_V5,
           );
         });
@@ -983,7 +984,7 @@ Deno.test({ name: '@publish_qos2 ws', only: false }, async (context) => {
           };
           broker.sendPubcomp(
             'cid',
-            packet.packetId!,
+            packet.packetId,
             Mqtt.ProtocolVersion.MQTT_V5,
             Mqtt.ReasonCode.PacketIdentifierNotFound,
             pubcompProperties,
@@ -1072,8 +1073,8 @@ Deno.test({ name: '@receive malformed puback ws', only: false }, async (context)
           const malformedPacket = new Uint8Array([
             0x40, // Fixed header: PUBACK packet type
             0x05, // Remaining length: 5 bytes
-            (packet.packetId! >> 8) & 0xFF, // Packet ID high byte
-            packet.packetId! & 0xFF, // Packet ID low byte
+            (packetIdOf(packet) >> 8) & 0xFF, // Packet ID high byte
+            packetIdOf(packet) & 0xFF, // Packet ID low byte
             0x00, // Reason Code: Success
             0x01, // Properties Length: 1 byte
             0xFF, // Property ID: 0xFF (INVALID)
@@ -1153,8 +1154,8 @@ Deno.test({ name: '@receive malformed pubrec ws', only: false }, async (context)
           const malformedPacket = new Uint8Array([
             0x50, // Fixed header: PUBREC packet type
             0x05, // Remaining length: 5 bytes
-            (packet.packetId! >> 8) & 0xFF, // Packet ID high byte
-            packet.packetId! & 0xFF, // Packet ID low byte
+            (packetIdOf(packet) >> 8) & 0xFF, // Packet ID high byte
+            packetIdOf(packet) & 0xFF, // Packet ID low byte
             0x00, // Reason Code: Success
             0x01, // Properties Length: 1 byte
             0xFF, // Property ID: 0xFF (INVALID)
@@ -1228,7 +1229,7 @@ Deno.test({ name: '@receive malformed pubcomp ws', only: false }, async (context
         broker.on('publish', (event) => {
           const packet = event.detail;
           // First send valid PUBREC
-          broker.sendPubrec(client.getClientId(), packet.packetId!, Mqtt.ProtocolVersion.MQTT_V5);
+          broker.sendPubrec(client.getClientId(), packetIdOf(packet), Mqtt.ProtocolVersion.MQTT_V5);
         });
 
         broker.on('pubrel', (event) => {

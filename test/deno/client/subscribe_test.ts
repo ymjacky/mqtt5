@@ -38,7 +38,7 @@ Deno.test({ name: '@subscribe', only: false }, async (context) => {
 
           broker.sendSuback(
             'cid',
-            packet.packetId!,
+            packet.packetId,
             Mqtt.ProtocolVersion.MQTT_V5,
             [Mqtt.ReasonCode.GrantedQoS0],
           );
@@ -84,7 +84,7 @@ Deno.test({ name: '@subscribe', only: false }, async (context) => {
 
           broker.sendSuback(
             'cid',
-            packet.packetId!,
+            packet.packetId,
             Mqtt.ProtocolVersion.MQTT_V5,
             [Mqtt.ReasonCode.GrantedQoS1],
           );
@@ -130,7 +130,7 @@ Deno.test({ name: '@subscribe', only: false }, async (context) => {
 
           broker.sendSuback(
             'cid',
-            packet.packetId!,
+            packet.packetId,
             Mqtt.ProtocolVersion.MQTT_V5,
             [Mqtt.ReasonCode.GrantedQoS2],
           );
@@ -177,7 +177,7 @@ Deno.test({ name: '@subscribe', only: false }, async (context) => {
 
           broker.sendSuback(
             'cid',
-            packet.packetId!,
+            packet.packetId,
             Mqtt.ProtocolVersion.MQTT_V3_1_1,
             [Mqtt.ReasonCode.GrantedQoS0],
           );
@@ -224,7 +224,7 @@ Deno.test({ name: '@subscribe', only: false }, async (context) => {
 
           broker.sendSuback(
             'cid',
-            packet.packetId!,
+            packet.packetId,
             Mqtt.ProtocolVersion.MQTT_V3_1_1,
             [Mqtt.ReasonCode.GrantedQoS1],
           );
@@ -271,7 +271,7 @@ Deno.test({ name: '@subscribe', only: false }, async (context) => {
 
           broker.sendSuback(
             'cid',
-            packet.packetId!,
+            packet.packetId,
             Mqtt.ProtocolVersion.MQTT_V3_1_1,
             [Mqtt.ReasonCode.GrantedQoS2],
           );
@@ -326,7 +326,7 @@ Deno.test({ name: '@subscribe', only: false }, async (context) => {
 
           broker.sendSuback(
             'cid',
-            packet.packetId!,
+            packet.packetId,
             Mqtt.ProtocolVersion.MQTT_V5,
             [Mqtt.ReasonCode.GrantedQoS0, Mqtt.ReasonCode.GrantedQoS1, Mqtt.ReasonCode.GrantedQoS2, Mqtt.ReasonCode.UnspecifiedError],
           );
@@ -386,7 +386,7 @@ Deno.test({ name: '@subscribe', only: false }, async (context) => {
 
           broker.sendSuback(
             'cid',
-            packet.packetId!,
+            packet.packetId,
             Mqtt.ProtocolVersion.MQTT_V5,
             [Mqtt.ReasonCode.GrantedQoS0, Mqtt.ReasonCode.GrantedQoS2],
           );
@@ -440,7 +440,7 @@ Deno.test({ name: '@subscribe', only: false }, async (context) => {
 
           broker.sendSuback(
             'cid',
-            packet.packetId!,
+            packet.packetId,
             Mqtt.ProtocolVersion.MQTT_V5,
             [Mqtt.ReasonCode.GrantedQoS1],
           );
@@ -493,7 +493,7 @@ Deno.test({ name: '@subscribe', only: false }, async (context) => {
 
           broker.sendSuback(
             'cid',
-            packet.packetId!,
+            packet.packetId,
             Mqtt.ProtocolVersion.MQTT_V5,
             [Mqtt.ReasonCode.GrantedQoS0],
           );
@@ -554,7 +554,7 @@ Deno.test({ name: '@subscribe', only: false }, async (context) => {
 
           broker.sendSuback(
             'cid',
-            packet.packetId!,
+            packet.packetId,
             Mqtt.ProtocolVersion.MQTT_V3_1_1,
             [
               Mqtt.V3_1_1_SubscribeReturnCode.Success_MaximumQoS0,
@@ -620,7 +620,7 @@ Deno.test({ name: '@subscribe', only: false }, async (context) => {
 
           broker.sendSuback(
             'cid',
-            packet.packetId!,
+            packet.packetId,
             Mqtt.ProtocolVersion.MQTT_V5,
             [Mqtt.ReasonCode.GrantedQoS0],
           );
@@ -684,7 +684,7 @@ Deno.test({ name: '@subscribe', only: false }, async (context) => {
 
           broker.sendSuback(
             'cid',
-            packet.packetId!,
+            packet.packetId,
             Mqtt.ProtocolVersion.MQTT_V5,
             [Mqtt.ReasonCode.GrantedQoS0, Mqtt.ReasonCode.GrantedQoS1, Mqtt.ReasonCode.GrantedQoS2],
           );
@@ -768,7 +768,7 @@ Deno.test({ name: '@subscribe', only: false }, async (context) => {
 
           broker.sendSuback(
             'cid',
-            packet.packetId!,
+            packet.packetId,
             Mqtt.ProtocolVersion.MQTT_V5,
             [Mqtt.ReasonCode.GrantedQoS0],
           );
@@ -848,7 +848,7 @@ Deno.test({ name: '@subscribe', only: false }, async (context) => {
 
           broker.sendSuback(
             'cid',
-            packet.packetId!,
+            packet.packetId,
             Mqtt.ProtocolVersion.MQTT_V5,
             [Mqtt.ReasonCode.GrantedQoS0],
           );
@@ -930,8 +930,8 @@ Deno.test({ name: '@receive malformed suback', only: false }, async (context) =>
           const malformedPacket = new Uint8Array([
             0x90, // Fixed header: SUBACK packet type
             0x04, // Remaining length: 4 bytes (Packet ID 2 bytes + Properties Length 1 byte + Property ID 1 byte + Reason Code would be after properties but we make it invalid)
-            (packet.packetId! >> 8) & 0xFF, // Packet ID high byte
-            packet.packetId! & 0xFF, // Packet ID low byte
+            (packet.packetId >> 8) & 0xFF, // Packet ID high byte
+            packet.packetId & 0xFF, // Packet ID low byte
             0x01, // Properties Length: 1 byte
             0xFF, // Property ID: 0xFF (INVALID)
             // Missing Reason Codes payload but that's okay for malformed packet test

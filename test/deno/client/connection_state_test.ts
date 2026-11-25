@@ -1,6 +1,6 @@
 import { ClientErrors, Mqtt, MqttClient, MqttPackets, type PublishResult, Store } from '../../../deno/mod.ts';
 import * as MqttStream from '../../../lib/mqtt_stream_utils/mod.ts';
-import { TestBroker } from '../broker/test_broker.ts';
+import { packetIdOf, TestBroker } from '../broker/test_broker.ts';
 import { connackBytes, type RawConnection, RawServer, waitUntil } from '../broker/raw_server.ts';
 import { assert, assertEquals, assertRejects } from '@std/assert';
 
@@ -66,7 +66,7 @@ function receivedPacketTypes(connection: RawConnection): string[] {
 class GatedStore extends Store.MemoryStore {
   storing = Promise.withResolvers<void>();
   gate = Promise.withResolvers<void>();
-  override async store(packet: MqttPackets.PublishPacket | MqttPackets.PubrelPacket): Promise<void> {
+  override async store(packet: MqttPackets.PublishPacketWithId | MqttPackets.PubrelPacket): Promise<void> {
     this.storing.resolve();
     await this.gate.promise;
     await super.store(packet);
@@ -355,7 +355,7 @@ Deno.test({ name: '@connection state: session store while CONNACK is handled', o
     }
   }
   class FailingResendStore extends Store.MemoryStore {
-    override async *resendIterator(): AsyncIterableIterator<MqttPackets.PublishPacket | MqttPackets.PubrelPacket> {
+    override async *resendIterator(): AsyncIterableIterator<MqttPackets.PublishPacketWithId | MqttPackets.PubrelPacket> {
       if (failures++ === 0) {
         throw new Error('store failed');
       }
@@ -869,7 +869,7 @@ Deno.test({ name: '@connection state: publish() and the next connection', only: 
         assertEquals(publish.topic, 'topicA');
 
         // The flow completes on the second connection.
-        await second.send(MqttPackets.packetToBytes({ type: 'puback', packetId: publish.packetId! }, Mqtt.ProtocolVersion.MQTT_V5));
+        await second.send(MqttPackets.packetToBytes({ type: 'puback', packetId: packetIdOf(publish) }, Mqtt.ProtocolVersion.MQTT_V5));
         assertEquals((await settleWithin(publishing, 'publish()')).result, 0);
       } finally {
         store.gate.resolve();

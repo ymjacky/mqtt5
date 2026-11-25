@@ -3,7 +3,7 @@ import { kvStore, publishPacket, resendOrder } from './outgoing_store_contract.t
 import { assertEquals, assertRejects, assertThrows } from '@std/assert';
 
 /** A PUBLISH whose MQTT 5.0 encoding is `size` bytes. */
-function publishPacketOfSize(size: number): MqttPackets.PublishPacket {
+function publishPacketOfSize(size: number): MqttPackets.PublishPacketWithId {
   const packet = publishPacket(1, '');
   const encodedSize = (payloadLength: number) =>
     MqttPackets.packetToBytes({ ...packet, payload: new Uint8Array(payloadLength) }, Mqtt.ProtocolVersion.MQTT_V5).length;
@@ -155,7 +155,7 @@ Deno.test({ name: '@KvOutgoingStore', only: false }, async (context) => {
 
       const sizes: number[] = [];
       for await (const stored of store.resendIterator()) {
-        sizes.push((stored as MqttPackets.PublishPacket).payload.length);
+        sizes.push((stored as MqttPackets.PublishPacketWithId).payload.length);
       }
       assertEquals(sizes, [packet.payload.length, v311.payload.length]);
     } finally {
