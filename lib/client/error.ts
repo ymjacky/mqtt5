@@ -36,8 +36,8 @@ export class ConnectTimeout extends Error {
  * without sending DISCONNECT. Rejected by `connect()`.
  *
  * The packet is a Malformed Packet, e.g. a CONNACK with a property that MQTT 5.0 does not define, a Protocol Error, e.g.
- * a CONNACK with a property twice, a packet larger than the Maximum Packet Size of CONNECT, or a packet that only a
- * client sends, e.g. SUBSCRIBE.
+ * a CONNACK with a property twice, a packet larger than the Maximum Packet Size of CONNECT, a packet that only a
+ * client sends, e.g. SUBSCRIBE, or a packet that the broker must not send before CONNACK, e.g. PUBLISH.
  */
 export class InvalidPacketBeforeConnackError extends Error {
   /** The name of the error class. */

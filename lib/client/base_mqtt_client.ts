@@ -389,7 +389,8 @@ export abstract class BaseMqttClient {
    * @throws {MqttPacketSerializeError} if CONNECT cannot be encoded, e.g. the user name is longer than 65,535 bytes. No connection is opened.
    * @throws {ConnectTimeout} if CONNACK is not received within `connectTimeoutMS`, including the time to open the connection.
    * @throws {InvalidPacketBeforeConnackError} if a packet that the client cannot accept is received before CONNACK, e.g. a
-   * malformed CONNACK. The client closes the connection without sending DISCONNECT.
+   * malformed CONNACK, or a PUBLISH, which the broker must not send before CONNACK. The client closes the connection
+   * without sending DISCONNECT.
    * @throws {ConnectionClosed} if the connection is closed before CONNACK is received, e.g. by `disconnect(true)`.
    * `WebSocketMqttClient` also rejects with it when the connection cannot be opened.
    * @throws {Error} `MqttClient`: the error of opening the connection, e.g. `Deno.errors.ConnectionRefused` when the broker is not running,
@@ -1479,8 +1480,8 @@ export abstract class BaseMqttClient {
    * Handlers run one at a time in the order packets were received, so a
    * handler awaiting e.g. a store never lets a later packet overtake it. A
    * failure inside a handler is logged instead of becoming an unhandled
-   * rejection. A packet that a broker must not send is a protocol error,
-   * which ends the connection.
+   * rejection. A packet that a broker must not send, or must not send
+   * before CONNACK, is a protocol error, which ends the connection.
    * @ignore
    */
   protected packetReceived(packet: AnyPacket): void {
@@ -1526,7 +1527,9 @@ export abstract class BaseMqttClient {
     }
 
     this.packetHandling = this.packetHandling
-      .then(handle)
+      // Checked when the packet is handled, not when it is received: by then, a CONNACK received just before it has been
+      // handled, and the client is online.
+      .then(() => this.mustNotBeSentBeforeConnack(packet) ? this.handlePacketBeforeConnack(packet) : handle())
       .catch((err) => {
         this.log(`Error while handling ${packet.type} packet:`, err);
       });
@@ -1953,6 +1956,37 @@ export abstract class BaseMqttClient {
    */
   private async handleUnexpectedPacket(packet: AnyPacket): Promise<void> {
     this.log(`${packet.type} packet must not be sent by a broker, ending the connection`, packet);
+    await this.disconnectWithError(Mqtt.ReasonCode.ProtocolError);
+  }
+
+  /**
+   * Whether the packet is one that the broker must not send while connect() waits for CONNACK. With MQTT 5.0, the broker
+   * sends AUTH only before CONNACK [MQTT-3.2.0-1]; with MQTT 3.1.1, CONNACK is the first packet it sends [MQTT-3.2.0-1].
+   * DISCONNECT is not counted: the broker must not send it before CONNACK either [MQTT-3.14.0-1], but the client closes
+   * the connection on it anyway, and emits the `disconnect` event, which tells why.
+   */
+  private mustNotBeSentBeforeConnack(packet: AnyPacket): boolean {
+    if (this.state.kind !== 'connecting') {
+      return false;
+    }
+    switch (packet.type) {
+      case 'connack':
+      case 'disconnect':
+        return false;
+      case 'auth':
+        return this.protocolVersion === Mqtt.ProtocolVersion.MQTT_V3_1_1;
+      default:
+        return true;
+    }
+  }
+
+  /**
+   * Handles a packet that the broker must not send before CONNACK, e.g. PUBLISH: a protocol error. It is not handled
+   * otherwise, e.g. no `publish` event and no PUBACK. Before CONNACK, the connection is closed without DISCONNECT, and
+   * connect() rejects with InvalidPacketBeforeConnackError.
+   */
+  private async handlePacketBeforeConnack(packet: AnyPacket): Promise<void> {
+    this.log(`${packet.type} packet must not be sent before CONNACK, ending the connection`, packet);
     await this.disconnectWithError(Mqtt.ReasonCode.ProtocolError);
   }
 
