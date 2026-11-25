@@ -11,7 +11,7 @@ Deno.test('encodeUnsubackPacket', function () {
         type: 'unsuback',
         packetId: 1,
       },
-      Mqtt.ProtocolVersion.MQTT_V3_1_1, // ProtocolVersion
+      Mqtt.ProtocolVersion.MqttV3_1_1, // ProtocolVersion
     ),
     new Uint8Array([
       // fixedHeader
@@ -42,7 +42,7 @@ Deno.test('encodeUnsubackPacketMQTT5WithReasonCodes', function () {
         ],
         properties: {},
       },
-      Mqtt.ProtocolVersion.MQTT_V5, // ProtocolVersion
+      Mqtt.ProtocolVersion.MqttV5, // ProtocolVersion
     ),
     new Uint8Array([
       // fixedHeader
@@ -80,7 +80,7 @@ Deno.test('encodeUnsubackPacketMQTT5WithProperties', function () {
           ],
         },
       },
-      Mqtt.ProtocolVersion.MQTT_V5, // ProtocolVersion
+      Mqtt.ProtocolVersion.MqttV5, // ProtocolVersion
     ),
     new Uint8Array([
       // fixedHeader
@@ -162,7 +162,7 @@ Deno.test('decodeUnsubackPacket', function () {
         1, // id LSB
       ]),
       2, // remainingLength
-      Mqtt.ProtocolVersion.MQTT_V3_1_1, // ProtocolVersion
+      Mqtt.ProtocolVersion.MqttV3_1_1, // ProtocolVersion
     ),
     {
       type: 'unsuback',
@@ -191,7 +191,7 @@ Deno.test('decodeUnsubackPacketMQTT5WithReasonCodes', function () {
         0x91, // PacketIdentifierInUse
       ]),
       10, // remainingLength (packetId: 2 bytes + properties length: 1 byte + reasonCodes: 7 bytes = 10 bytes)
-      Mqtt.ProtocolVersion.MQTT_V5, // ProtocolVersion
+      Mqtt.ProtocolVersion.MqttV5, // ProtocolVersion
     ),
     {
       type: 'unsuback',
@@ -278,7 +278,7 @@ Deno.test('decodeUnsubackPacketMQTT5WithProperties', function () {
         0x11, // NoSubscriptionExisted
       ]),
       59, // remainingLength
-      Mqtt.ProtocolVersion.MQTT_V5, // ProtocolVersion
+      Mqtt.ProtocolVersion.MqttV5, // ProtocolVersion
     ),
     {
       type: 'unsuback',

@@ -290,10 +290,10 @@ Deno.test({ name: '@send topic alias', only: false }, async (context) => {
           broker.on('publish', (event) => {
             const packet = event.detail;
             received.push({ topic: packet.topic, topicAlias: packet.properties?.topicAlias });
-            broker.sendPuback('cid', packetIdOf(packet), Mqtt.ProtocolVersion.MQTT_V5);
+            broker.sendPuback('cid', packetIdOf(packet), Mqtt.ProtocolVersion.MqttV5);
           });
 
-          const qos = { qos: Mqtt.QoS.AT_LEAST_ONCE };
+          const qos = { qos: Mqtt.QoS.AtLeastOnce };
           await client.publish('topicA', new TextEncoder().encode('1st'), qos); // topic alias 1
           await client.publish('topicA', new TextEncoder().encode('2nd'), qos); // topic alias 1
           await client.publish('topicB', new TextEncoder().encode('3rd'), qos); // topic alias 1, replacing topicA
@@ -344,13 +344,13 @@ Deno.test({ name: '@send topic alias', only: false }, async (context) => {
         broker.on('publish', (event) => {
           const packet = event.detail;
           received.push({ topic: packet.topic, topicAlias: packet.properties?.topicAlias });
-          broker.sendPuback('cid', packetIdOf(packet), Mqtt.ProtocolVersion.MQTT_V5);
+          broker.sendPuback('cid', packetIdOf(packet), Mqtt.ProtocolVersion.MqttV5);
         });
 
         const properties: MqttProperties.UserPublishProperties = { contentType: 'text/plain' };
         await Promise.all([
-          client.publish('topicA', new TextEncoder().encode('1st'), { qos: Mqtt.QoS.AT_LEAST_ONCE }, properties), // topic alias 1
-          client.publish('topicB', new TextEncoder().encode('2nd'), { qos: Mqtt.QoS.AT_LEAST_ONCE }, properties), // topic alias 2
+          client.publish('topicA', new TextEncoder().encode('1st'), { qos: Mqtt.QoS.AtLeastOnce }, properties), // topic alias 1
+          client.publish('topicB', new TextEncoder().encode('2nd'), { qos: Mqtt.QoS.AtLeastOnce }, properties), // topic alias 2
         ]);
 
         assertEquals(received, [
@@ -404,16 +404,16 @@ Deno.test({ name: '@send topic alias', only: false }, async (context) => {
           const message = new TextDecoder().decode(packet.payload);
           received.push({ message, topic: packet.topic, topicAlias: packet.properties?.topicAlias });
           if (sendPuback) {
-            broker.sendPuback('cid', packetIdOf(packet), Mqtt.ProtocolVersion.MQTT_V5);
+            broker.sendPuback('cid', packetIdOf(packet), Mqtt.ProtocolVersion.MqttV5);
           }
         });
 
         const properties: MqttProperties.UserPublishProperties = { contentType: 'text/plain' };
-        await client.publish('topicA', new TextEncoder().encode('1st'), { qos: Mqtt.QoS.AT_LEAST_ONCE }, properties); // topic alias 1
+        await client.publish('topicA', new TextEncoder().encode('1st'), { qos: Mqtt.QoS.AtLeastOnce }, properties); // topic alias 1
 
         // not acknowledged, so it is resent after reconnecting
         sendPuback = false;
-        const pubResult = client.publish('topicB', new TextEncoder().encode('2nd'), { qos: Mqtt.QoS.AT_LEAST_ONCE }); // topic alias 2
+        const pubResult = client.publish('topicB', new TextEncoder().encode('2nd'), { qos: Mqtt.QoS.AtLeastOnce }); // topic alias 2
 
         const closed = Promise.withResolvers<void>();
         client.on('closed', () => closed.resolve());
@@ -426,7 +426,7 @@ Deno.test({ name: '@send topic alias', only: false }, async (context) => {
         sendPuback = true;
         await client.connect();
         assertEquals((await pubResult).result, Mqtt.ReasonCode.Success);
-        await client.publish('topicC', new TextEncoder().encode('3rd'), { qos: Mqtt.QoS.AT_LEAST_ONCE }, properties);
+        await client.publish('topicC', new TextEncoder().encode('3rd'), { qos: Mqtt.QoS.AtLeastOnce }, properties);
 
         assertEquals(received, [
           { message: '1st', topic: 'topicA', topicAlias: 1 },
@@ -486,15 +486,15 @@ Deno.test({ name: '@send topic alias, concurrent publishes', only: false }, asyn
         broker.on('publish', (event) => {
           const packet = event.detail;
           received.push({ message: new TextDecoder().decode(packet.payload), topic: packet.topic, topicAlias: packet.properties?.topicAlias });
-          if (packet.qos === Mqtt.QoS.AT_LEAST_ONCE) {
-            broker.sendPuback('cid', packet.packetId, Mqtt.ProtocolVersion.MQTT_V5);
+          if (packet.qos === Mqtt.QoS.AtLeastOnce) {
+            broker.sendPuback('cid', packet.packetId, Mqtt.ProtocolVersion.MqttV5);
           }
         });
 
         // The QoS 1 PUBLISH waits for its packet ID and the session store, the QoS 0 one does not.
         await Promise.all([
-          client.publish('topicA', new TextEncoder().encode('1st'), { qos: Mqtt.QoS.AT_LEAST_ONCE }),
-          client.publish('topicA', new TextEncoder().encode('2nd'), { qos: Mqtt.QoS.AT_MOST_ONCE }),
+          client.publish('topicA', new TextEncoder().encode('1st'), { qos: Mqtt.QoS.AtLeastOnce }),
+          client.publish('topicA', new TextEncoder().encode('2nd'), { qos: Mqtt.QoS.AtMostOnce }),
         ]);
         // A QoS 0 publish() resolves when it is sent, maybe before the broker receives it.
         while (received.length < 2) {
@@ -552,12 +552,12 @@ Deno.test({ name: '@send topic alias, concurrent publishes', only: false }, asyn
         broker.on('publish', (event) => {
           const packet = event.detail;
           received.push({ message: new TextDecoder().decode(packet.payload), topic: packet.topic, topicAlias: packet.properties?.topicAlias });
-          broker.sendPuback('cid', packetIdOf(packet), Mqtt.ProtocolVersion.MQTT_V5);
+          broker.sendPuback('cid', packetIdOf(packet), Mqtt.ProtocolVersion.MqttV5);
         });
 
         await Promise.all([
-          client.publish('topicA', new TextEncoder().encode('1st'), { qos: Mqtt.QoS.AT_LEAST_ONCE }),
-          client.publish('topicA', new TextEncoder().encode('2nd'), { qos: Mqtt.QoS.AT_LEAST_ONCE }),
+          client.publish('topicA', new TextEncoder().encode('1st'), { qos: Mqtt.QoS.AtLeastOnce }),
+          client.publish('topicA', new TextEncoder().encode('2nd'), { qos: Mqtt.QoS.AtLeastOnce }),
         ]);
 
         assertAliasRegisteredFirst(received);

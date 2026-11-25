@@ -108,7 +108,7 @@ Deno.test({ name: '@async dispose', only: false }, async (context) => {
           events.push('client closed');
         });
         await client.connect({ properties: { sessionExpiryInterval: 3600 } });
-        await client.publish('topicA', 'A', { qos: Mqtt.QoS.AT_MOST_ONCE });
+        await client.publish('topicA', 'A', { qos: Mqtt.QoS.AtMostOnce });
       }
 
       assertEquals(b.received, ['DISCONNECT']);

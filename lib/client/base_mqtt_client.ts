@@ -138,7 +138,7 @@ function copyPublishProperties(properties: MqttProperties.UserPublishProperties)
  * import { type BaseMqttClient, Mqtt } from '@ymjacky/mqtt5';
  *
  * async function subscribeAll(client: BaseMqttClient, topics: string[]) {
- *   await client.subscribe(topics, Mqtt.QoS.AT_LEAST_ONCE);
+ *   await client.subscribe(topics, Mqtt.QoS.AtLeastOnce);
  * }
  * ```
  */
@@ -237,7 +237,7 @@ export abstract class BaseMqttClient {
    * is not an integer from 0 to 65,535, or if the `outgoingStore` cannot be used with the `clientId`.
    */
   constructor(options?: ClientOptions) {
-    this.protocolVersion = options?.protocolVersion ?? Mqtt.ProtocolVersion.MQTT_V5;
+    this.protocolVersion = options?.protocolVersion ?? Mqtt.ProtocolVersion.MqttV5;
     validateClientOptions(options, this.protocolVersion);
 
     this.url = options?.url ?? new URL('mqtt://127.0.0.1:1883');
@@ -270,11 +270,11 @@ export abstract class BaseMqttClient {
     this.eventTarget = new EventTarget();
     this.pingrespTimeoutMs = positiveOrDefault(options?.pingrespTimeoutMS, defaultPingrespTimeout);
 
-    if (this.protocolVersion === Mqtt.ProtocolVersion.MQTT_V5 && options?.topicAliasMaximumAboutSend) {
+    if (this.protocolVersion === Mqtt.ProtocolVersion.MqttV5 && options?.topicAliasMaximumAboutSend) {
       this.topicAliasMaximumAboutSend = options.topicAliasMaximumAboutSend;
     }
 
-    if (this.protocolVersion === Mqtt.ProtocolVersion.MQTT_V5 && options?.topicAliasMaximumAboutReceive) {
+    if (this.protocolVersion === Mqtt.ProtocolVersion.MqttV5 && options?.topicAliasMaximumAboutReceive) {
       this.topicAliasMaximumAboutReceive = options.topicAliasMaximumAboutReceive;
     }
     this.topicAliasMapAboutReceive = new Map<number, string>();
@@ -437,7 +437,7 @@ export abstract class BaseMqttClient {
    * await client.connect({
    *   will: {
    *     topic: 'topicA',
-   *     qos: Mqtt.QoS.AT_LEAST_ONCE,
+   *     qos: Mqtt.QoS.AtLeastOnce,
    *     payload: willPayload,
    *     properties: { userProperties: [{ key: 'userProp1', val: 'userData1' }] },
    *   },
@@ -560,7 +560,7 @@ export abstract class BaseMqttClient {
    *
    * @param topic topic name
    * @param payload payload. A string is encoded as UTF-8.
-   * @param options {@link PublishOptions}: QoS, retain and DUP flags. QoS defaults to `Mqtt.QoS.AT_MOST_ONCE`.
+   * @param options {@link PublishOptions}: QoS, retain and DUP flags. QoS defaults to `Mqtt.QoS.AtMostOnce`.
    * @param properties MQTT 5.0 PUBLISH properties ({@link MqttProperties.UserPublishProperties}).
    * @returns the result of the publish flow ({@link PublishResult}). Its `result` is the reason code; 0x80 (128) or more is a failure.
    * @throws {StateIsNotOnlineError} if the client is not connected.
@@ -582,11 +582,11 @@ export abstract class BaseMqttClient {
    *
    * const client = new MqttClient();
    *
-   * await client.publish('topicA', 'payload', { qos: Mqtt.QoS.AT_MOST_ONCE });
-   * await client.publish('topicA', 'payload', { qos: Mqtt.QoS.AT_LEAST_ONCE });
-   * await client.publish('topicA', 'payload', { qos: Mqtt.QoS.EXACTLY_ONCE });
-   * await client.publish('topicA', new TextEncoder().encode('payloadA'), { qos: Mqtt.QoS.EXACTLY_ONCE });
-   * await client.publish('topicA', 'payloadA', { qos: Mqtt.QoS.AT_LEAST_ONCE, dup: true, retain: true });
+   * await client.publish('topicA', 'payload', { qos: Mqtt.QoS.AtMostOnce });
+   * await client.publish('topicA', 'payload', { qos: Mqtt.QoS.AtLeastOnce });
+   * await client.publish('topicA', 'payload', { qos: Mqtt.QoS.ExactlyOnce });
+   * await client.publish('topicA', new TextEncoder().encode('payloadA'), { qos: Mqtt.QoS.ExactlyOnce });
+   * await client.publish('topicA', 'payloadA', { qos: Mqtt.QoS.AtLeastOnce, dup: true, retain: true });
    *
    * const pubProperties: MqttProperties.UserPublishProperties = {
    *   payloadFormatIndicator: 1,
@@ -600,7 +600,7 @@ export abstract class BaseMqttClient {
    *   ],
    *   contentType: 'application/json',
    * };
-   * await client.publish('topicA', 'payload', { qos: Mqtt.QoS.AT_MOST_ONCE }, pubProperties);
+   * await client.publish('topicA', 'payload', { qos: Mqtt.QoS.AtMostOnce }, pubProperties);
    * ```
    */
   public publish(
@@ -627,7 +627,7 @@ export abstract class BaseMqttClient {
     }
 
     const dup = options?.dup ?? false;
-    const qos = options?.qos ?? Mqtt.QoS.AT_MOST_ONCE;
+    const qos = options?.qos ?? Mqtt.QoS.AtMostOnce;
     const retain = options?.retain ?? false;
     // Check the topic given by the caller: with a topic alias, the client itself sends an empty Topic Name.
     validatePublish(topic, qos, dup, properties, this.protocolVersion);
@@ -651,7 +651,7 @@ export abstract class BaseMqttClient {
       // connect again meanwhile.
       const connectionOpen = this.connectionOpen();
 
-      if (qos !== Mqtt.QoS.AT_MOST_ONCE) {
+      if (qos !== Mqtt.QoS.AtMostOnce) {
         // Do not send more QoS 1 / QoS 2 PUBLISH packets than the Receive Maximum of the broker allows [MQTT-3.3.4-7]:
         // wait until an acknowledgment ends one. The turn is kept, so the publish() calls after this one wait too, in order.
         await this.session.waitForSendQuota(connectionOpen);
@@ -664,7 +664,7 @@ export abstract class BaseMqttClient {
       // Without a topic alias: it is set right before writing.
       let packet: PublishPacket;
       let bytes: Uint8Array | undefined;
-      if (qos === Mqtt.QoS.AT_MOST_ONCE) {
+      if (qos === Mqtt.QoS.AtMostOnce) {
         packet = { type: 'publish', topic, payload: buffer, dup, retain, qos, properties: publishProperties };
       } else {
         const packetId = await this.session.acquirePublishPacketId();
@@ -697,7 +697,7 @@ export abstract class BaseMqttClient {
       // No await from here until the packet is written (see encodePublishToWrite()).
       const [sending, sendingBytes] = this.encodePublishToWrite(packet, bytes);
       await this.sendPacket(sending, sendingBytes);
-      if (qos === Mqtt.QoS.AT_MOST_ONCE) {
+      if (qos === Mqtt.QoS.AtMostOnce) {
         deferred.resolve({ result: 0, reason: '' });
       }
     } finally {
@@ -783,7 +783,7 @@ export abstract class BaseMqttClient {
    * Subscribes to a topic filter and waits for SUBACK.
    * A rejection of an ignored promise does not terminate the process; await the promise to handle failures.
    * @param topicFilter topic name or topic filter
-   * @param qos QoS level. Defaults to `Mqtt.QoS.AT_MOST_ONCE`.
+   * @param qos QoS level. Defaults to `Mqtt.QoS.AtMostOnce`.
    * @param properties MQTT 5.0 SUBSCRIBE properties ({@link MqttProperties.SubscribeProperties}).
    * @returns the reason codes of SUBACK ({@link SubscribeResults}).
    * @throws {StateIsNotOnlineError} if the client is not connected.
@@ -801,7 +801,7 @@ export abstract class BaseMqttClient {
    *
    * const client = new MqttClient();
    *
-   * await client.subscribe('topicA', Mqtt.QoS.AT_MOST_ONCE);
+   * await client.subscribe('topicA', Mqtt.QoS.AtMostOnce);
    * ```
    */
   public subscribe(
@@ -814,7 +814,7 @@ export abstract class BaseMqttClient {
    * Subscribes to multiple topic filters with one SUBSCRIBE packet and waits for SUBACK.
    * A rejection of an ignored promise does not terminate the process; await the promise to handle failures.
    * @param topicFilters topic names or topic filters
-   * @param qos QoS level. Defaults to `Mqtt.QoS.AT_MOST_ONCE`.
+   * @param qos QoS level. Defaults to `Mqtt.QoS.AtMostOnce`.
    * @param properties MQTT 5.0 SUBSCRIBE properties ({@link MqttProperties.SubscribeProperties}).
    * @returns the reason codes of SUBACK ({@link SubscribeResults}).
    * @throws {StateIsNotOnlineError} if the client is not connected.
@@ -832,7 +832,7 @@ export abstract class BaseMqttClient {
    *
    * const client = new MqttClient();
    *
-   * await client.subscribe(['topicA', 'topicB'], Mqtt.QoS.AT_MOST_ONCE);
+   * await client.subscribe(['topicA', 'topicB'], Mqtt.QoS.AtMostOnce);
    * ```
    */
   public subscribe(
@@ -845,7 +845,7 @@ export abstract class BaseMqttClient {
    * Subscribes to a topic filter with MQTT 5.0 subscription options and waits for SUBACK.
    * A rejection of an ignored promise does not terminate the process; await the promise to handle failures.
    * @param subscription topic filter and subscription options ({@link SubscriptionOption}). Its `qos` takes precedence over the `qos` argument.
-   * @param qos QoS level. Defaults to `Mqtt.QoS.AT_MOST_ONCE`.
+   * @param qos QoS level. Defaults to `Mqtt.QoS.AtMostOnce`.
    * @param properties MQTT 5.0 SUBSCRIBE properties ({@link MqttProperties.SubscribeProperties}).
    * @returns the reason codes of SUBACK ({@link SubscribeResults}).
    * @throws {StateIsNotOnlineError} if the client is not connected.
@@ -863,7 +863,7 @@ export abstract class BaseMqttClient {
    *
    * const client = new MqttClient();
    *
-   * await client.subscribe({ topicFilter: 'topicA', qos: Mqtt.QoS.AT_MOST_ONCE, retainHandling: Mqtt.RetainHandling.DoNotSend, retainAsPublished: true, noLocal: true });
+   * await client.subscribe({ topicFilter: 'topicA', qos: Mqtt.QoS.AtMostOnce, retainHandling: Mqtt.RetainHandling.DoNotSend, retainAsPublished: true, noLocal: true });
    * ```
    */
   public subscribe(
@@ -876,7 +876,7 @@ export abstract class BaseMqttClient {
    * Subscribes to multiple topic filters with subscription options with one SUBSCRIBE packet and waits for SUBACK.
    * A rejection of an ignored promise does not terminate the process; await the promise to handle failures.
    * @param subscriptions topic filters and subscription options ({@link SubscriptionOption}). Their `qos` takes precedence over the `qos` argument.
-   * @param qos QoS level. Defaults to `Mqtt.QoS.AT_MOST_ONCE`.
+   * @param qos QoS level. Defaults to `Mqtt.QoS.AtMostOnce`.
    * @param properties MQTT 5.0 SUBSCRIBE properties ({@link MqttProperties.SubscribeProperties}).
    * @returns the reason codes of SUBACK ({@link SubscribeResults}).
    * @throws {StateIsNotOnlineError} if the client is not connected.
@@ -896,10 +896,10 @@ export abstract class BaseMqttClient {
    *
    * await client.subscribe(
    *   [
-   *     { topicFilter: 'topicA', qos: Mqtt.QoS.AT_MOST_ONCE },
-   *     { topicFilter: 'topicB', qos: Mqtt.QoS.AT_LEAST_ONCE },
-   *     { topicFilter: 'topicC', qos: Mqtt.QoS.EXACTLY_ONCE },
-   *     { topicFilter: 'topicD', qos: Mqtt.QoS.EXACTLY_ONCE, retainHandling: Mqtt.RetainHandling.DoNotSend, retainAsPublished: true, noLocal: true }
+   *     { topicFilter: 'topicA', qos: Mqtt.QoS.AtMostOnce },
+   *     { topicFilter: 'topicB', qos: Mqtt.QoS.AtLeastOnce },
+   *     { topicFilter: 'topicC', qos: Mqtt.QoS.ExactlyOnce },
+   *     { topicFilter: 'topicD', qos: Mqtt.QoS.ExactlyOnce, retainHandling: Mqtt.RetainHandling.DoNotSend, retainAsPublished: true, noLocal: true }
    *   ],
    * );
    * ```
@@ -939,12 +939,12 @@ export abstract class BaseMqttClient {
       return (typeof sub === 'object')
         ? {
           topicFilter: sub.topicFilter,
-          qos: sub.qos ?? qos ?? Mqtt.QoS.AT_MOST_ONCE,
+          qos: sub.qos ?? qos ?? Mqtt.QoS.AtMostOnce,
           retainHandling: sub.retainHandling,
           retainAsPublished: sub.retainAsPublished,
           noLocal: sub.noLocal,
         }
-        : { topicFilter: sub, qos: qos ?? Mqtt.QoS.AT_MOST_ONCE };
+        : { topicFilter: sub, qos: qos ?? Mqtt.QoS.AtMostOnce };
     });
     validateSubscribe(subs, properties, this.protocolVersion);
     validateSubscribeCapabilities(subs, properties, this.brokerCapabilities);
@@ -1341,7 +1341,7 @@ export abstract class BaseMqttClient {
       await this.close();
       return;
     }
-    if (this.protocolVersion === Mqtt.ProtocolVersion.MQTT_V3_1_1) {
+    if (this.protocolVersion === Mqtt.ProtocolVersion.MqttV3_1_1) {
       // MQTT v3.1.1: DISCONNECT has no reason code and unconditionally signals a
       // clean disconnect, which also causes the broker to discard the Will message.
       // Since this is an abnormal condition, close the connection directly instead of
@@ -1403,7 +1403,7 @@ export abstract class BaseMqttClient {
    */
   protected createFrameBuffer(): MqttStream.MqttFrameBuffer {
     // MQTT 3.1.1 CONNECT has no properties: the broker does not know of a limit.
-    const maximumPacketSize = this.protocolVersion > Mqtt.ProtocolVersion.MQTT_V3_1_1 ? this.connectProperties?.maximumPacketSize : undefined;
+    const maximumPacketSize = this.protocolVersion > Mqtt.ProtocolVersion.MqttV3_1_1 ? this.connectProperties?.maximumPacketSize : undefined;
     return new MqttStream.MqttFrameBuffer(maximumPacketSize);
   }
 
@@ -1545,7 +1545,7 @@ export abstract class BaseMqttClient {
     const pendingConnect = state.connection.connect;
     this.timers.connect.stop();
 
-    const accepted = this.protocolVersion > Mqtt.ProtocolVersion.MQTT_V3_1_1
+    const accepted = this.protocolVersion > Mqtt.ProtocolVersion.MqttV3_1_1
       ? packet.reasonCode === Mqtt.ReasonCode.Success
       : packet.returnCode === Mqtt.V3_1_1_ConnectReturnCode.ConnectionAccepted;
     if (!accepted) {
@@ -1726,11 +1726,11 @@ export abstract class BaseMqttClient {
       }
     }
 
-    if (packet.qos === Mqtt.QoS.AT_MOST_ONCE) {
+    if (packet.qos === Mqtt.QoS.AtMostOnce) {
       this.eventTarget.dispatchEvent(
         createCustomEvent('publish', { detail: packet }),
       );
-    } else if (packet.qos === Mqtt.QoS.AT_LEAST_ONCE) {
+    } else if (packet.qos === Mqtt.QoS.AtLeastOnce) {
       this.sendPacketInBackground(
         {
           type: 'puback',
@@ -1741,7 +1741,7 @@ export abstract class BaseMqttClient {
       this.eventTarget.dispatchEvent(
         createCustomEvent('publish', { detail: packet }),
       );
-    } else if (packet.qos === Mqtt.QoS.EXACTLY_ONCE) {
+    } else if (packet.qos === Mqtt.QoS.ExactlyOnce) {
       // A PUBLISH with DUP whose packet ID is stored is a message that has been emitted already: the broker sends it
       // again when it has not received PUBREC, e.g. the connection was closed. It is answered again, and not emitted again.
       const emitMessage = !packet.dup ||
@@ -1830,7 +1830,7 @@ export abstract class BaseMqttClient {
       this.sendPacketInBackground(pubrel);
     } else {
       this.log(`Unknown packetId received. (packetId:${packet.packetId})`, 'pubrec');
-      if (this.protocolVersion > Mqtt.ProtocolVersion.MQTT_V3_1_1) {
+      if (this.protocolVersion > Mqtt.ProtocolVersion.MqttV3_1_1) {
         const pubrel: PubrelPacket = {
           type: 'pubrel',
           packetId: packet.packetId,
@@ -1860,7 +1860,7 @@ export abstract class BaseMqttClient {
       );
     } else {
       this.log(`Unknown packetId received (packetId:${packet.packetId})`, 'pubrel');
-      if (this.protocolVersion > Mqtt.ProtocolVersion.MQTT_V3_1_1) {
+      if (this.protocolVersion > Mqtt.ProtocolVersion.MqttV3_1_1) {
         const pubcomp: PubcompPacket = {
           type: 'pubcomp',
           packetId: packet.packetId,
@@ -1970,7 +1970,7 @@ export abstract class BaseMqttClient {
       case 'disconnect':
         return false;
       case 'auth':
-        return this.protocolVersion === Mqtt.ProtocolVersion.MQTT_V3_1_1;
+        return this.protocolVersion === Mqtt.ProtocolVersion.MqttV3_1_1;
       default:
         return true;
     }
@@ -2158,7 +2158,7 @@ export abstract class BaseMqttClient {
    * {
    *   await using client = new MqttClient({ clientId: 'clientA' });
    *   await client.connect();
-   *   await client.publish('topicA', 'hello', { qos: Mqtt.QoS.AT_LEAST_ONCE });
+   *   await client.publish('topicA', 'hello', { qos: Mqtt.QoS.AtLeastOnce });
    * } // client.disconnect() is called here
    * ```
    */

@@ -7,7 +7,7 @@ type StoredPacket = MqttPackets.PublishPacketWithId | MqttPackets.PubrelPacket;
 export function publishPacket(
   packetId: number,
   payload: string,
-  qos: MqttPackets.PublishPacketWithId['qos'] = Mqtt.QoS.AT_LEAST_ONCE,
+  qos: MqttPackets.PublishPacketWithId['qos'] = Mqtt.QoS.AtLeastOnce,
 ): MqttPackets.PublishPacketWithId {
   return { type: 'publish', topic: 'topicA', payload: new TextEncoder().encode(payload), dup: false, retain: false, qos, packetId };
 }
@@ -54,7 +54,7 @@ export async function testOutgoingStoreContract(
       payload: new Uint8Array([0, 1, 2, 255]),
       dup: false,
       retain: true,
-      qos: Mqtt.QoS.EXACTLY_ONCE,
+      qos: Mqtt.QoS.ExactlyOnce,
       packetId: 10,
       properties: {
         payloadFormatIndicator: 1,
@@ -94,9 +94,9 @@ export async function testOutgoingStoreContract(
   });
 
   await step('PUBREL replaces the PUBLISH of its packet ID and keeps its position', async (store) => {
-    await store.store(publishPacket(1, 'A', Mqtt.QoS.EXACTLY_ONCE));
-    await store.store(publishPacket(2, 'B', Mqtt.QoS.EXACTLY_ONCE));
-    await store.store(publishPacket(3, 'C', Mqtt.QoS.EXACTLY_ONCE));
+    await store.store(publishPacket(1, 'A', Mqtt.QoS.ExactlyOnce));
+    await store.store(publishPacket(2, 'B', Mqtt.QoS.ExactlyOnce));
+    await store.store(publishPacket(3, 'C', Mqtt.QoS.ExactlyOnce));
     await store.store({ type: 'pubrel', packetId: 2 });
     assertEquals(await resendOrder(store), ['publish 1 A', 'pubrel 2', 'publish 3 C']);
     assertEquals(await store.count(), 3);
@@ -122,7 +122,7 @@ export async function testOutgoingStoreContract(
 
   await step('count follows store, replace, discard and clear', async (store) => {
     assertEquals(await store.count(), 0);
-    await store.store(publishPacket(1, 'A', Mqtt.QoS.EXACTLY_ONCE));
+    await store.store(publishPacket(1, 'A', Mqtt.QoS.ExactlyOnce));
     await store.store(publishPacket(2, 'B'));
     assertEquals(await store.count(), 2);
     await store.store({ type: 'pubrel', packetId: 1 });

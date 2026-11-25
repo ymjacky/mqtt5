@@ -20,7 +20,7 @@ async function waitFor(condition: () => boolean | Promise<boolean>, label: strin
   }
 }
 
-const v5 = Mqtt.ProtocolVersion.MQTT_V5;
+const v5 = Mqtt.ProtocolVersion.MqttV5;
 
 /**
  * A broker that records what it receives, e.g. `PUBLISH A`, `PUBLISH A dup retain`, `PUBREL 1` or `SUBSCRIBE a/b`.
@@ -86,9 +86,9 @@ async function assertStays(received: string[], expected: string[]) {
   assertEquals(received, expected);
 }
 
-const qos0 = { qos: Mqtt.QoS.AT_MOST_ONCE };
-const qos1 = { qos: Mqtt.QoS.AT_LEAST_ONCE };
-const qos2 = { qos: Mqtt.QoS.EXACTLY_ONCE };
+const qos0 = { qos: Mqtt.QoS.AtMostOnce };
+const qos1 = { qos: Mqtt.QoS.AtLeastOnce };
+const qos2 = { qos: Mqtt.QoS.ExactlyOnce };
 
 Deno.test({ name: '@CONNACK Receive Maximum', only: false }, async (context) => {
   await context.step('QoS 1: a PUBLISH waits for a PUBACK when Receive Maximum PUBLISH packets are in flight, in order', async () => {
@@ -358,14 +358,14 @@ Deno.test({ name: '@CONNACK Receive Maximum when resending after reconnecting', 
 Deno.test({ name: '@CONNACK Maximum QoS and Retain Available', only: false }, async (context) => {
   await context.step('a QoS higher than the Maximum QoS rejects with QoSNotSupportedError, and nothing is sent', async () => {
     const b = recordingBroker();
-    b.connackProperties = { maximumQoS: Mqtt.QoS.AT_LEAST_ONCE };
+    b.connackProperties = { maximumQoS: Mqtt.QoS.AtLeastOnce };
     const client = new MqttClient({ clientId: 'cid', logger });
     try {
       await client.connect();
       // [MQTT-3.2.2-11]
       const err = await assertRejects(() => client.publish('topicA', 'A', qos2), ClientErrors.QoSNotSupportedError);
       assertInstanceOf(err, ClientErrors.NotSupportedByBrokerError);
-      assertEquals(err.maximumQoS, Mqtt.QoS.AT_LEAST_ONCE);
+      assertEquals(err.maximumQoS, Mqtt.QoS.AtLeastOnce);
       assertEquals(await client.publishInflightCount(), 0);
 
       const publishingB = client.publish('topicA', 'B', qos1);
@@ -382,12 +382,12 @@ Deno.test({ name: '@CONNACK Maximum QoS and Retain Available', only: false }, as
 
   await context.step('Maximum QoS 0: QoS 1 is rejected, QoS 0 is sent', async () => {
     const b = recordingBroker();
-    b.connackProperties = { maximumQoS: Mqtt.QoS.AT_MOST_ONCE };
+    b.connackProperties = { maximumQoS: Mqtt.QoS.AtMostOnce };
     const client = new MqttClient({ clientId: 'cid', logger });
     try {
       await client.connect();
       const err = await assertRejects(() => client.publish('topicA', 'A', qos1), ClientErrors.QoSNotSupportedError);
-      assertEquals(err.maximumQoS, Mqtt.QoS.AT_MOST_ONCE);
+      assertEquals(err.maximumQoS, Mqtt.QoS.AtMostOnce);
       await client.publish('topicA', 'B', qos0);
       await waitFor(() => b.received.length === 1, 'B');
       assertEquals(b.received, ['PUBLISH B']);
@@ -426,7 +426,7 @@ Deno.test({ name: '@CONNACK Maximum QoS and Retain Available', only: false }, as
 
   await context.step('the limits are those of the current connection', async () => {
     const b = recordingBroker();
-    b.connackProperties = { maximumQoS: Mqtt.QoS.AT_MOST_ONCE, retainAvailable: false };
+    b.connackProperties = { maximumQoS: Mqtt.QoS.AtMostOnce, retainAvailable: false };
     const client = new MqttClient({ clientId: 'cid', logger });
     try {
       await client.connect();
@@ -492,11 +492,11 @@ Deno.test({ name: '@CONNACK Wildcard, Shared and Subscription Identifiers Availa
     try {
       await client.connect();
       const err = await assertRejects(
-        () => client.subscribe('a', Mqtt.QoS.AT_MOST_ONCE, { subscriptionIdentifier: 1 }),
+        () => client.subscribe('a', Mqtt.QoS.AtMostOnce, { subscriptionIdentifier: 1 }),
         ClientErrors.SubscriptionIdentifiersNotSupportedError,
       );
       assertInstanceOf(err, ClientErrors.NotSupportedByBrokerError);
-      await client.subscribe('a', Mqtt.QoS.AT_MOST_ONCE);
+      await client.subscribe('a', Mqtt.QoS.AtMostOnce);
       assertEquals(b.received, ['SUBSCRIBE a']);
       await client.disconnect();
     } finally {
@@ -510,7 +510,7 @@ Deno.test({ name: '@CONNACK Wildcard, Shared and Subscription Identifiers Availa
     const client = new MqttClient({ clientId: 'cid', logger });
     try {
       await client.connect();
-      await client.subscribe('$share/group1/a/+', Mqtt.QoS.AT_MOST_ONCE, { subscriptionIdentifier: 1 });
+      await client.subscribe('$share/group1/a/+', Mqtt.QoS.AtMostOnce, { subscriptionIdentifier: 1 });
       assertEquals(b.received, ['SUBSCRIBE $share/group1/a/+']);
       await client.disconnect();
     } finally {

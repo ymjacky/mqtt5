@@ -529,7 +529,7 @@ Deno.test({ name: '@closing DISCONNECT properties are checked before anything is
   await context.step(
     'a Session Expiry Interval other than 0 rejects with InvalidPropertyError when CONNECT has none, and the connection stays open',
     async () => {
-      await withClient(undefined, Mqtt.ProtocolVersion.MQTT_V5, async (client, received) => {
+      await withClient(undefined, Mqtt.ProtocolVersion.MqttV5, async (client, received) => {
         // MQTT 5.0 3.14.2.2.2: the broker would not treat this DISCONNECT as valid, and would publish the will message.
         await assertRejects(() => client.disconnect(false, { sessionExpiryInterval: 300 }), ClientErrors.InvalidPropertyError);
         assertEquals(received, []);
@@ -542,21 +542,21 @@ Deno.test({ name: '@closing DISCONNECT properties are checked before anything is
   );
 
   await context.step('a Session Expiry Interval other than 0 rejects also when that of CONNECT is 0', async () => {
-    await withClient({ properties: { sessionExpiryInterval: 0 } }, Mqtt.ProtocolVersion.MQTT_V5, async (client, received) => {
+    await withClient({ properties: { sessionExpiryInterval: 0 } }, Mqtt.ProtocolVersion.MqttV5, async (client, received) => {
       await assertRejects(() => client.disconnect(false, { sessionExpiryInterval: 300 }), ClientErrors.InvalidPropertyError);
       assertEquals(received, []);
     });
   });
 
   await context.step('a Reason String with U+0000 rejects with InvalidPropertyError', async () => {
-    await withClient(undefined, Mqtt.ProtocolVersion.MQTT_V5, async (client, received) => {
+    await withClient(undefined, Mqtt.ProtocolVersion.MqttV5, async (client, received) => {
       await assertRejects(() => client.disconnect(false, { reasonString: 'a\u0000b' }), ClientErrors.InvalidPropertyError);
       assertEquals(received, []);
     });
   });
 
   await context.step('MQTT 3.1.1: DISCONNECT has no properties, so they are not checked', async () => {
-    await withClient(undefined, Mqtt.ProtocolVersion.MQTT_V3_1_1, async (client, received) => {
+    await withClient(undefined, Mqtt.ProtocolVersion.MqttV3_1_1, async (client, received) => {
       await client.disconnect(false, { sessionExpiryInterval: 300 });
       assertEquals(received, [undefined]);
     });

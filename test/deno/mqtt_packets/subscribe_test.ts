@@ -12,11 +12,11 @@ Deno.test('encodeSubscribePacket', function () {
         type: 'subscribe',
         packetId: 1,
         subscriptions: [
-          { topicFilter: 'a/b', qos: Mqtt.QoS.AT_MOST_ONCE },
-          { topicFilter: 'c/d', qos: Mqtt.QoS.AT_LEAST_ONCE },
+          { topicFilter: 'a/b', qos: Mqtt.QoS.AtMostOnce },
+          { topicFilter: 'c/d', qos: Mqtt.QoS.AtLeastOnce },
         ],
       },
-      Mqtt.ProtocolVersion.MQTT_V3_1_1,
+      Mqtt.ProtocolVersion.MqttV3_1_1,
     ),
     new Uint8Array([
       // fixedHeader
@@ -52,21 +52,21 @@ Deno.test('encodeSubscribePacketMQTT5WithOptions', function () {
         subscriptions: [
           {
             topicFilter: 'sensors/#',
-            qos: Mqtt.QoS.EXACTLY_ONCE,
+            qos: Mqtt.QoS.ExactlyOnce,
             noLocal: true,
             retainAsPublished: true,
             retainHandling: Mqtt.RetainHandling.AtSubscribeOnlyIfTheSubscriptionDoesNotCurrentlyExist,
           },
           {
             topicFilter: 'status/+',
-            qos: Mqtt.QoS.AT_LEAST_ONCE,
+            qos: Mqtt.QoS.AtLeastOnce,
             noLocal: false,
             retainAsPublished: false,
             retainHandling: Mqtt.RetainHandling.AtTheTimeOfTheSubscribe,
           },
         ],
       },
-      Mqtt.ProtocolVersion.MQTT_V5,
+      Mqtt.ProtocolVersion.MqttV5,
     ),
     new Uint8Array([
       // fixedHeader
@@ -112,13 +112,13 @@ Deno.test('encodeSubscribePacketMQTT5WithSubscriptionIdentifier', function () {
         type: 'subscribe',
         packetId: 42,
         subscriptions: [
-          { topicFilter: 'device/temperature', qos: Mqtt.QoS.AT_MOST_ONCE },
+          { topicFilter: 'device/temperature', qos: Mqtt.QoS.AtMostOnce },
         ],
         properties: {
           subscriptionIdentifier: 123,
         },
       },
-      Mqtt.ProtocolVersion.MQTT_V5,
+      Mqtt.ProtocolVersion.MqttV5,
     ),
     new Uint8Array([
       // fixedHeader
@@ -164,7 +164,7 @@ Deno.test('encodeSubscribePacketMQTT5WithUserProperties', function () {
         type: 'subscribe',
         packetId: 99,
         subscriptions: [
-          { topicFilter: 'test/topic', qos: Mqtt.QoS.AT_LEAST_ONCE },
+          { topicFilter: 'test/topic', qos: Mqtt.QoS.AtLeastOnce },
         ],
         properties: {
           userProperties: [
@@ -172,7 +172,7 @@ Deno.test('encodeSubscribePacketMQTT5WithUserProperties', function () {
           ],
         },
       },
-      Mqtt.ProtocolVersion.MQTT_V5,
+      Mqtt.ProtocolVersion.MqttV5,
     ),
     new Uint8Array([
       // fixedHeader
@@ -246,14 +246,14 @@ Deno.test('decodeSubscribePacket', function () {
         1, // qos
       ]),
       14, // remainingLength
-      Mqtt.ProtocolVersion.MQTT_V3_1_1,
+      Mqtt.ProtocolVersion.MqttV3_1_1,
     ),
     {
       type: 'subscribe',
       packetId: 1,
       subscriptions: [
-        { topicFilter: 'a/b', qos: Mqtt.QoS.AT_MOST_ONCE },
-        { topicFilter: 'c/d', qos: Mqtt.QoS.AT_LEAST_ONCE },
+        { topicFilter: 'a/b', qos: Mqtt.QoS.AtMostOnce },
+        { topicFilter: 'c/d', qos: Mqtt.QoS.AtLeastOnce },
       ],
     },
   );
@@ -294,7 +294,7 @@ Deno.test('decodeSubscribePacketMQTT5WithOptions', function () {
         0x01, // subscription options (retain handling: 0 << 4 | QoS: 1)
       ]),
       26, // remainingLength
-      Mqtt.ProtocolVersion.MQTT_V5,
+      Mqtt.ProtocolVersion.MqttV5,
     ),
     {
       type: 'subscribe',
@@ -303,14 +303,14 @@ Deno.test('decodeSubscribePacketMQTT5WithOptions', function () {
       subscriptions: [
         {
           topicFilter: 'sensors/#',
-          qos: Mqtt.QoS.EXACTLY_ONCE,
+          qos: Mqtt.QoS.ExactlyOnce,
           noLocal: true,
           retainAsPublished: true,
           retainHandling: Mqtt.RetainHandling.AtSubscribeOnlyIfTheSubscriptionDoesNotCurrentlyExist,
         },
         {
           topicFilter: 'status/+',
-          qos: Mqtt.QoS.AT_LEAST_ONCE,
+          qos: Mqtt.QoS.AtLeastOnce,
           noLocal: false,
           retainAsPublished: false,
           retainHandling: Mqtt.RetainHandling.AtTheTimeOfTheSubscribe,
@@ -355,7 +355,7 @@ Deno.test('decodeSubscribePacketMQTT5WithSubscriptionIdentifier', function () {
         0x00, // subscription options (QoS: 0)
       ]),
       26, // remainingLength
-      Mqtt.ProtocolVersion.MQTT_V5,
+      Mqtt.ProtocolVersion.MqttV5,
     ),
     {
       type: 'subscribe',
@@ -363,7 +363,7 @@ Deno.test('decodeSubscribePacketMQTT5WithSubscriptionIdentifier', function () {
       subscriptions: [
         {
           topicFilter: 'device/temperature',
-          qos: Mqtt.QoS.AT_MOST_ONCE,
+          qos: Mqtt.QoS.AtMostOnce,
           noLocal: false,
           retainAsPublished: false,
           retainHandling: Mqtt.RetainHandling.AtTheTimeOfTheSubscribe,
@@ -424,7 +424,7 @@ Deno.test('decodeSubscribePacketMQTT5WithUserProperties', function () {
         0x01, // subscription options (QoS: 1)
       ]),
       39, // remainingLength
-      Mqtt.ProtocolVersion.MQTT_V5,
+      Mqtt.ProtocolVersion.MqttV5,
     ),
     {
       type: 'subscribe',
@@ -432,7 +432,7 @@ Deno.test('decodeSubscribePacketMQTT5WithUserProperties', function () {
       subscriptions: [
         {
           topicFilter: 'test/topic',
-          qos: Mqtt.QoS.AT_LEAST_ONCE,
+          qos: Mqtt.QoS.AtLeastOnce,
           noLocal: false,
           retainAsPublished: false,
           retainHandling: Mqtt.RetainHandling.AtTheTimeOfTheSubscribe,
@@ -471,7 +471,7 @@ Deno.test('decodeSubscribePacketMQTT5WithMultipleSubscriptionIdentifiers', funct
           0x00, // subscription options (QoS: 0)
         ]),
         13, // remainingLength
-        Mqtt.ProtocolVersion.MQTT_V5,
+        Mqtt.ProtocolVersion.MqttV5,
       ),
     MqttUtilsError.ProtocolViolationError,
     'SUBSCRIBE must not include the Subscription Identifier more than once',

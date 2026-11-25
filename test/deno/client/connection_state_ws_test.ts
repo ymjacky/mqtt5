@@ -29,8 +29,8 @@ async function settleWithin<T>(promise: Promise<T>, label: string, ms = 1000): P
 Deno.test({ name: '@connection state ws: packets a broker must not send', only: false }, async (context) => {
   for (
     const [version, protocolVersion, expected] of [
-      ['v5.0 sends DISCONNECT with the ProtocolError reason code', Mqtt.ProtocolVersion.MQTT_V5, [`DISCONNECT ${Mqtt.ReasonCode.ProtocolError}`]],
-      ['v3.1.1 closes without sending DISCONNECT', Mqtt.ProtocolVersion.MQTT_V3_1_1, []],
+      ['v5.0 sends DISCONNECT with the ProtocolError reason code', Mqtt.ProtocolVersion.MqttV5, [`DISCONNECT ${Mqtt.ReasonCode.ProtocolError}`]],
+      ['v3.1.1 closes without sending DISCONNECT', Mqtt.ProtocolVersion.MqttV3_1_1, []],
     ] as const
   ) {
     await context.step(

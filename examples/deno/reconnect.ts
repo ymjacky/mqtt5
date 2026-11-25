@@ -49,7 +49,7 @@ async function main() {
     clientId: 'reconnectClient', // a session belongs to a client ID, so use a fixed one
     logger: logger,
     clean: false, // keep the session
-    protocolVersion: Mqtt.ProtocolVersion.MQTT_V5,
+    protocolVersion: Mqtt.ProtocolVersion.MqttV5,
     keepAlive: 30,
   });
 
@@ -69,7 +69,7 @@ async function main() {
       throw new Error(`the broker refused the connection: reason code ${connack.reasonCode}`);
     }
     if (!connack.sessionPresent) {
-      await client.subscribe('topicA', Mqtt.QoS.AT_LEAST_ONCE);
+      await client.subscribe('topicA', Mqtt.QoS.AtLeastOnce);
     }
   }
 
@@ -105,7 +105,7 @@ async function main() {
     if (!online) {
       return;
     }
-    client.publish('topicA', `message ${++count}`, { qos: Mqtt.QoS.AT_LEAST_ONCE })
+    client.publish('topicA', `message ${++count}`, { qos: Mqtt.QoS.AtLeastOnce })
       .then((result) => logger(`published: reason code ${result.result}`))
       .catch((err) => logger('publish failed:', err)); // e.g. SessionLostError if the broker did not keep the session
   }, 5 * 1000);

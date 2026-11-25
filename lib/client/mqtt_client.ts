@@ -44,7 +44,7 @@ function openUnlessAborted<T extends Deno.Conn>(opening: Promise<T>, signal: Abo
  * const client = new MqttClient({
  *   url: new URL('mqtt://127.0.0.1:1883'),
  *   clientId: 'clientA',
- *   protocolVersion: Mqtt.ProtocolVersion.MQTT_V5,
+ *   protocolVersion: Mqtt.ProtocolVersion.MqttV5,
  * });
  * await client.connect();
  * ```

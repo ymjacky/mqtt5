@@ -16,7 +16,7 @@ function publishBytes(payloadSize: number): Uint8Array {
       retain: false,
       qos: 0,
     },
-    Mqtt.ProtocolVersion.MQTT_V3_1_1,
+    Mqtt.ProtocolVersion.MqttV3_1_1,
   );
 }
 

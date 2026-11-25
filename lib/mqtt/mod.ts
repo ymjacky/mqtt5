@@ -5,17 +5,17 @@
 
 /** Quality of Service levels of PUBLISH. */
 export const QoS = {
-  AT_MOST_ONCE: 0,
-  AT_LEAST_ONCE: 1,
-  EXACTLY_ONCE: 2,
+  AtMostOnce: 0,
+  AtLeastOnce: 1,
+  ExactlyOnce: 2,
 } as const;
 /** A value of {@link QoS}. */
 export type QoS = typeof QoS[keyof typeof QoS];
 
 /** MQTT protocol versions supported by the client. */
 export const ProtocolVersion = {
-  MQTT_V3_1_1: 4,
-  MQTT_V5: 5,
+  MqttV3_1_1: 4,
+  MqttV5: 5,
 } as const;
 /** A value of {@link ProtocolVersion}. */
 export type ProtocolVersion = typeof ProtocolVersion[keyof typeof ProtocolVersion];
@@ -85,9 +85,9 @@ export type V3_1_1_ConnectReturnCode = typeof V3_1_1_ConnectReturnCode[keyof typ
 
 /** MQTT 3.1.1 SUBACK return codes. */
 export const V3_1_1_SubscribeReturnCode = {
-  Success_MaximumQoS0: 0,
-  Success_MaximumQoS1: 1,
-  Success_MaximumQoS2: 2,
+  SuccessMaximumQoS0: 0,
+  SuccessMaximumQoS1: 1,
+  SuccessMaximumQoS2: 2,
   Failure: 128,
 } as const;
 /** A value of {@link V3_1_1_SubscribeReturnCode}. */
@@ -95,40 +95,40 @@ export type V3_1_1_SubscribeReturnCode = typeof V3_1_1_SubscribeReturnCode[keyof
 
 /** MQTT control packet types, the upper 4 bits of the fixed header. */
 export const PacketType = {
-  CONNECT: 0x1,
-  CONNACK: 0x2,
-  PUBLISH: 0x3,
-  PUBACK: 0x4,
-  PUBREC: 0x5,
-  PUBREL: 0x6,
-  PUBCOMP: 0x7,
-  SUBSCRIBE: 0x8,
-  SUBACK: 0x9,
-  UNSUBSCRIBE: 0xA,
-  UNSUBACK: 0xB,
-  PINGREQ: 0xC,
-  PINGRESP: 0xD,
-  DISCONNECT: 0xE,
-  AUTH: 0xF,
-};
+  Connect: 0x1,
+  Connack: 0x2,
+  Publish: 0x3,
+  Puback: 0x4,
+  Pubrec: 0x5,
+  Pubrel: 0x6,
+  Pubcomp: 0x7,
+  Subscribe: 0x8,
+  Suback: 0x9,
+  Unsubscribe: 0xA,
+  Unsuback: 0xB,
+  Pingreq: 0xC,
+  Pingresp: 0xD,
+  Disconnect: 0xE,
+  Auth: 0xF,
+} as const;
 
 /** Fixed header flags of each packet type, the lower 4 bits of the fixed header. */
-export const fixedHeaderFlag = {
-  CONNECT: 0b0000,
-  CONNACK: 0b0000,
-  PUBACK: 0b0000,
-  PUBREC: 0b0000,
-  PUBREL: 0b0010,
-  PUBCOMP: 0b0000,
-  SUBSCRIBE: 0b0010,
-  SUBACK: 0b0000,
-  UNSUBSCRIBE: 0b0010,
-  UNSUBACK: 0b0000,
-  PINGREQ: 0b0000,
-  PINGRESP: 0b0000,
-  DISCONNECT: 0b0000,
-  AUTH: 0b0000,
-};
+export const FixedHeaderFlag = {
+  Connect: 0b0000,
+  Connack: 0b0000,
+  Puback: 0b0000,
+  Pubrec: 0b0000,
+  Pubrel: 0b0010,
+  Pubcomp: 0b0000,
+  Subscribe: 0b0010,
+  Suback: 0b0000,
+  Unsubscribe: 0b0010,
+  Unsuback: 0b0000,
+  Pingreq: 0b0000,
+  Pingresp: 0b0000,
+  Disconnect: 0b0000,
+  Auth: 0b0000,
+} as const;
 
 /** Retain Handling subscription option: whether retained messages are sent when subscribing. */
 export const RetainHandling = {

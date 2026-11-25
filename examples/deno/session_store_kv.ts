@@ -22,7 +22,7 @@ async function main() {
     clientId: 'sessionStoreA',
     clean: false, // continue the session of the previous run
     outgoingStore: new KvOutgoingStore(kv),
-    protocolVersion: Mqtt.ProtocolVersion.MQTT_V5,
+    protocolVersion: Mqtt.ProtocolVersion.MqttV5,
     keepAlive: 60,
   });
 
@@ -38,7 +38,7 @@ async function main() {
 
   // The message is stored before it is sent, and removed when the broker acknowledges it.
   // If the process ends in between, the next run resends it.
-  const result = await client.publish('topicA', 'payload', { qos: Mqtt.QoS.AT_LEAST_ONCE });
+  const result = await client.publish('topicA', 'payload', { qos: Mqtt.QoS.AtLeastOnce });
   logger('published', result);
 } // client.disconnect(), then kv.close()
 

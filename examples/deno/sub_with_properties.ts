@@ -10,7 +10,7 @@ async function main() {
     clientId: 'subscriberA',
     logger: logger,
     clean: false,
-    protocolVersion: Mqtt.ProtocolVersion.MQTT_V5,
+    protocolVersion: Mqtt.ProtocolVersion.MqttV5,
     keepAlive: 30,
   });
 
@@ -32,7 +32,7 @@ async function main() {
     ],
     subscriptionIdentifier: 1,
   };
-  await client.subscribe(['topicA', 'topicB', 'topicC'], Mqtt.QoS.AT_LEAST_ONCE, subProperties);
+  await client.subscribe(['topicA', 'topicB', 'topicC'], Mqtt.QoS.AtLeastOnce, subProperties);
 }
 
 main();

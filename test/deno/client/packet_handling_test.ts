@@ -67,7 +67,7 @@ Deno.test({ name: '@packet handling', only: false }, async (context) => {
           clean: false,
           connectTimeoutMS: 10000,
           keepAlive: 10,
-          protocolVersion: Mqtt.ProtocolVersion.MQTT_V5,
+          protocolVersion: Mqtt.ProtocolVersion.MqttV5,
           incomingStore,
         });
 
@@ -92,11 +92,11 @@ Deno.test({ name: '@packet handling', only: false }, async (context) => {
           client.clientId,
           1,
           'topicA',
-          Mqtt.ProtocolVersion.MQTT_V5,
+          Mqtt.ProtocolVersion.MqttV5,
           new TextEncoder().encode('payload A'),
-          Mqtt.QoS.EXACTLY_ONCE,
+          Mqtt.QoS.ExactlyOnce,
         );
-        await broker.sendPubrel(client.clientId, 1, Mqtt.ProtocolVersion.MQTT_V5);
+        await broker.sendPubrel(client.clientId, 1, Mqtt.ProtocolVersion.MqttV5);
 
         await promise;
         await client.disconnect();
@@ -125,7 +125,7 @@ Deno.test({ name: '@packet handling', only: false }, async (context) => {
           clean: false,
           connectTimeoutMS: 10000,
           keepAlive: 10,
-          protocolVersion: Mqtt.ProtocolVersion.MQTT_V5,
+          protocolVersion: Mqtt.ProtocolVersion.MqttV5,
           incomingStore: new FailingIncomingStore(),
         });
 
@@ -144,14 +144,14 @@ Deno.test({ name: '@packet handling', only: false }, async (context) => {
         });
 
         // handlePubrel() fails because incomingStore.has() rejects.
-        await broker.sendPubrel(client.clientId, 1, Mqtt.ProtocolVersion.MQTT_V5);
+        await broker.sendPubrel(client.clientId, 1, Mqtt.ProtocolVersion.MqttV5);
         await broker.sendPublish(
           client.clientId,
           0,
           'topicB',
-          Mqtt.ProtocolVersion.MQTT_V5,
+          Mqtt.ProtocolVersion.MqttV5,
           new TextEncoder().encode('payload B'),
-          Mqtt.QoS.AT_MOST_ONCE,
+          Mqtt.QoS.AtMostOnce,
         );
 
         await promise;

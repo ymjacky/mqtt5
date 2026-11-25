@@ -55,7 +55,7 @@ const maximumEntryBytes = 65499;
  * const client = new MqttClient({ clientId: 'clientA', clean: false, outgoingStore: new KvOutgoingStore(kv) });
  *
  * await client.connect({ properties: { sessionExpiryInterval: 3600 } });
- * await client.publish('topicA', 'payload', { qos: Mqtt.QoS.AT_LEAST_ONCE });
+ * await client.publish('topicA', 'payload', { qos: Mqtt.QoS.AtLeastOnce });
  * await client.disconnect();
  * kv.close();
  * ```
@@ -110,7 +110,7 @@ export class KvOutgoingStore implements OutgoingStore {
     if (!packet.packetId) {
       throw new Error('missing packet.packetId');
     }
-    const bytes = MqttPackets.packetToBytes(packet, Mqtt.ProtocolVersion.MQTT_V5);
+    const bytes = MqttPackets.packetToBytes(packet, Mqtt.ProtocolVersion.MqttV5);
     if (bytes.length > maximumEntryBytes) {
       throw new Error(`${packet.type.toUpperCase()} is ${bytes.length} bytes, larger than the ${maximumEntryBytes} bytes Deno KV can keep`);
     }
@@ -216,8 +216,8 @@ export class KvOutgoingStore implements OutgoingStore {
       return undefined;
     }
     try {
-      const packet = MqttPackets.decode(entry.bytes, Mqtt.ProtocolVersion.MQTT_V5);
-      const stored = packet.type === 'pubrel' || (packet.type === 'publish' && packet.qos !== Mqtt.QoS.AT_MOST_ONCE);
+      const packet = MqttPackets.decode(entry.bytes, Mqtt.ProtocolVersion.MqttV5);
+      const stored = packet.type === 'pubrel' || (packet.type === 'publish' && packet.qos !== Mqtt.QoS.AtMostOnce);
       if (stored && packet.packetId === key.at(-1)) {
         return { seq: entry.seq, packet };
       }

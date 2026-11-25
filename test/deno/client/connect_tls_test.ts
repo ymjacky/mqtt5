@@ -34,7 +34,7 @@ Deno.test({ name: '@connect_tls', only: false }, async (context) => {
           assertEquals(packet.clean, false);
           assertEquals(packet.username, 'myname');
           assertEquals(packet.password, 'mypass');
-          assertEquals(packet.protocolVersion, Mqtt.ProtocolVersion.MQTT_V3_1_1);
+          assertEquals(packet.protocolVersion, Mqtt.ProtocolVersion.MqttV3_1_1);
           assertEquals(packet.keepAlive, 20);
           assertEquals(packet.properties, undefined);
 
@@ -84,7 +84,7 @@ Deno.test({ name: '@connect_tls', only: false }, async (context) => {
           assertEquals(packet.clean, false);
           assertEquals(packet.username, 'myname');
           assertEquals(packet.password, 'mypass');
-          assertEquals(packet.protocolVersion, Mqtt.ProtocolVersion.MQTT_V5);
+          assertEquals(packet.protocolVersion, Mqtt.ProtocolVersion.MqttV5);
           assertEquals(packet.keepAlive, 20);
           assertEquals(packet.properties, undefined);
 

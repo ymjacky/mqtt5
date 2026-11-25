@@ -12,7 +12,7 @@ Deno.test('encodeAuthPacketBasic', function () {
       {
         type: 'auth',
       },
-      Mqtt.ProtocolVersion.MQTT_V5,
+      Mqtt.ProtocolVersion.MqttV5,
     ),
     new Uint8Array([
       // fixedHeader
@@ -30,7 +30,7 @@ Deno.test('encodeAuthPacketWithReasonCode', function () {
         type: 'auth',
         reasonCode: Mqtt.ReasonCode.Success,
       },
-      Mqtt.ProtocolVersion.MQTT_V5,
+      Mqtt.ProtocolVersion.MqttV5,
     ),
     new Uint8Array([
       // fixedHeader
@@ -50,7 +50,7 @@ Deno.test('encodeAuthPacketWithContinueAuth', function () {
         type: 'auth',
         reasonCode: Mqtt.ReasonCode.ContinueAuthentication,
       },
-      Mqtt.ProtocolVersion.MQTT_V5,
+      Mqtt.ProtocolVersion.MqttV5,
     ),
     new Uint8Array([
       // fixedHeader
@@ -78,7 +78,7 @@ Deno.test('encodeAuthPacketWithProperties', function () {
           ],
         },
       },
-      Mqtt.ProtocolVersion.MQTT_V5,
+      Mqtt.ProtocolVersion.MqttV5,
     ),
     new Uint8Array([
       // fixedHeader
@@ -177,7 +177,7 @@ Deno.test('encodeAuthPacketWithAuthData', function () {
           authenticationData: new Uint8Array([0x01, 0x02, 0x03, 0x04]),
         },
       },
-      Mqtt.ProtocolVersion.MQTT_V5,
+      Mqtt.ProtocolVersion.MqttV5,
     ),
     new Uint8Array([
       // fixedHeader
@@ -218,7 +218,7 @@ Deno.test('decodeAuthPacketBasic', function () {
     parse(
       new Uint8Array([]), // empty buffer for no variable header
       0, // remainingLength
-      Mqtt.ProtocolVersion.MQTT_V5,
+      Mqtt.ProtocolVersion.MqttV5,
     ),
     {
       type: 'auth',
@@ -236,7 +236,7 @@ Deno.test('decodeAuthPacketWithReasonCode', function () {
         0x00, // properties length
       ]),
       2, // remainingLength
-      Mqtt.ProtocolVersion.MQTT_V5,
+      Mqtt.ProtocolVersion.MqttV5,
     ),
     {
       type: 'auth',
@@ -249,7 +249,7 @@ Deno.test('decodeAuthPacketWithReasonCode', function () {
 // MQTT 5.0 3.15.2.1): a Reason Code without a Property Length is a Malformed Packet.
 Deno.test('decodeAuthPacketWithReasonCodeAndNoPropertyLength', function () {
   assertThrows(
-    () => parse(new Uint8Array([0x18]), 1, Mqtt.ProtocolVersion.MQTT_V5),
+    () => parse(new Uint8Array([0x18]), 1, Mqtt.ProtocolVersion.MqttV5),
     MqttUtilsError.MalformedDataError,
     '1 bytes are needed at byte 1, but only 0 are left',
   );
@@ -338,7 +338,7 @@ Deno.test('decodeAuthPacketWithProperties', function () {
         0x32, // 'value2'
       ]),
       75, // remainingLength (1 + 1 + 73)
-      Mqtt.ProtocolVersion.MQTT_V5,
+      Mqtt.ProtocolVersion.MqttV5,
     ),
     {
       type: 'auth',
@@ -386,7 +386,7 @@ Deno.test('decodeAuthPacketWithAuthData', function () {
         0x04, // Auth data bytes
       ]),
       23, // remainingLength (1 + 22)
-      Mqtt.ProtocolVersion.MQTT_V5,
+      Mqtt.ProtocolVersion.MqttV5,
     ),
     {
       type: 'auth',
@@ -408,7 +408,7 @@ Deno.test('encodeAuthPacketWithEmptyProperties', function () {
         reasonCode: Mqtt.ReasonCode.Success,
         properties: {},
       },
-      Mqtt.ProtocolVersion.MQTT_V5,
+      Mqtt.ProtocolVersion.MqttV5,
     ),
     new Uint8Array([
       // fixedHeader
@@ -430,7 +430,7 @@ Deno.test('decodeAuthPacketWithEmptyProperties', function () {
         0x00, // properties length = 0
       ]),
       2, // remainingLength
-      Mqtt.ProtocolVersion.MQTT_V5,
+      Mqtt.ProtocolVersion.MqttV5,
     ),
     {
       type: 'auth',

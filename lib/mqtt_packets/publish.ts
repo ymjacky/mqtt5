@@ -8,7 +8,7 @@ export function toBytes(
   packet: PublishPacket,
   protocolVersion: Mqtt.ProtocolVersion,
 ): Uint8Array {
-  const qos = packet.qos || Mqtt.QoS.AT_MOST_ONCE;
+  const qos = packet.qos || Mqtt.QoS.AtMostOnce;
 
   const flags = // fixedHeader Flags
     (packet.dup ? 0b1000 : 0) + // dup
@@ -17,11 +17,11 @@ export function toBytes(
 
   const variableHeaderChunks: (Uint8Array | number[])[] = [stringToUtfEncodedString(packet.topic)]; // topic
 
-  if (packet.qos === Mqtt.QoS.AT_LEAST_ONCE || packet.qos === Mqtt.QoS.EXACTLY_ONCE) {
+  if (packet.qos === Mqtt.QoS.AtLeastOnce || packet.qos === Mqtt.QoS.ExactlyOnce) {
     variableHeaderChunks.push(numToTwoByteInteger(packet.packetId));
   }
 
-  if (protocolVersion > Mqtt.ProtocolVersion.MQTT_V3_1_1) {
+  if (protocolVersion > Mqtt.ProtocolVersion.MqttV3_1_1) {
     variableHeaderChunks.push(MqttProperties.propertiesToBytes(packet.properties));
   }
 
@@ -34,7 +34,7 @@ export function toBytes(
   }
 
   const fixedHeader = [
-    (Mqtt.PacketType.PUBLISH << 4) + flags,
+    (Mqtt.PacketType.Publish << 4) + flags,
     ...remainingLengthToBytes(variableHeader.length + payload.length),
   ];
 
@@ -57,8 +57,8 @@ export function parse(
   const reader = new ByteReader(buffer, remainingLength);
   const topic = reader.readUtf8EncodedString();
   // Only QoS 1 and QoS 2 have a packet ID.
-  const qosAndPacketId = qos === Mqtt.QoS.AT_MOST_ONCE ? { qos } : { qos, packetId: reader.readTwoByteInteger() };
-  const properties = protocolVersion > Mqtt.ProtocolVersion.MQTT_V3_1_1 ? readProperties(reader) : undefined;
+  const qosAndPacketId = qos === Mqtt.QoS.AtMostOnce ? { qos } : { qos, packetId: reader.readTwoByteInteger() };
+  const properties = protocolVersion > Mqtt.ProtocolVersion.MqttV3_1_1 ? readProperties(reader) : undefined;
 
   // payload: the rest of the packet
   const payload = reader.readRest();

@@ -164,7 +164,7 @@ export class TestWsBroker extends EventTarget {
     };
 
     // Packets after CONNECT are decoded with the protocol version the client connected with.
-    let protocolVersion: Mqtt.ProtocolVersion = Mqtt.ProtocolVersion.MQTT_V5;
+    let protocolVersion: Mqtt.ProtocolVersion = Mqtt.ProtocolVersion.MqttV5;
 
     conn.onmessage = (e: MessageEvent<unknown>) => {
       const receiveBytes = new Uint8Array(e.data as ArrayBuffer);
@@ -216,7 +216,7 @@ export class TestWsBroker extends EventTarget {
     const client = this.clients.get(clientId);
     if (client) { // found
       let packet: MqttPackets.ConnackPacket;
-      if (protocolVersion > Mqtt.ProtocolVersion.MQTT_V3_1_1) {
+      if (protocolVersion > Mqtt.ProtocolVersion.MqttV3_1_1) {
         packet = {
           type: 'connack',
           sessionPresent,
@@ -253,9 +253,9 @@ export class TestWsBroker extends EventTarget {
     const client = this.clients.get(clientId);
     if (client) { // found
       // Only QoS 1 and QoS 2 have a packet ID.
-      const qosAndPacketId = qos === Mqtt.QoS.AT_MOST_ONCE ? { qos } : { qos, packetId };
+      const qosAndPacketId = qos === Mqtt.QoS.AtMostOnce ? { qos } : { qos, packetId };
       let packet: MqttPackets.PublishPacket;
-      if (protocolVersion > Mqtt.ProtocolVersion.MQTT_V3_1_1) {
+      if (protocolVersion > Mqtt.ProtocolVersion.MqttV3_1_1) {
         packet = {
           type: 'publish',
           ...qosAndPacketId,
@@ -294,7 +294,7 @@ export class TestWsBroker extends EventTarget {
     const client = this.clients.get(clientId);
     if (client) { // found
       let packet: MqttPackets.PubackPacket;
-      if (protocolVersion > Mqtt.ProtocolVersion.MQTT_V3_1_1) {
+      if (protocolVersion > Mqtt.ProtocolVersion.MqttV3_1_1) {
         packet = {
           type: 'puback',
           packetId,
@@ -326,7 +326,7 @@ export class TestWsBroker extends EventTarget {
     const client = this.clients.get(clientId);
     if (client) { // found
       let packet: MqttPackets.PubrecPacket;
-      if (protocolVersion > Mqtt.ProtocolVersion.MQTT_V3_1_1) {
+      if (protocolVersion > Mqtt.ProtocolVersion.MqttV3_1_1) {
         packet = {
           type: 'pubrec',
           packetId,
@@ -358,7 +358,7 @@ export class TestWsBroker extends EventTarget {
     const client = this.clients.get(clientId);
     if (client) { // found
       let packet: MqttPackets.PubrelPacket;
-      if (protocolVersion > Mqtt.ProtocolVersion.MQTT_V3_1_1) {
+      if (protocolVersion > Mqtt.ProtocolVersion.MqttV3_1_1) {
         packet = {
           type: 'pubrel',
           packetId,
@@ -390,7 +390,7 @@ export class TestWsBroker extends EventTarget {
     const client = this.clients.get(clientId);
     if (client) { // found
       let packet: MqttPackets.PubcompPacket;
-      if (protocolVersion > Mqtt.ProtocolVersion.MQTT_V3_1_1) {
+      if (protocolVersion > Mqtt.ProtocolVersion.MqttV3_1_1) {
         packet = {
           type: 'pubcomp',
           packetId,
@@ -422,7 +422,7 @@ export class TestWsBroker extends EventTarget {
     const client = this.clients.get(clientId);
     if (client) { // found
       let packet: MqttPackets.SubackPacket;
-      if (protocolVersion > Mqtt.ProtocolVersion.MQTT_V3_1_1) {
+      if (protocolVersion > Mqtt.ProtocolVersion.MqttV3_1_1) {
         packet = {
           type: 'suback',
           packetId,
@@ -455,7 +455,7 @@ export class TestWsBroker extends EventTarget {
     const client = this.clients.get(clientId);
     if (client) { // found
       let packet: MqttPackets.UnsubackPacket;
-      if (protocolVersion > Mqtt.ProtocolVersion.MQTT_V3_1_1) {
+      if (protocolVersion > Mqtt.ProtocolVersion.MqttV3_1_1) {
         packet = {
           type: 'unsuback',
           packetId,
@@ -491,7 +491,7 @@ export class TestWsBroker extends EventTarget {
       };
 
       log(`sending packet`, packet);
-      const bytes = MqttPackets.packetToBytes(packet, Mqtt.ProtocolVersion.MQTT_V5);
+      const bytes = MqttPackets.packetToBytes(packet, Mqtt.ProtocolVersion.MqttV5);
       log(`sending bytes`, bytes);
 
       await client.conn.send(bytes);
@@ -511,7 +511,7 @@ export class TestWsBroker extends EventTarget {
       };
 
       log(`sending packet`, packet);
-      const bytes = MqttPackets.packetToBytes(packet, Mqtt.ProtocolVersion.MQTT_V5);
+      const bytes = MqttPackets.packetToBytes(packet, Mqtt.ProtocolVersion.MqttV5);
       log(`sending bytes`, bytes);
 
       await client.conn.send(bytes);

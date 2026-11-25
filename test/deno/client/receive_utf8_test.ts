@@ -41,16 +41,16 @@ function replaceBytes(bytes: Uint8Array, placeholder: string, replacement: numbe
 function publishBytes(
   topic: string,
   properties?: MqttPackets.PublishPacket['properties'],
-  protocolVersion: Mqtt.ProtocolVersion = Mqtt.ProtocolVersion.MQTT_V5,
+  protocolVersion: Mqtt.ProtocolVersion = Mqtt.ProtocolVersion.MqttV5,
 ): Uint8Array {
   return MqttPackets.packetToBytes(
-    { type: 'publish', topic, payload: new Uint8Array([0x78]), dup: false, retain: false, qos: Mqtt.QoS.AT_MOST_ONCE, properties },
+    { type: 'publish', topic, payload: new Uint8Array([0x78]), dup: false, retain: false, qos: Mqtt.QoS.AtMostOnce, properties },
     protocolVersion,
   );
 }
 
 /** The bytes of a QoS 0 PUBLISH whose Topic Name is `topic/` followed by `topicBytes`. */
-function publishWithTopicBytes(topicBytes: number[], protocolVersion: Mqtt.ProtocolVersion = Mqtt.ProtocolVersion.MQTT_V5): Uint8Array {
+function publishWithTopicBytes(topicBytes: number[], protocolVersion: Mqtt.ProtocolVersion = Mqtt.ProtocolVersion.MqttV5): Uint8Array {
   const placeholder = 'X'.repeat(topicBytes.length);
   return replaceBytes(publishBytes(`topic/${placeholder}`, undefined, protocolVersion), placeholder, topicBytes);
 }
@@ -144,7 +144,7 @@ Deno.test({ name: '@receive strings that are not valid UTF-8 Encoded Strings', o
 
   await context.step('MQTT 3.1.1: the client closes the connection without sending DISCONNECT', async () => {
     const broker = new TestBroker();
-    const client = new MqttClient({ clientId: 'cid', logger, protocolVersion: Mqtt.ProtocolVersion.MQTT_V3_1_1 });
+    const client = new MqttClient({ clientId: 'cid', logger, protocolVersion: Mqtt.ProtocolVersion.MqttV3_1_1 });
     try {
       broker.listen();
       acceptConnect(broker);
@@ -152,7 +152,7 @@ Deno.test({ name: '@receive strings that are not valid UTF-8 Encoded Strings', o
       await client.connect();
 
       // [MQTT-1.5.3-1] ill-formed UTF-8: the client closes the Network Connection.
-      await broker.sendRawBytes('cid', publishWithTopicBytes([0xFF], Mqtt.ProtocolVersion.MQTT_V3_1_1));
+      await broker.sendRawBytes('cid', publishWithTopicBytes([0xFF], Mqtt.ProtocolVersion.MqttV3_1_1));
       await waitFor(() => recorded.closed, 'the close');
       assertEquals(recorded.disconnects, []);
       assertEquals(recorded.topics, []);

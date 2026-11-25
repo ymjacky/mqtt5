@@ -9,28 +9,28 @@ export function toBytes(
   protocolVersion: Mqtt.ProtocolVersion,
 ): Uint8Array {
   const variableHeaderChunks: (Uint8Array | number[])[] = [numToTwoByteInteger(packet.packetId)]; //packetId
-  if (protocolVersion > Mqtt.ProtocolVersion.MQTT_V3_1_1) {
+  if (protocolVersion > Mqtt.ProtocolVersion.MqttV3_1_1) {
     // MQTT V5.0
     variableHeaderChunks.push(MqttProperties.propertiesToBytes(packet.properties));
   }
 
   const variableHeader = concatBytes(variableHeaderChunks);
 
-  if (protocolVersion > Mqtt.ProtocolVersion.MQTT_V3_1_1) {
+  if (protocolVersion > Mqtt.ProtocolVersion.MqttV3_1_1) {
     const payload = packet.reasonCodes;
     if (payload === undefined) {
       throw new Error('UNSUBACK has no reasonCodes');
     }
 
     const fixedHeader = [
-      (Mqtt.PacketType.UNSUBACK << 4) + Mqtt.fixedHeaderFlag.UNSUBACK,
+      (Mqtt.PacketType.Unsuback << 4) + Mqtt.FixedHeaderFlag.Unsuback,
       ...remainingLengthToBytes(variableHeader.length + payload.length),
     ];
 
     return concatBytes([fixedHeader, variableHeader, payload]);
   } else {
     const fixedHeader = [
-      (Mqtt.PacketType.UNSUBACK << 4) + Mqtt.fixedHeaderFlag.UNSUBACK,
+      (Mqtt.PacketType.Unsuback << 4) + Mqtt.FixedHeaderFlag.Unsuback,
       ...remainingLengthToBytes(variableHeader.length),
     ];
 
@@ -46,7 +46,7 @@ export function parse(
   const reader = new ByteReader(buffer, remainingLength);
   const packetId = reader.readTwoByteInteger();
 
-  if (protocolVersion === Mqtt.ProtocolVersion.MQTT_V3_1_1) {
+  if (protocolVersion === Mqtt.ProtocolVersion.MqttV3_1_1) {
     // MQTT 3.1.1 UNSUBACK has only the Packet Identifier.
     reader.expectEnd('UNSUBACK');
     return {

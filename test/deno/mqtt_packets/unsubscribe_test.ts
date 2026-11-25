@@ -11,7 +11,7 @@ Deno.test('encodeUnsubscribePacket', function () {
         packetId: 1,
         topicFilters: ['a/b', 'c/d'],
       },
-      Mqtt.ProtocolVersion.MQTT_V3_1_1, // ProtocolVersion
+      Mqtt.ProtocolVersion.MqttV3_1_1, // ProtocolVersion
     ),
     new Uint8Array([
       // fixedHeader
@@ -49,7 +49,7 @@ Deno.test('encodeUnsubscribePacketMQTT5', function () {
           ],
         },
       },
-      Mqtt.ProtocolVersion.MQTT_V5, // ProtocolVersion
+      Mqtt.ProtocolVersion.MqttV5, // ProtocolVersion
     ),
     new Uint8Array([
       // fixedHeader
@@ -114,7 +114,7 @@ Deno.test('encodeUnsubscribePacketMQTT5NoProperties', function () {
         packetId: 1,
         topicFilters: ['a/b', 'c/d'],
       },
-      Mqtt.ProtocolVersion.MQTT_V5, // ProtocolVersion
+      Mqtt.ProtocolVersion.MqttV5, // ProtocolVersion
     ),
     new Uint8Array([
       // fixedHeader
@@ -159,7 +159,7 @@ Deno.test('decodeUnsubscribePacket', function () {
         100, // 'd'
       ]),
       12, // remainingLength
-      Mqtt.ProtocolVersion.MQTT_V3_1_1, // ProtocolVersion
+      Mqtt.ProtocolVersion.MqttV3_1_1, // ProtocolVersion
     ),
     {
       type: 'unsubscribe',
@@ -227,7 +227,7 @@ Deno.test('decodeUnsubscribePacketMQTT5', function () {
     parse(
       buffer,
       remainingLength,
-      Mqtt.ProtocolVersion.MQTT_V5, // ProtocolVersion
+      Mqtt.ProtocolVersion.MqttV5, // ProtocolVersion
     ),
     {
       type: 'unsubscribe',
@@ -265,7 +265,7 @@ Deno.test('decodeUnsubscribePacketMQTT5NoProperties', function () {
         100, // 'd'
       ]),
       13, // remainingLength
-      Mqtt.ProtocolVersion.MQTT_V5, // ProtocolVersion
+      Mqtt.ProtocolVersion.MqttV5, // ProtocolVersion
     ),
     {
       type: 'unsubscribe',

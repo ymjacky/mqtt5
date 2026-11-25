@@ -10,7 +10,7 @@ async function main() {
     clientId: 'clientA',
     logger: logger,
     clean: true,
-    protocolVersion: Mqtt.ProtocolVersion.MQTT_V5,
+    protocolVersion: Mqtt.ProtocolVersion.MqttV5,
     keepAlive: 30,
   });
 

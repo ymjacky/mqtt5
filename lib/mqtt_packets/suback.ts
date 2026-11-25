@@ -9,7 +9,7 @@ export function toBytes(
   protocolVersion: Mqtt.ProtocolVersion,
 ): Uint8Array {
   const variableHeaderChunks: (Uint8Array | number[])[] = [numToTwoByteInteger(packet.packetId)]; //packetId
-  if (protocolVersion > Mqtt.ProtocolVersion.MQTT_V3_1_1) {
+  if (protocolVersion > Mqtt.ProtocolVersion.MqttV3_1_1) {
     // MQTT V5.0
     variableHeaderChunks.push(MqttProperties.propertiesToBytes(packet.properties));
   }
@@ -17,13 +17,13 @@ export function toBytes(
   const variableHeader = concatBytes(variableHeaderChunks);
 
   // MQTT 5.0 SUBACK has Reason Codes, MQTT 3.1.1 SUBACK has Return Codes.
-  const payload = (protocolVersion > Mqtt.ProtocolVersion.MQTT_V3_1_1) ? packet.reasonCodes : packet.returnCodes;
+  const payload = (protocolVersion > Mqtt.ProtocolVersion.MqttV3_1_1) ? packet.reasonCodes : packet.returnCodes;
   if (payload === undefined) {
-    throw new Error(`SUBACK has no ${protocolVersion > Mqtt.ProtocolVersion.MQTT_V3_1_1 ? 'reasonCodes' : 'returnCodes'}`);
+    throw new Error(`SUBACK has no ${protocolVersion > Mqtt.ProtocolVersion.MqttV3_1_1 ? 'reasonCodes' : 'returnCodes'}`);
   }
 
   const fixedHeader = [
-    (Mqtt.PacketType.SUBACK << 4) + Mqtt.fixedHeaderFlag.SUBACK,
+    (Mqtt.PacketType.Suback << 4) + Mqtt.FixedHeaderFlag.Suback,
     ...remainingLengthToBytes(variableHeader.length + payload.length),
   ];
 
@@ -38,7 +38,7 @@ export function parse(
   const reader = new ByteReader(buffer, remainingLength);
   const packetId = reader.readTwoByteInteger();
 
-  if (protocolVersion === Mqtt.ProtocolVersion.MQTT_V3_1_1) {
+  if (protocolVersion === Mqtt.ProtocolVersion.MqttV3_1_1) {
     return {
       type: 'suback',
       packetId,

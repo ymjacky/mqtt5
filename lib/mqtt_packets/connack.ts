@@ -21,7 +21,7 @@ export function toBytes(
   const variableHeader = concatBytes(variableHeaderChunks);
 
   const fixedHeader = [
-    (Mqtt.PacketType.CONNACK << 4) + Mqtt.fixedHeaderFlag.CONNACK,
+    (Mqtt.PacketType.Connack << 4) + Mqtt.FixedHeaderFlag.Connack,
     ...remainingLengthToBytes(variableHeader.length),
   ];
 
@@ -37,7 +37,7 @@ export function parse(
   const sessionPresent = (reader.readByte() & 0b00000001) !== 0;
   const rc = reader.readByte();
 
-  if (protocolVersion === Mqtt.ProtocolVersion.MQTT_V3_1_1) {
+  if (protocolVersion === Mqtt.ProtocolVersion.MqttV3_1_1) {
     reader.expectEnd('CONNACK');
     return {
       type: 'connack',

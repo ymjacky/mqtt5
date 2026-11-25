@@ -37,7 +37,7 @@ Deno.test({ name: '@unsubscribe', only: false }, async (context) => {
           broker.sendUnsuback(
             'cid',
             packet.packetId,
-            Mqtt.ProtocolVersion.MQTT_V5,
+            Mqtt.ProtocolVersion.MqttV5,
             [Mqtt.ReasonCode.Success],
           );
         });
@@ -68,7 +68,7 @@ Deno.test({ name: '@unsubscribe', only: false }, async (context) => {
           clean: true,
           connectTimeoutMS: 10000,
           keepAlive: 10,
-          protocolVersion: Mqtt.ProtocolVersion.MQTT_V3_1_1,
+          protocolVersion: Mqtt.ProtocolVersion.MqttV3_1_1,
         });
 
         await client.connect();
@@ -82,7 +82,7 @@ Deno.test({ name: '@unsubscribe', only: false }, async (context) => {
           broker.sendUnsuback(
             'cid',
             packet.packetId,
-            Mqtt.ProtocolVersion.MQTT_V3_1_1,
+            Mqtt.ProtocolVersion.MqttV3_1_1,
           );
         });
         const result = await client.unsubscribe('topicA');
@@ -129,7 +129,7 @@ Deno.test({ name: '@unsubscribe', only: false }, async (context) => {
           broker.sendUnsuback(
             'cid',
             packet.packetId,
-            Mqtt.ProtocolVersion.MQTT_V5,
+            Mqtt.ProtocolVersion.MqttV5,
             [Mqtt.ReasonCode.Success, Mqtt.ReasonCode.Success, Mqtt.ReasonCode.Success, Mqtt.ReasonCode.UnspecifiedError],
           );
         });
@@ -171,7 +171,7 @@ Deno.test({ name: '@unsubscribe', only: false }, async (context) => {
           clean: true,
           connectTimeoutMS: 10000,
           keepAlive: 10,
-          protocolVersion: Mqtt.ProtocolVersion.MQTT_V3_1_1,
+          protocolVersion: Mqtt.ProtocolVersion.MqttV3_1_1,
         });
 
         await client.connect();
@@ -189,7 +189,7 @@ Deno.test({ name: '@unsubscribe', only: false }, async (context) => {
           broker.sendUnsuback(
             'cid',
             packet.packetId,
-            Mqtt.ProtocolVersion.MQTT_V3_1_1,
+            Mqtt.ProtocolVersion.MqttV3_1_1,
           );
         });
 
@@ -258,7 +258,7 @@ Deno.test({ name: '@unsubscribe', only: false }, async (context) => {
           broker.sendUnsuback(
             'cid',
             packet.packetId,
-            Mqtt.ProtocolVersion.MQTT_V5,
+            Mqtt.ProtocolVersion.MqttV5,
             [Mqtt.ReasonCode.Success],
           );
         });
@@ -331,7 +331,7 @@ Deno.test({ name: '@unsubscribe', only: false }, async (context) => {
           broker.sendUnsuback(
             'cid',
             packet.packetId,
-            Mqtt.ProtocolVersion.MQTT_V5,
+            Mqtt.ProtocolVersion.MqttV5,
             [Mqtt.ReasonCode.Success, Mqtt.ReasonCode.Success, Mqtt.ReasonCode.Success, Mqtt.ReasonCode.UnspecifiedError],
             unsubackProperties,
           );
@@ -373,7 +373,7 @@ Deno.test({ name: '@receive malformed unsuback', only: false }, async (context) 
           clean: false,
           connectTimeoutMS: 10000,
           keepAlive: 10,
-          protocolVersion: Mqtt.ProtocolVersion.MQTT_V5,
+          protocolVersion: Mqtt.ProtocolVersion.MqttV5,
         });
 
         broker.on('connect', (event) => {
@@ -465,7 +465,7 @@ Deno.test({ name: '@unsubscribe invalid arguments', only: false }, async (contex
         broker.on('unsubscribe', (event) => {
           const packet = event.detail;
           received.push({ packetId: packet.packetId, topicFilters: packet.topicFilters });
-          broker.sendUnsuback('cid', packet.packetId, Mqtt.ProtocolVersion.MQTT_V5, [Mqtt.ReasonCode.Success]);
+          broker.sendUnsuback('cid', packet.packetId, Mqtt.ProtocolVersion.MqttV5, [Mqtt.ReasonCode.Success]);
         });
 
         await assertRejects(() => client.unsubscribe([]), ClientErrors.InvalidArgumentError);

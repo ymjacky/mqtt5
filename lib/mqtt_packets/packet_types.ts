@@ -53,7 +53,7 @@ export type PublishPacketWithoutId = {
   payload: Uint8Array;
   dup: boolean;
   retain: boolean;
-  /** `Mqtt.QoS.AT_MOST_ONCE`. */
+  /** `Mqtt.QoS.AtMostOnce`. */
   qos: 0;
   /** QoS 0 has no packet ID. */
   packetId?: undefined;
@@ -67,7 +67,7 @@ export type PublishPacketWithId = {
   payload: Uint8Array;
   dup: boolean;
   retain: boolean;
-  /** `Mqtt.QoS.AT_LEAST_ONCE` or `Mqtt.QoS.EXACTLY_ONCE`. */
+  /** `Mqtt.QoS.AtLeastOnce` or `Mqtt.QoS.ExactlyOnce`. */
   qos: 1 | 2;
   packetId: number;
   properties?: MqttProperties.PublishProperties;

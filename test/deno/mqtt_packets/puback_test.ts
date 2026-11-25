@@ -9,7 +9,7 @@ Deno.test('encodePubackPacket', function () {
     toBytes({
       type: 'puback',
       packetId: 1337,
-    }, Mqtt.ProtocolVersion.MQTT_V3_1_1),
+    }, Mqtt.ProtocolVersion.MqttV3_1_1),
     new Uint8Array([
       // fixedHeader
       0x40, // packetType + flags
@@ -28,7 +28,7 @@ Deno.test('encodePubackPacketMQTT5WithSuccessReasonCode', function () {
       type: 'puback',
       packetId: 1337,
       reasonCode: Mqtt.ReasonCode.Success,
-    }, Mqtt.ProtocolVersion.MQTT_V5),
+    }, Mqtt.ProtocolVersion.MqttV5),
     new Uint8Array([
       // fixedHeader
       0x40, // packetType + flags
@@ -48,7 +48,7 @@ Deno.test('encodePubackPacketMQTT5WithErrorReasonCode', function () {
       type: 'puback',
       packetId: 1337,
       reasonCode: Mqtt.ReasonCode.NotAuthorized,
-    }, Mqtt.ProtocolVersion.MQTT_V5),
+    }, Mqtt.ProtocolVersion.MqttV5),
     new Uint8Array([
       // fixedHeader
       0x40, // packetType + flags
@@ -74,7 +74,7 @@ Deno.test('encodePubackPacketMQTT5WithProperties', function () {
           { key: 'topic', val: 'restricted/topic' },
         ],
       },
-    }, Mqtt.ProtocolVersion.MQTT_V5),
+    }, Mqtt.ProtocolVersion.MqttV5),
     new Uint8Array([
       // fixedHeader
       0x40, // packetType + flags
@@ -153,7 +153,7 @@ Deno.test('decodePubackPacket', function () {
         57, // id LSB
       ]),
       2, // remainingLength
-      Mqtt.ProtocolVersion.MQTT_V3_1_1, // ProtocolVersion
+      Mqtt.ProtocolVersion.MqttV3_1_1, // ProtocolVersion
     ),
     {
       type: 'puback',
@@ -173,7 +173,7 @@ Deno.test('decodePubackPacketMQTT5WithReasonCode', function () {
         0x87, // reasonCode = NotAuthorized (135)
       ]),
       3, // remainingLength
-      Mqtt.ProtocolVersion.MQTT_V5, // ProtocolVersion
+      Mqtt.ProtocolVersion.MqttV5, // ProtocolVersion
     ),
     {
       type: 'puback',
@@ -250,7 +250,7 @@ Deno.test('decodePubackPacketMQTT5WithProperties', function () {
         99, // 'restricted/topic'
       ]),
       58, // remainingLength (packetId: 2 bytes + reasonCode: 1 byte + properties length: 1 byte + properties: 54 bytes = 58 bytes)
-      Mqtt.ProtocolVersion.MQTT_V5, // ProtocolVersion
+      Mqtt.ProtocolVersion.MqttV5, // ProtocolVersion
     ),
     {
       type: 'puback',
@@ -268,6 +268,6 @@ Deno.test('decodePubackPacketMQTT5WithProperties', function () {
 
 // Test handling of short PUBACK packets (error cases)
 Deno.test('decodeShortPubackPackets', function () {
-  assertThrows(() => parse(Uint8Array.from([]), 0, Mqtt.ProtocolVersion.MQTT_V3_1_1));
-  assertThrows(() => parse(Uint8Array.from([5]), 1, Mqtt.ProtocolVersion.MQTT_V3_1_1));
+  assertThrows(() => parse(Uint8Array.from([]), 0, Mqtt.ProtocolVersion.MqttV3_1_1));
+  assertThrows(() => parse(Uint8Array.from([5]), 1, Mqtt.ProtocolVersion.MqttV3_1_1));
 });

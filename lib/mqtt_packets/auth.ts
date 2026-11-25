@@ -23,7 +23,7 @@ export function toBytes(
   const variableHeader = concatBytes(variableHeaderChunks);
 
   const fixedHeader = [
-    (Mqtt.PacketType.AUTH << 4) + Mqtt.fixedHeaderFlag.AUTH,
+    (Mqtt.PacketType.Auth << 4) + Mqtt.FixedHeaderFlag.Auth,
     ...remainingLengthToBytes(variableHeader.length),
   ];
 

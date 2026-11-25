@@ -6,7 +6,7 @@ import { assertEquals, assertRejects, assertThrows } from '@std/assert';
 function publishPacketOfSize(size: number): MqttPackets.PublishPacketWithId {
   const packet = publishPacket(1, '');
   const encodedSize = (payloadLength: number) =>
-    MqttPackets.packetToBytes({ ...packet, payload: new Uint8Array(payloadLength) }, Mqtt.ProtocolVersion.MQTT_V5).length;
+    MqttPackets.packetToBytes({ ...packet, payload: new Uint8Array(payloadLength) }, Mqtt.ProtocolVersion.MqttV5).length;
   let payloadLength = size - encodedSize(0);
   payloadLength -= encodedSize(payloadLength) - size; // the Remaining Length takes more bytes with the payload
   packet.payload = new Uint8Array(payloadLength);
@@ -54,7 +54,7 @@ Deno.test({ name: '@KvOutgoingStore', only: false }, async (context) => {
     try {
       const before = kvStore(kv, 'cid');
       await before.store(publishPacket(3, 'A'));
-      await before.store(publishPacket(1, 'B', Mqtt.QoS.EXACTLY_ONCE));
+      await before.store(publishPacket(1, 'B', Mqtt.QoS.ExactlyOnce));
       await before.store(publishPacket(2, 'C'));
       await before.discard(3); // the first position is free again
 
@@ -150,7 +150,7 @@ Deno.test({ name: '@KvOutgoingStore', only: false }, async (context) => {
       await store.store(packet);
       // MQTT 3.1.1: PUBLISH has no properties, and is one byte longer when it is stored.
       const v311 = { ...publishPacketOfSize(store.maximumPacketSize + 1), packetId: 2 };
-      assertEquals(MqttPackets.packetToBytes(v311, Mqtt.ProtocolVersion.MQTT_V3_1_1).length, store.maximumPacketSize);
+      assertEquals(MqttPackets.packetToBytes(v311, Mqtt.ProtocolVersion.MqttV3_1_1).length, store.maximumPacketSize);
       await store.store(v311);
 
       const sizes: number[] = [];
@@ -185,7 +185,7 @@ Deno.test({ name: '@KvOutgoingStore', only: false }, async (context) => {
       const packet = publishPacket(1, 'A');
       await store.store(packet);
       const entry = await kv.get<{ seq: number; bytes: Uint8Array }>(['mqtt5', 'cid', 'outgoing', 1]);
-      assertEquals(entry.value, { seq: 1, bytes: MqttPackets.packetToBytes(packet, Mqtt.ProtocolVersion.MQTT_V5) });
+      assertEquals(entry.value, { seq: 1, bytes: MqttPackets.packetToBytes(packet, Mqtt.ProtocolVersion.MqttV5) });
     } finally {
       kv.close();
     }
@@ -195,7 +195,7 @@ Deno.test({ name: '@KvOutgoingStore', only: false }, async (context) => {
     const kv = await Deno.openKv(':memory:');
     try {
       await kvStore(kv, 'cid').store(publishPacket(2, 'A'));
-      const bytes = MqttPackets.packetToBytes(publishPacket(5, 'B'), Mqtt.ProtocolVersion.MQTT_V5);
+      const bytes = MqttPackets.packetToBytes(publishPacket(5, 'B'), Mqtt.ProtocolVersion.MqttV5);
       await kv.set(['mqtt5', 'cid', 'outgoing', 1], 'not an entry');
       await kv.set(['mqtt5', 'cid', 'outgoing', 3], { seq: 9, bytes: new Uint8Array([1, 2, 3]) }); // not a packet
       await kv.set(['mqtt5', 'cid', 'outgoing', 4], { seq: 9, bytes }); // the packet ID is not the one of the key

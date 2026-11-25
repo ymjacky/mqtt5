@@ -11,12 +11,12 @@ function publishBytes(topic: string, payload: Uint8Array): Uint8Array {
     {
       type: 'publish',
       topic,
-      qos: Mqtt.QoS.AT_MOST_ONCE,
+      qos: Mqtt.QoS.AtMostOnce,
       dup: false,
       retain: false,
       payload,
     },
-    Mqtt.ProtocolVersion.MQTT_V5,
+    Mqtt.ProtocolVersion.MqttV5,
   );
 }
 

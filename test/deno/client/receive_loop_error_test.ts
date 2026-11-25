@@ -41,8 +41,8 @@ class FramingFailingClient extends MqttClient {
 
 /** A QoS 0 PUBLISH (MQTT 5.0). */
 const publish = MqttPackets.packetToBytes(
-  { type: 'publish', topic: 'a', payload: new Uint8Array([0x78]), dup: false, retain: false, qos: Mqtt.QoS.AT_MOST_ONCE },
-  Mqtt.ProtocolVersion.MQTT_V5,
+  { type: 'publish', topic: 'a', payload: new Uint8Array([0x78]), dup: false, retain: false, qos: Mqtt.QoS.AtMostOnce },
+  Mqtt.ProtocolVersion.MqttV5,
 );
 
 /** Connects `client` to `server`, which accepts the connection. Returns the connection on the side of the server. */

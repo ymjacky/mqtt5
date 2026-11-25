@@ -17,7 +17,7 @@ Deno.test('encodePublishPacket', function () {
         retain: false,
         qos: 0,
       },
-      Mqtt.ProtocolVersion.MQTT_V3_1_1,
+      Mqtt.ProtocolVersion.MqttV3_1_1,
     ),
     new Uint8Array([
       // fixedHeader
@@ -54,7 +54,7 @@ Deno.test('encodePublishPacketWithQoS1', function () {
         qos: 1,
         packetId: 42,
       },
-      Mqtt.ProtocolVersion.MQTT_V3_1_1,
+      Mqtt.ProtocolVersion.MqttV3_1_1,
     ),
     new Uint8Array([
       // fixedHeader
@@ -95,7 +95,7 @@ Deno.test('encodePublishPacketMQTT5WithTopicAlias', function () {
           topicAlias: 5,
         },
       },
-      Mqtt.ProtocolVersion.MQTT_V5,
+      Mqtt.ProtocolVersion.MqttV5,
     ),
     new Uint8Array([
       // fixedHeader
@@ -139,7 +139,7 @@ Deno.test('encodePublishPacketMQTT5WithPayloadFormatIndicator', function () {
           payloadFormatIndicator: 1, // 1 = UTF-8 encoded data
         },
       },
-      Mqtt.ProtocolVersion.MQTT_V5,
+      Mqtt.ProtocolVersion.MqttV5,
     ),
     new Uint8Array([
       // fixedHeader
@@ -189,7 +189,7 @@ Deno.test('encodePublishPacketMQTT5WithMultipleProperties', function () {
           ],
         },
       },
-      Mqtt.ProtocolVersion.MQTT_V5,
+      Mqtt.ProtocolVersion.MqttV5,
     ),
     new Uint8Array([
       // fixedHeader
@@ -304,7 +304,7 @@ Deno.test('decodePublishPacket', function () {
         100, // 'd'
       ]),
       12, // remainingLength
-      Mqtt.ProtocolVersion.MQTT_V3_1_1,
+      Mqtt.ProtocolVersion.MqttV3_1_1,
     ),
     {
       type: 'publish',
@@ -350,7 +350,7 @@ Deno.test('decodePublishPacketWithQoS1', function () {
         100, // 'd'
       ]),
       14, // remainingLength
-      Mqtt.ProtocolVersion.MQTT_V3_1_1,
+      Mqtt.ProtocolVersion.MqttV3_1_1,
     ),
     {
       type: 'publish',
@@ -400,7 +400,7 @@ Deno.test('decodePublishPacketMQTT5WithTopicAlias', function () {
         100, // 'd'
       ]),
       16, // remainingLength
-      Mqtt.ProtocolVersion.MQTT_V5,
+      Mqtt.ProtocolVersion.MqttV5,
     ),
     {
       type: 'publish',
@@ -515,7 +515,7 @@ Deno.test('decodePublishPacketMQTT5WithMultipleProperties', function () {
         53, // '25.5'
       ]),
       80, // remainingLength
-      Mqtt.ProtocolVersion.MQTT_V5,
+      Mqtt.ProtocolVersion.MqttV5,
     ),
     {
       type: 'publish',
@@ -568,7 +568,7 @@ Deno.test('decodePublishPacketWithExtraBytes', function () {
         99, // 'c'
       ]),
       15,
-      Mqtt.ProtocolVersion.MQTT_V3_1_1,
+      Mqtt.ProtocolVersion.MqttV3_1_1,
     ),
     {
       type: 'publish',
@@ -612,7 +612,7 @@ Deno.test('encodeAndDecodePublishPacketWithLargePayload', function () {
       retain: false,
       qos: 0,
     },
-    Mqtt.ProtocolVersion.MQTT_V3_1_1,
+    Mqtt.ProtocolVersion.MqttV3_1_1,
   );
 
   // fixedHeader = packetType/flags byte (1) + remainingLength (variable byte integer, 3 bytes for this size)
@@ -625,7 +625,7 @@ Deno.test('encodeAndDecodePublishPacketWithLargePayload', function () {
     0b0000, // packetFlag
     encoded.slice(fixedHeaderSize), // skip fixedHeader
     remainingLength,
-    Mqtt.ProtocolVersion.MQTT_V3_1_1,
+    Mqtt.ProtocolVersion.MqttV3_1_1,
   );
 
   assertEquals(decoded.topic, 'a/b');
@@ -655,7 +655,7 @@ Deno.test('decodePublishPacketMQTT5WithMultipleSubscriptionIdentifiers', functio
       120, // 'x'
     ]),
     11, // remainingLength
-    Mqtt.ProtocolVersion.MQTT_V5,
+    Mqtt.ProtocolVersion.MqttV5,
   );
 
   assertEquals(packet.properties, { subscriptionIdentifiers: [1, 42] });
@@ -678,7 +678,7 @@ Deno.test('encodePublishPacketMQTT5WithMultipleSubscriptionIdentifiers', functio
           subscriptionIdentifiers: [1, 42],
         },
       },
-      Mqtt.ProtocolVersion.MQTT_V5,
+      Mqtt.ProtocolVersion.MqttV5,
     ),
     Uint8Array.from([
       // fixedHeader
@@ -708,7 +708,7 @@ Deno.test('encodePublishPacketTooLarge', function () {
     () =>
       toBytes(
         { type: 'publish', topic: 't', payload: new Uint8Array(268_435_455), dup: false, retain: false, qos: 0 },
-        Mqtt.ProtocolVersion.MQTT_V5,
+        Mqtt.ProtocolVersion.MqttV5,
       ),
     MqttUtilsError.RemainingLengthError,
   );
@@ -730,7 +730,7 @@ Deno.test('decodePublishPacketKeepsU+FEFFAtTheStartOfTheTopic', function () {
       120, // 'x'
     ]),
     7, // remainingLength
-    Mqtt.ProtocolVersion.MQTT_V3_1_1,
+    Mqtt.ProtocolVersion.MqttV3_1_1,
   );
 
   assertEquals(packet.topic, '\u{FEFF}a');
@@ -749,7 +749,7 @@ Deno.test('decodePublishPacketWithAnInvalidTopic', function () {
       ...topicBytes,
       120, // payload 'x'
     ]);
-    const error = assertThrows(() => decode(bytes, Mqtt.ProtocolVersion.MQTT_V5), MqttPacketsError.MqttPacketParseError);
+    const error = assertThrows(() => decode(bytes, Mqtt.ProtocolVersion.MqttV5), MqttPacketsError.MqttPacketParseError);
     assertInstanceOf(error.cause, MqttUtilsError.InvalidUtf8EncodedStringError, JSON.stringify(topicBytes));
   }
 });

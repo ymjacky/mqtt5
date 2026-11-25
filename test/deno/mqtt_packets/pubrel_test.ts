@@ -11,7 +11,7 @@ Deno.test('encodePubrelPacket', function () {
         type: 'pubrel',
         packetId: 1337,
       },
-      Mqtt.ProtocolVersion.MQTT_V3_1_1, // ProtocolVersion
+      Mqtt.ProtocolVersion.MqttV3_1_1, // ProtocolVersion
     ),
     new Uint8Array([
       // fixedHeader
@@ -33,7 +33,7 @@ Deno.test('encodePubrelPacketMQTT5WithSuccessReasonCode', function () {
         packetId: 1337,
         reasonCode: Mqtt.ReasonCode.Success,
       },
-      Mqtt.ProtocolVersion.MQTT_V5,
+      Mqtt.ProtocolVersion.MqttV5,
     ),
     new Uint8Array([
       // fixedHeader
@@ -56,7 +56,7 @@ Deno.test('encodePubrelPacketMQTT5WithErrorReasonCode', function () {
         packetId: 1337,
         reasonCode: Mqtt.ReasonCode.PacketIdentifierNotFound,
       },
-      Mqtt.ProtocolVersion.MQTT_V5,
+      Mqtt.ProtocolVersion.MqttV5,
     ),
     new Uint8Array([
       // fixedHeader
@@ -85,7 +85,7 @@ Deno.test('encodePubrelPacketMQTT5WithProperties', function () {
           ],
         },
       },
-      Mqtt.ProtocolVersion.MQTT_V5,
+      Mqtt.ProtocolVersion.MqttV5,
     ),
     new Uint8Array([
       // fixedHeader
@@ -169,7 +169,7 @@ Deno.test('decodePubrelPacket', function () {
         57, // id LSB
       ]),
       2, // remainingLength
-      Mqtt.ProtocolVersion.MQTT_V3_1_1, // ProtocolVersion
+      Mqtt.ProtocolVersion.MqttV3_1_1, // ProtocolVersion
     ),
     {
       type: 'pubrel',
@@ -189,7 +189,7 @@ Deno.test('decodePubrelPacketMQTT5WithReasonCode', function () {
         0x92, // reasonCode = PacketIdentifierNotFound (146)
       ]),
       3, // remainingLength
-      Mqtt.ProtocolVersion.MQTT_V5, // ProtocolVersion
+      Mqtt.ProtocolVersion.MqttV5, // ProtocolVersion
     ),
     {
       type: 'pubrel',
@@ -270,7 +270,7 @@ Deno.test('decodePubrelPacketMQTT5WithProperties', function () {
         51, // 'mqtt-client-123'
       ]),
       62, // remainingLength (packetId: 2 bytes + reasonCode: 1 byte + properties length: 1 byte + properties: 58 bytes = 62 bytes)
-      Mqtt.ProtocolVersion.MQTT_V5, // ProtocolVersion
+      Mqtt.ProtocolVersion.MqttV5, // ProtocolVersion
     ),
     {
       type: 'pubrel',
@@ -288,6 +288,6 @@ Deno.test('decodePubrelPacketMQTT5WithProperties', function () {
 
 // Test handling of short PUBREL packets (error cases)
 Deno.test('decodeShortPubrelPackets', function () {
-  assertThrows(() => parse(Uint8Array.from([]), 0, Mqtt.ProtocolVersion.MQTT_V3_1_1));
-  assertThrows(() => parse(Uint8Array.from([5]), 1, Mqtt.ProtocolVersion.MQTT_V3_1_1));
+  assertThrows(() => parse(Uint8Array.from([]), 0, Mqtt.ProtocolVersion.MqttV3_1_1));
+  assertThrows(() => parse(Uint8Array.from([5]), 1, Mqtt.ProtocolVersion.MqttV3_1_1));
 });

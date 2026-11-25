@@ -224,7 +224,7 @@ Deno.test({ name: '@manipulation', only: false }, async (context) => {
         await client.publish(
           'topicA',
           bigData,
-          { qos: Mqtt.QoS.AT_LEAST_ONCE },
+          { qos: Mqtt.QoS.AtLeastOnce },
         ).catch((err: Error) => {
           assert(err instanceof ClientErrors.PacketTooLargeError);
           resolve();
@@ -282,7 +282,7 @@ Deno.test({ name: '@manipulation', only: false }, async (context) => {
         await client.publish(
           'topicA',
           new TextEncoder().encode('payloadA'),
-          { qos: Mqtt.QoS.AT_LEAST_ONCE },
+          { qos: Mqtt.QoS.AtLeastOnce },
         ).catch((err: Error) => {
           assert(err instanceof ClientErrors.StateIsNotOnlineError);
           resolve();
@@ -332,7 +332,7 @@ Deno.test({ name: '@manipulation', only: false }, async (context) => {
         await client.publish(
           'topicA',
           new TextEncoder().encode('payloadA'),
-          { qos: Mqtt.QoS.AT_LEAST_ONCE },
+          { qos: Mqtt.QoS.AtLeastOnce },
         ).catch((err: Error) => {
           assert(err instanceof ClientErrors.StateIsNotOnlineError);
           resolve();
@@ -372,7 +372,7 @@ Deno.test({ name: '@manipulation', only: false }, async (context) => {
           resolve();
         });
         broker.on('connect', () => {
-          broker.sendConnack(client.clientId, false, Mqtt.ProtocolVersion.MQTT_V5);
+          broker.sendConnack(client.clientId, false, Mqtt.ProtocolVersion.MqttV5);
         });
 
         client.connect();
@@ -408,7 +408,7 @@ Deno.test({ name: '@manipulation', only: false }, async (context) => {
         });
 
         broker.on('connect', () => {
-          broker.sendConnack(client.clientId, false, Mqtt.ProtocolVersion.MQTT_V5);
+          broker.sendConnack(client.clientId, false, Mqtt.ProtocolVersion.MqttV5);
           resolve();
         });
 
@@ -416,7 +416,7 @@ Deno.test({ name: '@manipulation', only: false }, async (context) => {
         client.publish(
           'topicA',
           new TextEncoder().encode('payloadA'),
-          { qos: Mqtt.QoS.AT_LEAST_ONCE },
+          { qos: Mqtt.QoS.AtLeastOnce },
         ).catch((err: Error) => {
           assert(err instanceof ClientErrors.StateIsNotOnlineError);
         });
@@ -460,7 +460,7 @@ Deno.test({ name: '@manipulation', only: false }, async (context) => {
 
         await client.connect();
 
-        broker.sendPuback(client.clientId, 999, Mqtt.ProtocolVersion.MQTT_V5);
+        broker.sendPuback(client.clientId, 999, Mqtt.ProtocolVersion.MqttV5);
 
         await promise;
       } catch (err) {
@@ -504,7 +504,7 @@ Deno.test({ name: '@manipulation', only: false }, async (context) => {
 
         await client.connect();
 
-        broker.sendPubrec(client.clientId, 999, Mqtt.ProtocolVersion.MQTT_V5);
+        broker.sendPubrec(client.clientId, 999, Mqtt.ProtocolVersion.MqttV5);
 
         await promise;
       } catch (err) {
@@ -548,7 +548,7 @@ Deno.test({ name: '@manipulation', only: false }, async (context) => {
 
         await client.connect();
 
-        broker.sendPubrel(client.clientId, 999, Mqtt.ProtocolVersion.MQTT_V5);
+        broker.sendPubrel(client.clientId, 999, Mqtt.ProtocolVersion.MqttV5);
 
         await promise;
       } catch (err) {
@@ -589,7 +589,7 @@ Deno.test({ name: '@manipulation', only: false }, async (context) => {
 
         await client.connect();
 
-        broker.sendPubcomp(client.clientId, 999, Mqtt.ProtocolVersion.MQTT_V5);
+        broker.sendPubcomp(client.clientId, 999, Mqtt.ProtocolVersion.MqttV5);
 
         await promise;
       } catch (err) {
@@ -630,7 +630,7 @@ Deno.test({ name: '@manipulation', only: false }, async (context) => {
 
         await client.connect();
 
-        broker.sendSuback(client.clientId, 999, Mqtt.ProtocolVersion.MQTT_V5);
+        broker.sendSuback(client.clientId, 999, Mqtt.ProtocolVersion.MqttV5);
 
         await promise;
       } catch (err) {
@@ -671,7 +671,7 @@ Deno.test({ name: '@manipulation', only: false }, async (context) => {
 
         await client.connect();
 
-        broker.sendUnsuback(client.clientId, 999, Mqtt.ProtocolVersion.MQTT_V5);
+        broker.sendUnsuback(client.clientId, 999, Mqtt.ProtocolVersion.MqttV5);
 
         await promise;
       } catch (err) {

@@ -207,10 +207,10 @@ Deno.test({ name: '@reconnect', only: false }, async (context) => {
 
         const settled = (promise: Promise<unknown>) => promise.then(() => 'resolved', (err) => err);
         const results = Promise.all([
-          settled(client.publish('topicA', 'qos1', { qos: Mqtt.QoS.AT_LEAST_ONCE })),
-          settled(client.publish('topicA', 'qos2', { qos: Mqtt.QoS.EXACTLY_ONCE })),
+          settled(client.publish('topicA', 'qos1', { qos: Mqtt.QoS.AtLeastOnce })),
+          settled(client.publish('topicA', 'qos2', { qos: Mqtt.QoS.ExactlyOnce })),
         ]);
-        client.publish('topicA', 'ignored', { qos: Mqtt.QoS.AT_LEAST_ONCE }); // ignored on purpose: no unhandled rejection
+        client.publish('topicA', 'ignored', { qos: Mqtt.QoS.AtLeastOnce }); // ignored on purpose: no unhandled rejection
 
         while (received < 3) {
           await new Promise((resolve) => setTimeout(resolve, 10));

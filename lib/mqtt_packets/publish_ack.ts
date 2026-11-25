@@ -27,7 +27,7 @@ export function parsePublishAck(
 ): PublishAckFields {
   const reader = new ByteReader(buffer, remainingLength);
   const packetId = reader.readTwoByteInteger();
-  if (protocolVersion === Mqtt.ProtocolVersion.MQTT_V3_1_1) {
+  if (protocolVersion === Mqtt.ProtocolVersion.MqttV3_1_1) {
     reader.expectEnd(name);
     return { packetId };
   }

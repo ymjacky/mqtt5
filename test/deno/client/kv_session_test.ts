@@ -70,7 +70,7 @@ function payloadLengthForPacketSize(size: number, protocolVersion: Mqtt.Protocol
   return payloadLength;
 }
 
-const v5 = Mqtt.ProtocolVersion.MQTT_V5;
+const v5 = Mqtt.ProtocolVersion.MqttV5;
 
 function kvClient(kv: Deno.Kv, options?: Partial<ConstructorParameters<typeof MqttClient>[0]>): MqttClient {
   return new MqttClient({ clientId: 'cid', logger, clean: false, outgoingStore: new KvOutgoingStore(kv), ...options });
@@ -84,9 +84,9 @@ Deno.test({ name: '@session in Deno KV: after the process restarts', only: false
       // The first process publishes and ends before every PUBACK.
       const first = kvClient(kv);
       await first.connect();
-      const publishingA = first.publish('topicA', 'A', { qos: Mqtt.QoS.AT_LEAST_ONCE });
-      first.publish('topicA', 'B', { qos: Mqtt.QoS.AT_LEAST_ONCE });
-      first.publish('topicA', 'C', { qos: Mqtt.QoS.AT_LEAST_ONCE });
+      const publishingA = first.publish('topicA', 'A', { qos: Mqtt.QoS.AtLeastOnce });
+      first.publish('topicA', 'B', { qos: Mqtt.QoS.AtLeastOnce });
+      first.publish('topicA', 'C', { qos: Mqtt.QoS.AtLeastOnce });
       await waitFor(() => b.received.length === 3, 'the messages of the first process');
       assertEquals(b.received, ['PUBLISH 1 A', 'PUBLISH 2 B', 'PUBLISH 3 C']);
       b.broker.sendPuback('cid', 1, v5); // only 'A' is acknowledged
@@ -100,7 +100,7 @@ Deno.test({ name: '@session in Deno KV: after the process restarts', only: false
       const second = kvClient(kv);
       await second.connect();
       assertEquals(await second.publishInflightCount(), 2);
-      const publishingD = second.publish('topicA', 'D', { qos: Mqtt.QoS.AT_LEAST_ONCE });
+      const publishingD = second.publish('topicA', 'D', { qos: Mqtt.QoS.AtLeastOnce });
       await waitFor(() => b.received.length === 3, 'the resent and the new messages');
       // 'D' does not get the packet ID 2 or 3, which are not acknowledged yet, but gets 1, which 'A' gave back
       assertEquals(b.received, ['PUBLISH 2 B dup', 'PUBLISH 3 C dup', 'PUBLISH 1 D']);
@@ -127,14 +127,14 @@ Deno.test({ name: '@session in Deno KV: after the process restarts', only: false
         // The first process publishes A, B, C, D. 'C' gets the packet ID 1 again, which 'X' gave back.
         const first = kvClient(kv);
         await first.connect();
-        const publishingX = first.publish('topicA', 'X', { qos: Mqtt.QoS.AT_LEAST_ONCE });
-        first.publish('topicA', 'A', { qos: Mqtt.QoS.AT_LEAST_ONCE });
-        first.publish('topicA', 'B', { qos: Mqtt.QoS.AT_LEAST_ONCE });
+        const publishingX = first.publish('topicA', 'X', { qos: Mqtt.QoS.AtLeastOnce });
+        first.publish('topicA', 'A', { qos: Mqtt.QoS.AtLeastOnce });
+        first.publish('topicA', 'B', { qos: Mqtt.QoS.AtLeastOnce });
         await waitFor(() => b.received.length === 3, 'X, A and B');
         b.broker.sendPuback('cid', 1, v5);
         await publishingX;
-        first.publish('topicA', 'C', { qos: Mqtt.QoS.AT_LEAST_ONCE });
-        first.publish('topicA', 'D', { qos: Mqtt.QoS.AT_LEAST_ONCE });
+        first.publish('topicA', 'C', { qos: Mqtt.QoS.AtLeastOnce });
+        first.publish('topicA', 'D', { qos: Mqtt.QoS.AtLeastOnce });
         await waitFor(() => b.received.length === 5, 'C and D');
         assertEquals(b.received, ['PUBLISH 1 X', 'PUBLISH 2 A', 'PUBLISH 3 B', 'PUBLISH 1 C', 'PUBLISH 4 D']);
         await first.disconnect(true);
@@ -188,7 +188,7 @@ Deno.test({ name: '@session in Deno KV: after the process restarts', only: false
     try {
       const first = kvClient(kv);
       await first.connect();
-      first.publish('topicA', 'A', { qos: Mqtt.QoS.EXACTLY_ONCE });
+      first.publish('topicA', 'A', { qos: Mqtt.QoS.ExactlyOnce });
       await waitFor(() => b.received.length === 1, 'PUBLISH');
       await first.disconnect(true);
 
@@ -216,7 +216,7 @@ Deno.test({ name: '@session in Deno KV: after the process restarts', only: false
     try {
       const first = kvClient(kv);
       await first.connect();
-      first.publish('topicA', 'A', { qos: Mqtt.QoS.EXACTLY_ONCE });
+      first.publish('topicA', 'A', { qos: Mqtt.QoS.ExactlyOnce });
       await waitFor(() => b.received.length === 1, 'PUBLISH');
       b.broker.sendPubrec('cid', 1, v5);
       await waitFor(() => b.received.length === 2, 'PUBREL');
@@ -244,8 +244,8 @@ Deno.test({ name: '@session in Deno KV: after the process restarts', only: false
     try {
       const first = kvClient(kv);
       await first.connect();
-      first.publish('topicA', 'A', { qos: Mqtt.QoS.AT_LEAST_ONCE });
-      first.publish('topicA', 'B', { qos: Mqtt.QoS.EXACTLY_ONCE });
+      first.publish('topicA', 'A', { qos: Mqtt.QoS.AtLeastOnce });
+      first.publish('topicA', 'B', { qos: Mqtt.QoS.ExactlyOnce });
       await waitFor(() => b.received.length === 2, 'the messages of the first process');
       await first.disconnect(true);
       // the messages of another client stay
@@ -269,11 +269,11 @@ Deno.test({ name: '@session in Deno KV: after the process restarts', only: false
   await context.step('MQTT 3.1.1: a QoS 1 message is resent', async () => {
     const kv = await Deno.openKv(':memory:');
     const b = recordingBroker();
-    const v311 = Mqtt.ProtocolVersion.MQTT_V3_1_1;
+    const v311 = Mqtt.ProtocolVersion.MqttV3_1_1;
     try {
       const first = kvClient(kv, { protocolVersion: v311 });
       await first.connect();
-      first.publish('topicA', 'A', { qos: Mqtt.QoS.AT_LEAST_ONCE });
+      first.publish('topicA', 'A', { qos: Mqtt.QoS.AtLeastOnce });
       await waitFor(() => b.received.length === 1, 'PUBLISH');
       await first.disconnect(true);
 
@@ -300,7 +300,7 @@ Deno.test({ name: '@session in Deno KV: client options', only: false }, async (c
     try {
       const client = kvClient(kv, { clean: true });
       await client.connect();
-      const publishing = client.publish('topicA', 'A', { qos: Mqtt.QoS.AT_LEAST_ONCE });
+      const publishing = client.publish('topicA', 'A', { qos: Mqtt.QoS.AtLeastOnce });
       await waitFor(() => b.received.length === 1, 'PUBLISH');
       assertEquals(await keys(kv), [['mqtt5', 'cid', 'outgoing', 1]]);
       b.broker.sendPuback('cid', 1, v5);
@@ -341,7 +341,7 @@ Deno.test({ name: '@session in Deno KV: client options', only: false }, async (c
     try {
       const client = new MqttClient({ clientId: 'clientB', logger, outgoingStore: new KvOutgoingStore(kv) });
       await client.connect();
-      client.publish('topicA', 'A', { qos: Mqtt.QoS.AT_LEAST_ONCE });
+      client.publish('topicA', 'A', { qos: Mqtt.QoS.AtLeastOnce });
       await waitFor(() => b.received.length === 1, 'PUBLISH');
       assertEquals(await keys(kv), [['mqtt5', 'clientB', 'outgoing', 1]]);
       await client.disconnect(true);
@@ -374,8 +374,8 @@ Deno.test({ name: '@session in Deno KV: client options', only: false }, async (c
     try {
       const client = kvClient(kv, { topicAliasMaximumAboutSend: 10 });
       await client.connect();
-      client.publish('topicA', 'A', { qos: Mqtt.QoS.AT_LEAST_ONCE });
-      client.publish('topicA', 'B', { qos: Mqtt.QoS.AT_LEAST_ONCE }); // sent with the alias and an empty Topic Name
+      client.publish('topicA', 'A', { qos: Mqtt.QoS.AtLeastOnce });
+      client.publish('topicA', 'B', { qos: Mqtt.QoS.AtLeastOnce }); // sent with the alias and an empty Topic Name
       await waitFor(() => b.received.length === 2, 'the messages');
 
       const stored: MqttPackets.PublishPacket[] = [];
@@ -394,7 +394,7 @@ Deno.test({ name: '@session in Deno KV: client options', only: false }, async (c
 Deno.test({ name: '@session in Deno KV: packet size', only: false }, async (context) => {
   const storeMaximum = KvOutgoingStore.maximumPacketSize;
 
-  for (const protocolVersion of [Mqtt.ProtocolVersion.MQTT_V5, Mqtt.ProtocolVersion.MQTT_V3_1_1]) {
+  for (const protocolVersion of [Mqtt.ProtocolVersion.MqttV5, Mqtt.ProtocolVersion.MqttV3_1_1]) {
     await context.step(`protocol version ${protocolVersion}: QoS 1 and 2 PUBLISH larger than the store can keep are rejected, QoS 0 is sent`, async () => {
       const kv = await Deno.openKv(':memory:');
       const b = recordingBroker();
@@ -404,7 +404,7 @@ Deno.test({ name: '@session in Deno KV: packet size', only: false }, async (cont
         const fits = new Uint8Array(payloadLengthForPacketSize(storeMaximum, protocolVersion));
         const tooLarge = new Uint8Array(fits.length + 1);
 
-        for (const qos of [Mqtt.QoS.AT_LEAST_ONCE, Mqtt.QoS.EXACTLY_ONCE]) {
+        for (const qos of [Mqtt.QoS.AtLeastOnce, Mqtt.QoS.ExactlyOnce]) {
           const err = await assertRejects(() => client.publish('topicA', tooLarge, { qos }), ClientErrors.PacketTooLargeError);
           assertStringIncludes(err.message, `larger than the ${storeMaximum} bytes the session store can keep`);
         }
@@ -412,11 +412,11 @@ Deno.test({ name: '@session in Deno KV: packet size', only: false }, async (cont
         assertEquals(b.received, []);
 
         // QoS 0 is not stored. Its PUBLISH has no packet ID, so it is 2 bytes smaller.
-        await client.publish('topicA', new Uint8Array(tooLarge.length + 10), { qos: Mqtt.QoS.AT_MOST_ONCE });
+        await client.publish('topicA', new Uint8Array(tooLarge.length + 10), { qos: Mqtt.QoS.AtMostOnce });
         await waitFor(() => b.received.length === 1, 'the QoS 0 message');
 
         // The largest PUBLISH is stored and sent, with the packet ID the rejected ones gave back.
-        const publishing = client.publish('topicA', fits, { qos: Mqtt.QoS.AT_LEAST_ONCE });
+        const publishing = client.publish('topicA', fits, { qos: Mqtt.QoS.AtLeastOnce });
         await waitFor(() => b.received.length === 2, 'the largest message');
         assertEquals(b.received, [`PUBLISH undefined ${tooLarge.length + 10} bytes`, `PUBLISH 1 ${fits.length} bytes`]);
         assertEquals(await keys(kv), [['mqtt5', 'cid', 'outgoing', 1]]);
@@ -440,20 +440,20 @@ Deno.test({ name: '@session in Deno KV: packet size', only: false }, async (cont
       // The broker accepts less than the store.
       b.connackProperties = { maximumPacketSize: 1000 };
       await client.connect();
-      let err = await assertRejects(() => client.publish('topicA', new Uint8Array(1000), { qos: Mqtt.QoS.AT_LEAST_ONCE }), ClientErrors.PacketTooLargeError);
+      let err = await assertRejects(() => client.publish('topicA', new Uint8Array(1000), { qos: Mqtt.QoS.AtLeastOnce }), ClientErrors.PacketTooLargeError);
       assertStringIncludes(err.message, 'larger than the Maximum Packet Size 1000 of the broker');
-      err = await assertRejects(() => client.publish('topicA', tooLargeForStore, { qos: Mqtt.QoS.AT_LEAST_ONCE }), ClientErrors.PacketTooLargeError);
+      err = await assertRejects(() => client.publish('topicA', tooLargeForStore, { qos: Mqtt.QoS.AtLeastOnce }), ClientErrors.PacketTooLargeError);
       assertStringIncludes(err.message, 'of the broker');
       await client.disconnect();
 
       // The broker accepts more than the store.
       b.connackProperties = { maximumPacketSize: 100000 };
       await client.connect();
-      err = await assertRejects(() => client.publish('topicA', tooLargeForStore, { qos: Mqtt.QoS.AT_LEAST_ONCE }), ClientErrors.PacketTooLargeError);
+      err = await assertRejects(() => client.publish('topicA', tooLargeForStore, { qos: Mqtt.QoS.AtLeastOnce }), ClientErrors.PacketTooLargeError);
       assertStringIncludes(err.message, 'the session store can keep');
       // QoS 0 has the limit of the broker only
-      await client.publish('topicA', tooLargeForStore, { qos: Mqtt.QoS.AT_MOST_ONCE });
-      await assertRejects(() => client.publish('topicA', new Uint8Array(100000), { qos: Mqtt.QoS.AT_MOST_ONCE }), ClientErrors.PacketTooLargeError);
+      await client.publish('topicA', tooLargeForStore, { qos: Mqtt.QoS.AtMostOnce });
+      await assertRejects(() => client.publish('topicA', new Uint8Array(100000), { qos: Mqtt.QoS.AtMostOnce }), ClientErrors.PacketTooLargeError);
       await waitFor(() => b.received.length === 1, 'the QoS 0 message');
 
       assertEquals(await keys(kv), []);

@@ -42,7 +42,7 @@ Deno.test({ name: '@auth', only: false }, async (context) => {
           const connackPropertie: MqttProperties.ConnackProperties = {
             authenticationMethod: packet.properties?.authenticationMethod,
           };
-          broker.sendConnack(client.clientId, false, Mqtt.ProtocolVersion.MQTT_V5, Mqtt.ReasonCode.Success, connackPropertie);
+          broker.sendConnack(client.clientId, false, Mqtt.ProtocolVersion.MqttV5, Mqtt.ReasonCode.Success, connackPropertie);
           resolve();
         });
 
@@ -110,7 +110,7 @@ Deno.test({ name: '@receive malformed auth', only: false }, async (context) => {
           clean: false,
           connectTimeoutMS: 10000,
           keepAlive: 10,
-          protocolVersion: Mqtt.ProtocolVersion.MQTT_V5,
+          protocolVersion: Mqtt.ProtocolVersion.MqttV5,
         });
 
         broker.on('connect', (event) => {

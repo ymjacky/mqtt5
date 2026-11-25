@@ -9,7 +9,7 @@ async function main() {
     clientId: 'publisherB',
     clean: true,
     logger: logger,
-    protocolVersion: Mqtt.ProtocolVersion.MQTT_V5,
+    protocolVersion: Mqtt.ProtocolVersion.MqttV5,
     keepAlive: 60,
   });
   await client.connect();
@@ -26,7 +26,7 @@ async function main() {
     ],
     contentType: 'application/json',
   };
-  await client.publish('topicA', 'payload', { qos: Mqtt.QoS.AT_MOST_ONCE }, pubProperties);
+  await client.publish('topicA', 'payload', { qos: Mqtt.QoS.AtMostOnce }, pubProperties);
 }
 
 main();

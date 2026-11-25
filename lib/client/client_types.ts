@@ -51,8 +51,8 @@ export type ClientOptions = {
    */
   disconnectTimeoutMS?: number;
   /**
-   * MQTT protocol version: `Mqtt.ProtocolVersion.MQTT_V5` or `Mqtt.ProtocolVersion.MQTT_V3_1_1`.
-   * @default {Mqtt.ProtocolVersion.MQTT_V5}
+   * MQTT protocol version: `Mqtt.ProtocolVersion.MqttV5` or `Mqtt.ProtocolVersion.MqttV3_1_1`.
+   * @default {Mqtt.ProtocolVersion.MqttV5}
    */
   protocolVersion?: Mqtt.ProtocolVersion;
   incomingStore?: IncomingStore;
@@ -133,7 +133,7 @@ export type PublishOptions = {
   dup?: boolean;
   /**
    * QoS level.
-   * @default {Mqtt.QoS.AT_MOST_ONCE}
+   * @default {Mqtt.QoS.AtMostOnce}
    */
   qos?: Mqtt.QoS;
   /**

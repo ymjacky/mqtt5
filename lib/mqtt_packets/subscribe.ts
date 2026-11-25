@@ -10,7 +10,7 @@ export function toBytes(
   protocolVersion: Mqtt.ProtocolVersion,
 ): Uint8Array {
   const variableHeaderChunks: (Uint8Array | number[])[] = [numToTwoByteInteger(packet.packetId)];
-  if (protocolVersion > Mqtt.ProtocolVersion.MQTT_V3_1_1) {
+  if (protocolVersion > Mqtt.ProtocolVersion.MqttV3_1_1) {
     if (packet.properties) {
       variableHeaderChunks.push(MqttProperties.propertiesToBytes(packet.properties));
     } else {
@@ -22,15 +22,15 @@ export function toBytes(
 
   const payloadChunks: (Uint8Array | number[])[] = [];
   for (const sub of packet.subscriptions) {
-    if (protocolVersion > Mqtt.ProtocolVersion.MQTT_V3_1_1) {
+    if (protocolVersion > Mqtt.ProtocolVersion.MqttV3_1_1) {
       const subscriptionOptions = (0b0) | // 7bit reserved
         (0b0) | // 6bit reserved
         (sub.retainHandling === Mqtt.RetainHandling.DoNotSend ? 0b00100000 : 0) | // 5bit for retainHandling
         (sub.retainHandling === Mqtt.RetainHandling.AtSubscribeOnlyIfTheSubscriptionDoesNotCurrentlyExist ? 0b00010000 : 0) | // 4bit for retainHandling
         (sub.retainAsPublished ? 0b00001000 : 0) | // 3bit for retainAsPublished
         (sub.noLocal ? 0b00000100 : 0) | // 2bit for noLocal
-        (sub.qos === Mqtt.QoS.EXACTLY_ONCE ? 0b00000010 : 0) | // 1bit for qos
-        (sub.qos === Mqtt.QoS.AT_LEAST_ONCE ? 0b00000001 : 0); // 0bit for qos
+        (sub.qos === Mqtt.QoS.ExactlyOnce ? 0b00000010 : 0) | // 1bit for qos
+        (sub.qos === Mqtt.QoS.AtLeastOnce ? 0b00000001 : 0); // 0bit for qos
 
       payloadChunks.push(stringToUtfEncodedString(sub.topicFilter), [subscriptionOptions]);
     } else {
@@ -41,7 +41,7 @@ export function toBytes(
   const payload = concatBytes(payloadChunks);
 
   const fixedHeader = [
-    (Mqtt.PacketType.SUBSCRIBE << 4) + Mqtt.fixedHeaderFlag.SUBSCRIBE,
+    (Mqtt.PacketType.Subscribe << 4) + Mqtt.FixedHeaderFlag.Subscribe,
     ...remainingLengthToBytes(variableHeader.length + payload.length),
   ];
 
@@ -57,7 +57,7 @@ export function parse(
   const packetId = reader.readTwoByteInteger();
 
   const properties = (() => {
-    if (protocolVersion === Mqtt.ProtocolVersion.MQTT_V3_1_1) {
+    if (protocolVersion === Mqtt.ProtocolVersion.MqttV3_1_1) {
       return undefined;
     }
     const { subscriptionIdentifiers, ...props } = readProperties(reader) ?? {};
@@ -75,7 +75,7 @@ export function parse(
   while (reader.remaining > 0) {
     const topicFilter = reader.readUtf8EncodedString();
 
-    if (protocolVersion > Mqtt.ProtocolVersion.MQTT_V3_1_1) {
+    if (protocolVersion > Mqtt.ProtocolVersion.MqttV3_1_1) {
       const subscribeOptions = reader.readByte();
 
       // Get RetainHandling from 5-4bit (0b00110000 = 0x30)
@@ -96,7 +96,7 @@ export function parse(
     }
   }
 
-  if (protocolVersion > Mqtt.ProtocolVersion.MQTT_V3_1_1) {
+  if (protocolVersion > Mqtt.ProtocolVersion.MqttV3_1_1) {
     return {
       type: 'subscribe',
       packetId,

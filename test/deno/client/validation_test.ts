@@ -13,8 +13,8 @@ import {
   validateUnsubscribe,
 } from '../../../lib/client/validation.ts';
 
-const V5 = Mqtt.ProtocolVersion.MQTT_V5;
-const V3 = Mqtt.ProtocolVersion.MQTT_V3_1_1;
+const V5 = Mqtt.ProtocolVersion.MqttV5;
+const V3 = Mqtt.ProtocolVersion.MqttV3_1_1;
 const MAX_FOUR = 0xFFFF_FFFF;
 
 Deno.test('validateTopicName accepts valid topic names', () => {

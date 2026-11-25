@@ -21,7 +21,7 @@ const closingHandshakeTimeout = 1 * 1000;
  * const client = new WebSocketMqttClient({
  *   url: new URL('ws://127.0.0.1:8080'),
  *   clientId: 'clientA',
- *   protocolVersion: Mqtt.ProtocolVersion.MQTT_V5,
+ *   protocolVersion: Mqtt.ProtocolVersion.MqttV5,
  * });
  * await client.connect();
  * ```

@@ -3,7 +3,7 @@ import type { PingrespPacket } from './packet_types.ts';
 
 export function toBytes(_packet: PingrespPacket): Uint8Array {
   const fixedHeader = [
-    (Mqtt.PacketType.PINGRESP << 4) + Mqtt.fixedHeaderFlag.PINGRESP,
+    (Mqtt.PacketType.Pingresp << 4) + Mqtt.FixedHeaderFlag.Pingresp,
     0, // remainingLength 0
   ];
 

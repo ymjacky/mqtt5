@@ -52,7 +52,7 @@ async function main() {
     clientId: 'retryClient',
     logger: logger,
     clean: true,
-    protocolVersion: Mqtt.ProtocolVersion.MQTT_V5,
+    protocolVersion: Mqtt.ProtocolVersion.MqttV5,
     keepAlive: 30,
     connectTimeoutMS: 10 * 1000, // wait up to 10 s for CONNACK
   });
@@ -63,7 +63,7 @@ async function main() {
   }
   logger('connected');
 
-  await client.publish('topicA', 'payload', { qos: Mqtt.QoS.AT_LEAST_ONCE });
+  await client.publish('topicA', 'payload', { qos: Mqtt.QoS.AtLeastOnce });
   await client.disconnect();
 }
 

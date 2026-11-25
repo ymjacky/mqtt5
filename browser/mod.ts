@@ -39,7 +39,7 @@
  * const client = new WebSocketMqttClient({
  *   url: new URL('wss://broker.example.com:8081'),
  *   clientId: 'browserClient',
- *   protocolVersion: Mqtt.ProtocolVersion.MQTT_V5,
+ *   protocolVersion: Mqtt.ProtocolVersion.MqttV5,
  * });
  *
  * client.on('publish', (event) => {
@@ -48,7 +48,7 @@
  * });
  *
  * await client.connect();
- * await client.subscribe('topicA', Mqtt.QoS.AT_LEAST_ONCE);
+ * await client.subscribe('topicA', Mqtt.QoS.AtLeastOnce);
  * ```
  *
  * @example Publish a message
@@ -62,7 +62,7 @@
  * await client.connect();
  *
  * // Resolves when the broker acknowledges the message (PUBACK for QoS 1).
- * await client.publish('topicA', JSON.stringify({ temperature: 23.5 }), { qos: Mqtt.QoS.AT_LEAST_ONCE }, {
+ * await client.publish('topicA', JSON.stringify({ temperature: 23.5 }), { qos: Mqtt.QoS.AtLeastOnce }, {
  *   contentType: 'application/json',
  * });
  *
@@ -84,7 +84,7 @@
  *
  * try {
  *   await client.connect();
- *   await client.subscribe('sensors/+/temperature', Mqtt.QoS.AT_LEAST_ONCE);
+ *   await client.subscribe('sensors/+/temperature', Mqtt.QoS.AtLeastOnce);
  * } catch (err) {
  *   if (err instanceof ClientErrors.ConnectTimeout || err instanceof ClientErrors.ConnectionClosed) {
  *     console.error('could not connect to the broker');
@@ -103,7 +103,7 @@
  * const client = new WebSocketMqttClient({
  *   url: new URL('wss://broker.example.com:8081'),
  *   clientId: 'browserClient',
- *   protocolVersion: Mqtt.ProtocolVersion.MQTT_V5,
+ *   protocolVersion: Mqtt.ProtocolVersion.MqttV5,
  * });
  * await client.connect();
  * </script>

@@ -8,7 +8,7 @@ Deno.test('encodeDisconnectPacket', function () {
   assertEquals(
     toBytes({
       type: 'disconnect',
-    }, Mqtt.ProtocolVersion.MQTT_V3_1_1),
+    }, Mqtt.ProtocolVersion.MqttV3_1_1),
     new Uint8Array([
       // fixedHeader
       0xe0, // packetType + flags
@@ -23,7 +23,7 @@ Deno.test('encodeDisconnectPacketMQTT5WithReasonCode', function () {
     toBytes({
       type: 'disconnect',
       reasonCode: Mqtt.ReasonCode.ServerBusy,
-    }, Mqtt.ProtocolVersion.MQTT_V5),
+    }, Mqtt.ProtocolVersion.MqttV5),
     new Uint8Array([
       // fixedHeader
       0xe0, // packetType + flags
@@ -40,7 +40,7 @@ Deno.test('encodeDisconnectPacketMQTT5WithSuccessReasonCode', function () {
     toBytes({
       type: 'disconnect',
       reasonCode: Mqtt.ReasonCode.Success,
-    }, Mqtt.ProtocolVersion.MQTT_V5),
+    }, Mqtt.ProtocolVersion.MqttV5),
     new Uint8Array([
       // fixedHeader
       0xe0, // packetType + flags
@@ -63,7 +63,7 @@ Deno.test('encodeDisconnectPacketMQTT5WithProperties', function () {
           { key: 'diagnostic', val: 'high-load' },
         ],
       },
-    }, Mqtt.ProtocolVersion.MQTT_V5),
+    }, Mqtt.ProtocolVersion.MqttV5),
     new Uint8Array([
       // fixedHeader
       0xe0, // packetType + flags
@@ -157,7 +157,7 @@ Deno.test('encodeDisconnectPacketMQTT5WithSessionExpiryIntervalZero', function (
       properties: {
         sessionExpiryInterval: 0,
       },
-    }, Mqtt.ProtocolVersion.MQTT_V5),
+    }, Mqtt.ProtocolVersion.MqttV5),
     new Uint8Array([
       // fixedHeader
       0xe0, // packetType + flags
@@ -184,7 +184,7 @@ Deno.test('encodeDisconnectPacketMQTT5WithServerReference', function () {
       properties: {
         serverReference: 'server2.example.com',
       },
-    }, Mqtt.ProtocolVersion.MQTT_V5),
+    }, Mqtt.ProtocolVersion.MqttV5),
     new Uint8Array([
       // fixedHeader
       0xe0, // packetType + flags
@@ -226,7 +226,7 @@ Deno.test('encodeDisconnectPacketMQTT5WithEmptyProperties', function () {
       type: 'disconnect',
       reasonCode: Mqtt.ReasonCode.NormalDisconnection,
       properties: {},
-    }, Mqtt.ProtocolVersion.MQTT_V5),
+    }, Mqtt.ProtocolVersion.MqttV5),
     new Uint8Array([
       // fixedHeader
       0xe0, // packetType + flags
@@ -246,7 +246,7 @@ Deno.test('decodeDisconnectPacket', function () {
         // Empty buffer for v3.1.1
       ]),
       0, // remainingLength
-      Mqtt.ProtocolVersion.MQTT_V3_1_1, // ProtocolVersion
+      Mqtt.ProtocolVersion.MqttV3_1_1, // ProtocolVersion
     ),
     {
       type: 'disconnect',
@@ -262,7 +262,7 @@ Deno.test('decodeDisconnectPacketMQTT5WithReasonCode', function () {
         0x89, // reasonCode = ServerBusy (137)
       ]),
       1, // remainingLength
-      Mqtt.ProtocolVersion.MQTT_V5, // ProtocolVersion
+      Mqtt.ProtocolVersion.MqttV5, // ProtocolVersion
     ),
     {
       type: 'disconnect',
@@ -352,7 +352,7 @@ Deno.test('decodeDisconnectPacketMQTT5WithProperties', function () {
         0x64, // 'high-load'
       ]),
       73, // remainingLength (1 + 1 + 71)
-      Mqtt.ProtocolVersion.MQTT_V5, // ProtocolVersion
+      Mqtt.ProtocolVersion.MqttV5, // ProtocolVersion
     ),
     {
       type: 'disconnect',
@@ -400,7 +400,7 @@ Deno.test('decodeDisconnectPacketMQTT5WithServerReference', function () {
         0x6d, // 'server2.example.com'
       ]),
       24, // remainingLength (1 + 1 + 22)
-      Mqtt.ProtocolVersion.MQTT_V5, // ProtocolVersion
+      Mqtt.ProtocolVersion.MqttV5, // ProtocolVersion
     ),
     {
       type: 'disconnect',
@@ -421,7 +421,7 @@ Deno.test('decodeDisconnectPacketMQTT5WithEmptyProperties', function () {
         0x00, // properties length = 0
       ]),
       2, // remainingLength
-      Mqtt.ProtocolVersion.MQTT_V5, // ProtocolVersion
+      Mqtt.ProtocolVersion.MqttV5, // ProtocolVersion
     ),
     {
       type: 'disconnect',

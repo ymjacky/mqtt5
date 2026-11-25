@@ -24,7 +24,7 @@ Deno.test('encodeConnectPacketWithClientId', function () {
       81, // 'Q'
       84, // 'T'
       84, // 'T'
-      Mqtt.ProtocolVersion.MQTT_V3_1_1, // ProtocolVersion
+      Mqtt.ProtocolVersion.MqttV3_1_1, // ProtocolVersion
       2, // connectFlags (cleanSession)
       0, // keepAlive MSB
       0, // keepAlive LSB
@@ -59,7 +59,7 @@ Deno.test('encodeConnectPacketWithCleanFalse', function () {
       81, // 'Q'
       84, // 'T'
       84, // 'T'
-      Mqtt.ProtocolVersion.MQTT_V3_1_1, // ProtocolVersion
+      Mqtt.ProtocolVersion.MqttV3_1_1, // ProtocolVersion
       0, // connectFlags
       0, // keepAlive MSB
       0, // keepAlive LSB
@@ -94,7 +94,7 @@ Deno.test('encodeConnectPacketWithKeepAlive', function () {
       81, // 'Q'
       84, // 'T'
       84, // 'T'
-      Mqtt.ProtocolVersion.MQTT_V3_1_1, // ProtocolVersion
+      Mqtt.ProtocolVersion.MqttV3_1_1, // ProtocolVersion
       2, // connectFlags (cleanSession)
       1, // keepAlive MSB
       44, // keepAlive LSB
@@ -130,7 +130,7 @@ Deno.test('encodeConnectPacketWithUsernameAndPassword', function () {
       81, // 'Q'
       84, // 'T'
       84, // 'T'
-      Mqtt.ProtocolVersion.MQTT_V3_1_1, // ProtocolVersion
+      Mqtt.ProtocolVersion.MqttV3_1_1, // ProtocolVersion
       194, // connectFlags (usernameFlag, passwordFlag, cleanSession)
       0, // keepAlive MSB
       0, // keepAlive LSB
@@ -165,7 +165,7 @@ Deno.test('encodeConnectPacketWithWill', function () {
       {
         type: 'connect',
         clientId: 'mqtt-client',
-        protocolVersion: Mqtt.ProtocolVersion.MQTT_V3_1_1,
+        protocolVersion: Mqtt.ProtocolVersion.MqttV3_1_1,
         clean: true,
         keepAlive: 30,
         will: {
@@ -243,7 +243,7 @@ Deno.test('encodeConnectPacketMQTTv5WithProperties', function () {
       {
         type: 'connect',
         clientId: 'mqtt-client-123',
-        protocolVersion: Mqtt.ProtocolVersion.MQTT_V5,
+        protocolVersion: Mqtt.ProtocolVersion.MqttV5,
         clean: true,
         keepAlive: 60,
         properties: {
@@ -386,7 +386,7 @@ Deno.test('encodeConnectPacketMQTTv5WithWill', function () {
       {
         type: 'connect',
         clientId: 'mqtt-client',
-        protocolVersion: Mqtt.ProtocolVersion.MQTT_V5,
+        protocolVersion: Mqtt.ProtocolVersion.MqttV5,
         clean: true,
         keepAlive: 30,
         properties: {
@@ -562,7 +562,7 @@ Deno.test('decodeConnectPacketWithUsernameAndPassword', function () {
         81, // 'Q'
         84, // 'T'
         84, // 'T'
-        Mqtt.ProtocolVersion.MQTT_V3_1_1, // ProtocolVersion
+        Mqtt.ProtocolVersion.MqttV3_1_1, // ProtocolVersion
         194, // connectFlags (usernameFlag, passwordFlag, cleanSession)
         0, // keepAlive MSB
         0, // keepAlive LSB
@@ -664,7 +664,7 @@ Deno.test('decodeConnectPacketWithWill', function () {
       type: 'connect',
       clientId: 'mqtt-client',
       protocolName: 'MQTT',
-      protocolVersion: Mqtt.ProtocolVersion.MQTT_V3_1_1,
+      protocolVersion: Mqtt.ProtocolVersion.MqttV3_1_1,
       username: undefined,
       password: undefined,
       clean: true,
@@ -689,7 +689,7 @@ Deno.test('decodeConnectPacketMQTTv5WithUsernameAndPassword', function () {
         81, // 'Q'
         84, // 'T'
         84, // 'T'
-        Mqtt.ProtocolVersion.MQTT_V5, // ProtocolVersion
+        Mqtt.ProtocolVersion.MqttV5, // ProtocolVersion
         194, // connectFlags (usernameFlag, passwordFlag, cleanSession)
         0, // keepAlive MSB
         0, // keepAlive LSB
@@ -721,7 +721,7 @@ Deno.test('decodeConnectPacketMQTTv5WithUsernameAndPassword', function () {
       type: 'connect',
       clientId: 'id',
       protocolName: 'MQTT',
-      protocolVersion: Mqtt.ProtocolVersion.MQTT_V5,
+      protocolVersion: Mqtt.ProtocolVersion.MqttV5,
       username: 'user',
       password: 'pass',
       will: undefined,
@@ -745,7 +745,7 @@ Deno.test('decodeConnectPacketMQTTv5WithPropertiesAndWillProperties', function (
         0x51,
         0x54,
         0x54, // "MQTT"
-        Mqtt.ProtocolVersion.MQTT_V5, // Protocol version
+        Mqtt.ProtocolVersion.MqttV5, // Protocol version
         14, // Connect flags (will QoS 1, will flag, clean session)
         0x00,
         0x3C, // Keep alive (60 seconds)
@@ -818,7 +818,7 @@ Deno.test('decodeConnectPacketMQTTv5WithPropertiesAndWillProperties', function (
       type: 'connect',
       clientId: 'id',
       protocolName: 'MQTT',
-      protocolVersion: Mqtt.ProtocolVersion.MQTT_V5,
+      protocolVersion: Mqtt.ProtocolVersion.MqttV5,
       username: undefined,
       password: undefined,
       clean: true,
@@ -870,7 +870,7 @@ Deno.test('encodeConnectPacketWithEmptyUsernameAndPassword', function () {
       81, // 'Q'
       84, // 'T'
       84, // 'T'
-      Mqtt.ProtocolVersion.MQTT_V3_1_1, // ProtocolVersion
+      Mqtt.ProtocolVersion.MqttV3_1_1, // ProtocolVersion
       194, // connectFlags (usernameFlag, passwordFlag, cleanSession)
       0, // keepAlive MSB
       0, // keepAlive LSB
@@ -909,7 +909,7 @@ Deno.test('encodeConnectPacketWithEmptyUsernameOnly', function () {
       81, // 'Q'
       84, // 'T'
       84, // 'T'
-      Mqtt.ProtocolVersion.MQTT_V3_1_1, // ProtocolVersion
+      Mqtt.ProtocolVersion.MqttV3_1_1, // ProtocolVersion
       130, // connectFlags (usernameFlag, cleanSession)
       0, // keepAlive MSB
       0, // keepAlive LSB
@@ -933,7 +933,7 @@ Deno.test('decodeConnectPacketWithEmptyUsernameAndPassword', function () {
         81, // 'Q'
         84, // 'T'
         84, // 'T'
-        Mqtt.ProtocolVersion.MQTT_V3_1_1, // ProtocolVersion
+        Mqtt.ProtocolVersion.MqttV3_1_1, // ProtocolVersion
         194, // connectFlags (usernameFlag, passwordFlag, cleanSession)
         0, // keepAlive MSB
         0, // keepAlive LSB
@@ -971,7 +971,7 @@ function connectWithUsernameAndPassword(username: number[], password: number[]):
     81, // 'Q'
     84, // 'T'
     84, // 'T'
-    Mqtt.ProtocolVersion.MQTT_V3_1_1, // ProtocolVersion
+    Mqtt.ProtocolVersion.MqttV3_1_1, // ProtocolVersion
     194, // connectFlags (usernameFlag, passwordFlag, cleanSession)
     0, // keepAlive MSB
     0, // keepAlive LSB

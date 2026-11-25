@@ -40,9 +40,9 @@ function connectBroker(broker: TestBroker) {
 Deno.test({ name: '@slow outgoing store', only: false }, async (context) => {
   for (
     const [ending, qos] of [
-      ['PUBACK', Mqtt.QoS.AT_LEAST_ONCE],
-      ['PUBCOMP', Mqtt.QoS.EXACTLY_ONCE],
-      ['PUBREC with an error Reason Code', Mqtt.QoS.EXACTLY_ONCE],
+      ['PUBACK', Mqtt.QoS.AtLeastOnce],
+      ['PUBCOMP', Mqtt.QoS.ExactlyOnce],
+      ['PUBREC with an error Reason Code', Mqtt.QoS.ExactlyOnce],
     ] as const
   ) {
     await context.step(
@@ -72,15 +72,15 @@ Deno.test({ name: '@slow outgoing store', only: false }, async (context) => {
               return;
             }
             if (ending === 'PUBACK') {
-              broker.sendPuback('cid', packetIdOf(packet), Mqtt.ProtocolVersion.MQTT_V5);
+              broker.sendPuback('cid', packetIdOf(packet), Mqtt.ProtocolVersion.MqttV5);
             } else if (ending === 'PUBCOMP') {
-              broker.sendPubrec('cid', packetIdOf(packet), Mqtt.ProtocolVersion.MQTT_V5);
+              broker.sendPubrec('cid', packetIdOf(packet), Mqtt.ProtocolVersion.MqttV5);
             } else {
-              broker.sendPubrec('cid', packetIdOf(packet), Mqtt.ProtocolVersion.MQTT_V5, Mqtt.ReasonCode.UnspecifiedError);
+              broker.sendPubrec('cid', packetIdOf(packet), Mqtt.ProtocolVersion.MqttV5, Mqtt.ReasonCode.UnspecifiedError);
             }
           });
           broker.on('pubrel', (event) => {
-            broker.sendPubcomp('cid', event.detail.packetId, Mqtt.ProtocolVersion.MQTT_V5);
+            broker.sendPubcomp('cid', event.detail.packetId, Mqtt.ProtocolVersion.MqttV5);
           });
 
           const client = new MqttClient({ clientId: 'cid', logger: logger, clean: false, outgoingStore: store });
@@ -88,7 +88,7 @@ Deno.test({ name: '@slow outgoing store', only: false }, async (context) => {
 
           const a = client.publish('topicA', 'A', { qos });
           await discardStarted.promise; // the flow of 'A' is ending
-          const b = client.publish('topicA', 'B', { qos: Mqtt.QoS.AT_LEAST_ONCE });
+          const b = client.publish('topicA', 'B', { qos: Mqtt.QoS.AtLeastOnce });
 
           const expected = ending === 'PUBREC with an error Reason Code' ? Mqtt.ReasonCode.UnspecifiedError : Mqtt.ReasonCode.Success;
           assertEquals((await settleWithin(a, "publish() of 'A'")).result, expected);
@@ -98,7 +98,7 @@ Deno.test({ name: '@slow outgoing store', only: false }, async (context) => {
           assertEquals(received, [{ message: 'A', packetId: 1 }, { message: 'B', packetId: 2 }]);
           assertEquals(await client.publishInflightCount(), 1);
 
-          broker.sendPuback('cid', 2, Mqtt.ProtocolVersion.MQTT_V5);
+          broker.sendPuback('cid', 2, Mqtt.ProtocolVersion.MqttV5);
           assertEquals((await settleWithin(b, "publish() of 'B'")).result, Mqtt.ReasonCode.Success);
           assertEquals(await client.publishInflightCount(), 0);
 
@@ -132,17 +132,17 @@ Deno.test({ name: '@slow outgoing store', only: false }, async (context) => {
         connectBroker(broker);
         broker.on('publish', (event) => {
           events.push('broker received PUBLISH');
-          broker.sendPubrec('cid', packetIdOf(event.detail), Mqtt.ProtocolVersion.MQTT_V5);
+          broker.sendPubrec('cid', packetIdOf(event.detail), Mqtt.ProtocolVersion.MqttV5);
         });
         broker.on('pubrel', (event) => {
           events.push('broker received PUBREL');
-          broker.sendPubcomp('cid', event.detail.packetId, Mqtt.ProtocolVersion.MQTT_V5);
+          broker.sendPubcomp('cid', event.detail.packetId, Mqtt.ProtocolVersion.MqttV5);
         });
 
         const client = new MqttClient({ clientId: 'cid', logger: logger, clean: false, outgoingStore: new SlowPubrelStore() });
         await client.connect();
 
-        const result = await settleWithin(client.publish('topicA', 'A', { qos: Mqtt.QoS.EXACTLY_ONCE }), 'publish()');
+        const result = await settleWithin(client.publish('topicA', 'A', { qos: Mqtt.QoS.ExactlyOnce }), 'publish()');
         assertEquals(result.result, Mqtt.ReasonCode.Success);
 
         await waitFor(() => events.length === 4);
@@ -180,17 +180,17 @@ Deno.test({ name: '@failing outgoing store', only: false }, async (context) => {
         broker.on('publish', (event) => {
           const packet = event.detail;
           received.push({ message: new TextDecoder().decode(packet.payload), packetId: packet.packetId });
-          broker.sendPuback('cid', packetIdOf(packet), Mqtt.ProtocolVersion.MQTT_V5);
+          broker.sendPuback('cid', packetIdOf(packet), Mqtt.ProtocolVersion.MqttV5);
         });
 
         const client = new MqttClient({ clientId: 'cid', logger: logger, clean: false, outgoingStore: new FailingStore() });
         await client.connect();
 
-        await assertRejects(() => client.publish('topicA', 'A', { qos: Mqtt.QoS.AT_LEAST_ONCE }), Error, 'store failed');
+        await assertRejects(() => client.publish('topicA', 'A', { qos: Mqtt.QoS.AtLeastOnce }), Error, 'store failed');
         assertEquals(await client.publishInflightCount(), 0);
 
         // The packet ID of 'A' is free again.
-        const result = await settleWithin(client.publish('topicA', 'B', { qos: Mqtt.QoS.AT_LEAST_ONCE }), "publish() of 'B'");
+        const result = await settleWithin(client.publish('topicA', 'B', { qos: Mqtt.QoS.AtLeastOnce }), "publish() of 'B'");
         assertEquals(result.result, Mqtt.ReasonCode.Success);
         assertEquals(received, [{ message: 'B', packetId: 1 }]);
 
@@ -230,11 +230,11 @@ Deno.test({ name: '@failing outgoing store', only: false }, async (context) => {
         broker.on('publish', (event) => {
           const packet = event.detail;
           received.push(`PUBLISH dup=${packet.dup}`);
-          broker.sendPubrec('cid', packetIdOf(packet), Mqtt.ProtocolVersion.MQTT_V5);
+          broker.sendPubrec('cid', packetIdOf(packet), Mqtt.ProtocolVersion.MqttV5);
         });
         broker.on('pubrel', (event) => {
           received.push('PUBREL');
-          broker.sendPubcomp('cid', event.detail.packetId, Mqtt.ProtocolVersion.MQTT_V5);
+          broker.sendPubcomp('cid', event.detail.packetId, Mqtt.ProtocolVersion.MqttV5);
         });
         broker.on('disconnect', (event) => {
           received.push(`DISCONNECT reasonCode=${event.detail.reasonCode}`);
@@ -251,7 +251,7 @@ Deno.test({ name: '@failing outgoing store', only: false }, async (context) => {
         client.on('closed', () => closed.resolve());
         await client.connect();
 
-        const publishing = client.publish('topicA', 'A', { qos: Mqtt.QoS.EXACTLY_ONCE });
+        const publishing = client.publish('topicA', 'A', { qos: Mqtt.QoS.ExactlyOnce });
         await settleWithin(closed.promise, 'the connection');
         assertEquals(received, ['PUBLISH dup=false', `DISCONNECT reasonCode=${Mqtt.ReasonCode.UnspecifiedError}`]);
 
@@ -278,9 +278,9 @@ Deno.test({ name: '@failing outgoing store', only: false }, async (context) => {
   const disconnected = `DISCONNECT reasonCode=${Mqtt.ReasonCode.UnspecifiedError}`;
   for (
     const [ending, qos, expected] of [
-      ['PUBACK', Mqtt.QoS.AT_LEAST_ONCE, ['PUBLISH dup=false', disconnected, 'PUBLISH dup=true']],
-      ['PUBCOMP', Mqtt.QoS.EXACTLY_ONCE, ['PUBLISH dup=false', 'PUBREL', disconnected, 'PUBREL']],
-      ['PUBREC with an error Reason Code', Mqtt.QoS.EXACTLY_ONCE, ['PUBLISH dup=false', disconnected, 'PUBLISH dup=true']],
+      ['PUBACK', Mqtt.QoS.AtLeastOnce, ['PUBLISH dup=false', disconnected, 'PUBLISH dup=true']],
+      ['PUBCOMP', Mqtt.QoS.ExactlyOnce, ['PUBLISH dup=false', 'PUBREL', disconnected, 'PUBREL']],
+      ['PUBREC with an error Reason Code', Mqtt.QoS.ExactlyOnce, ['PUBLISH dup=false', disconnected, 'PUBLISH dup=true']],
     ] as const
   ) {
     await context.step(
@@ -311,16 +311,16 @@ Deno.test({ name: '@failing outgoing store', only: false }, async (context) => {
             const packet = event.detail;
             received.push(`PUBLISH dup=${packet.dup}`);
             if (ending === 'PUBACK') {
-              broker.sendPuback('cid', packetIdOf(packet), Mqtt.ProtocolVersion.MQTT_V5);
+              broker.sendPuback('cid', packetIdOf(packet), Mqtt.ProtocolVersion.MqttV5);
             } else if (ending === 'PUBCOMP') {
-              broker.sendPubrec('cid', packetIdOf(packet), Mqtt.ProtocolVersion.MQTT_V5);
+              broker.sendPubrec('cid', packetIdOf(packet), Mqtt.ProtocolVersion.MqttV5);
             } else {
-              broker.sendPubrec('cid', packetIdOf(packet), Mqtt.ProtocolVersion.MQTT_V5, Mqtt.ReasonCode.UnspecifiedError);
+              broker.sendPubrec('cid', packetIdOf(packet), Mqtt.ProtocolVersion.MqttV5, Mqtt.ReasonCode.UnspecifiedError);
             }
           });
           broker.on('pubrel', (event) => {
             received.push('PUBREL');
-            broker.sendPubcomp('cid', event.detail.packetId, Mqtt.ProtocolVersion.MQTT_V5);
+            broker.sendPubcomp('cid', event.detail.packetId, Mqtt.ProtocolVersion.MqttV5);
           });
           broker.on('disconnect', (event) => {
             received.push(`DISCONNECT reasonCode=${event.detail.reasonCode}`);
