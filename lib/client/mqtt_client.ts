@@ -56,8 +56,8 @@ export class MqttClient extends BaseMqttClient {
    */
   protected conn?: Deno.Conn;
   // Writes to and reads from `conn`. Set when it is opened.
-  private writer?: WritableStreamDefaultWriter<Uint8Array>;
-  private reader?: ReadableStreamDefaultReader<Uint8Array>;
+  #writer?: WritableStreamDefaultWriter<Uint8Array>;
+  #reader?: ReadableStreamDefaultReader<Uint8Array>;
 
   /**
    * Creates a client. It does not connect until {@link MqttClient.connect} is called.
@@ -109,11 +109,11 @@ export class MqttClient extends BaseMqttClient {
 
     // Nothing of this client is changed until the connection is open: an aborted opening must not affect the next one.
     this.conn = await openUnlessAborted(openSocket(), signal);
-    this.writer = this.conn.writable.getWriter();
+    this.#writer = this.conn.writable.getWriter();
     // The receive loop reads this connection only, and reports its close only while it is the connection of the client:
     // a loop that outlives its connection must not touch the next one.
     const reader = this.conn.readable.getReader();
-    this.reader = reader;
+    this.#reader = reader;
     // Not shared with a previous connection, which may have left a partial packet.
     const frameBuffer = this.createFrameBuffer();
 
@@ -153,7 +153,7 @@ export class MqttClient extends BaseMqttClient {
         // would keep receiving, and the broker would see the client as connected until the keep alive expires.
         // cancel() rejects when the connection has failed already, e.g. it was reset: there is nothing to close then.
         await reader.cancel().catch(() => {});
-        if (this.reader === reader) {
+        if (this.#reader === reader) {
           this.detectClosed();
         }
       }
@@ -166,7 +166,7 @@ export class MqttClient extends BaseMqttClient {
    * @ignore
    */
   protected override async write(bytes: Uint8Array): Promise<void> {
-    const writer = this.writer;
+    const writer = this.#writer;
     if (!writer) {
       return Promise.reject(new SendPacketError());
     }
@@ -180,6 +180,6 @@ export class MqttClient extends BaseMqttClient {
    * @ignore
    */
   protected override async close(): Promise<void> {
-    await this.reader?.cancel();
+    await this.#reader?.cancel();
   }
 }
