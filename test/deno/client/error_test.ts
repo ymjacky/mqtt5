@@ -1,34 +1,53 @@
-import { assert, assertEquals } from '@std/assert';
+import { assert, assertEquals, assertStrictEquals } from '@std/assert';
 import { ClientErrors, Mqtt, MqttPackets, MqttProperties } from '../../../deno/mod.ts';
+import { InvalidQoSError, MqttUtilsError } from '../../../lib/mqtt_utils/mod.ts';
+import { PacketTooLargeToReceiveError } from '../../../lib/mqtt_stream_utils/mod.ts';
 
-// One instance of each error class that users can catch, by the name of its class.
-const errors: Record<string, Error> = {
-  ConnectionClosed: new ClientErrors.ConnectionClosed(),
-  MalformedPacketError: new ClientErrors.MalformedPacketError('m'),
-  ConnectTimeout: new ClientErrors.ConnectTimeout(),
-  InvalidPacketBeforeConnackError: new ClientErrors.InvalidPacketBeforeConnackError(Mqtt.ReasonCode.MalformedPacket),
-  StateIsNotOfflineError: new ClientErrors.StateIsNotOfflineError('m'),
-  StateIsNotOnlineError: new ClientErrors.StateIsNotOnlineError('m'),
-  SessionLostError: new ClientErrors.SessionLostError(),
-  SendPacketError: new ClientErrors.SendPacketError(),
-  InvalidTopicNameError: new ClientErrors.InvalidTopicNameError('m'),
-  InvalidTopicFilterError: new ClientErrors.InvalidTopicFilterError('m'),
-  InvalidPropertyError: new ClientErrors.InvalidPropertyError('m'),
-  InvalidArgumentError: new ClientErrors.InvalidArgumentError('m'),
-  PacketTooLargeError: new ClientErrors.PacketTooLargeError('m'),
-  NotSupportedByBrokerError: new ClientErrors.NotSupportedByBrokerError('m'),
-  QoSNotSupportedError: new ClientErrors.QoSNotSupportedError(2, 1),
-  RetainNotSupportedError: new ClientErrors.RetainNotSupportedError(),
-  WildcardSubscriptionsNotSupportedError: new ClientErrors.WildcardSubscriptionsNotSupportedError('a/#'),
-  SubscriptionIdentifiersNotSupportedError: new ClientErrors.SubscriptionIdentifiersNotSupportedError(),
-  SharedSubscriptionsNotSupportedError: new ClientErrors.SharedSubscriptionsNotSupportedError('$share/g/a'),
-  UnexpectedUrlProtocol: new ClientErrors.UnexpectedUrlProtocol('m'),
-  MqttPacketParseError: new MqttPackets.MqttPacketsError.MqttPacketParseError('m'),
-  MqttPacketSerializeError: new MqttPackets.MqttPacketsError.MqttPacketSerializeError('m'),
-  UnsupportedPacketError: new MqttPackets.MqttPacketsError.UnsupportedPacketError('m'),
-  InvalidProtocolVersionError: new MqttPackets.MqttPacketsError.InvalidProtocolVersionError('m'),
-  UnsupportedPropertyError: new MqttProperties.UnsupportedPropertyError(0),
+// Creates an error of one class, passing `options` to its constructor.
+type ErrorFactory = (options?: ErrorOptions) => Error;
+
+// One factory for each error class that users can catch, by the name of its class.
+const errors: Record<string, ErrorFactory> = {
+  MqttClientError: (options) => new ClientErrors.MqttClientError('m', options),
+  ConnectionClosed: (options) => new ClientErrors.ConnectionClosed(options),
+  MalformedPacketError: (options) => new ClientErrors.MalformedPacketError('m', options),
+  ConnectTimeout: (options) => new ClientErrors.ConnectTimeout(options),
+  InvalidPacketBeforeConnackError: (options) => new ClientErrors.InvalidPacketBeforeConnackError(Mqtt.ReasonCode.MalformedPacket, options),
+  StateIsNotOfflineError: (options) => new ClientErrors.StateIsNotOfflineError('m', options),
+  StateIsNotOnlineError: (options) => new ClientErrors.StateIsNotOnlineError('m', options),
+  SessionLostError: (options) => new ClientErrors.SessionLostError(options),
+  SendPacketError: (options) => new ClientErrors.SendPacketError(options),
+  InvalidTopicNameError: (options) => new ClientErrors.InvalidTopicNameError('m', options),
+  InvalidTopicFilterError: (options) => new ClientErrors.InvalidTopicFilterError('m', options),
+  InvalidPropertyError: (options) => new ClientErrors.InvalidPropertyError('m', options),
+  InvalidArgumentError: (options) => new ClientErrors.InvalidArgumentError('m', options),
+  PacketTooLargeError: (options) => new ClientErrors.PacketTooLargeError('m', options),
+  NotSupportedByBrokerError: (options) => new ClientErrors.NotSupportedByBrokerError('m', options),
+  QoSNotSupportedError: (options) => new ClientErrors.QoSNotSupportedError(2, 1, options),
+  RetainNotSupportedError: (options) => new ClientErrors.RetainNotSupportedError(options),
+  WildcardSubscriptionsNotSupportedError: (options) => new ClientErrors.WildcardSubscriptionsNotSupportedError('a/#', options),
+  SubscriptionIdentifiersNotSupportedError: (options) => new ClientErrors.SubscriptionIdentifiersNotSupportedError(options),
+  SharedSubscriptionsNotSupportedError: (options) => new ClientErrors.SharedSubscriptionsNotSupportedError('$share/g/a', options),
+  UnexpectedUrlProtocol: (options) => new ClientErrors.UnexpectedUrlProtocol('m', options),
+  MqttPacketParseError: (options) => new MqttPackets.MqttPacketsError.MqttPacketParseError('m', options),
+  MqttPacketSerializeError: (options) => new MqttPackets.MqttPacketsError.MqttPacketSerializeError('m', options),
+  UnsupportedPacketError: (options) => new MqttPackets.MqttPacketsError.UnsupportedPacketError('m', options),
+  InvalidProtocolVersionError: (options) => new MqttPackets.MqttPacketsError.InvalidProtocolVersionError('m', options),
+  UnsupportedPropertyError: (options) => new MqttProperties.UnsupportedPropertyError(0, options),
 };
+
+// The error classes that are not exported: users see them only as the `cause` of another error.
+const internalErrors: Record<string, ErrorFactory> = {
+  NumIsOutOfRange: (options) => new MqttUtilsError.NumIsOutOfRange(options),
+  RemainingLengthError: (options) => new MqttUtilsError.RemainingLengthError('m', options),
+  InvalidUtf8EncodedStringError: (options) => new MqttUtilsError.InvalidUtf8EncodedStringError('m', options),
+  MalformedDataError: (options) => new MqttUtilsError.MalformedDataError('m', options),
+  ProtocolViolationError: (options) => new MqttUtilsError.ProtocolViolationError('m', options),
+  InvalidQoSError: (options) => new InvalidQoSError(3, options),
+  PacketTooLargeToReceiveError: (options) => new PacketTooLargeToReceiveError(10, 5, options),
+};
+
+const allErrors = { ...errors, ...internalErrors };
 
 Deno.test('every error class that users can catch is tested here', () => {
   const exported = [
@@ -39,11 +58,32 @@ Deno.test('every error class that users can catch is tested here', () => {
   assertEquals(exported.sort(), Object.keys(errors).sort());
 });
 
+Deno.test('every error class of the utilities is tested here', () => {
+  assertEquals(Object.keys(MqttUtilsError).sort(), Object.keys(internalErrors).filter((key) => key in MqttUtilsError).sort());
+});
+
 Deno.test('an error has the name of its class, which logs and String() show', () => {
-  for (const [className, error] of Object.entries(errors)) {
+  for (const [className, create] of Object.entries(allErrors)) {
+    const error = create();
     assertEquals(error.name, className);
     assertEquals(String(error), `${className}: ${error.message}`);
     assert(error.stack?.startsWith(`${className}: `), className);
+  }
+});
+
+Deno.test('every error class of this library extends MqttClientError, so that one catch handles all of them', () => {
+  for (const [className, create] of Object.entries(allErrors)) {
+    const error = create();
+    assert(error instanceof ClientErrors.MqttClientError, className);
+    assert(error instanceof Error, className);
+  }
+});
+
+Deno.test('an error has the error that caused it as cause, and no cause without one', () => {
+  for (const [className, create] of Object.entries(allErrors)) {
+    const cause = new Error('the underlying error');
+    assertStrictEquals(create({ cause }).cause, cause, className);
+    assert(!('cause' in create()), className);
   }
 });
 
@@ -66,4 +106,8 @@ Deno.test('the error classes stay apart as types', () => {
   // @ts-expect-error not about broker support
   const _notSupported: ClientErrors.NotSupportedByBrokerError = new ClientErrors.InvalidArgumentError('m');
   const _subclass: ClientErrors.NotSupportedByBrokerError = new ClientErrors.RetainNotSupportedError();
+  // Every error class of this library has the type of the base class.
+  const _base: ClientErrors.MqttClientError = new ClientErrors.ConnectTimeout();
+  const _packets: ClientErrors.MqttClientError = new MqttPackets.MqttPacketsError.MqttPacketParseError('m');
+  const _properties: ClientErrors.MqttClientError = new MqttProperties.UnsupportedPropertyError(0);
 });

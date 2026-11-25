@@ -1,6 +1,6 @@
-import { ClientErrors, type ClientTypes, Mqtt, MqttClient, type MqttPackets, type MqttProperties, Store } from '../../../deno/mod.ts';
+import { ClientErrors, type ClientTypes, Mqtt, MqttClient, MqttPackets, type MqttProperties, Store } from '../../../deno/mod.ts';
 import { packetIdOf, TestBroker } from '../broker/test_broker.ts';
-import { assertEquals, assertRejects, fail } from '@std/assert';
+import { assertEquals, assertInstanceOf, assertRejects, fail } from '@std/assert';
 
 function logger(msg: string, ...args: unknown[]): void {
   console.log('[Test Client]', msg, ...args);
@@ -1347,11 +1347,13 @@ Deno.test({ name: '@publish too large', only: false }, async (context) => {
 
         // With the topic and the packet ID, the Remaining Length is larger than 268,435,455.
         const payload = new Uint8Array(268_435_455);
-        await assertRejects(
+        const error = await assertRejects(
           () => client.publish('topicA', payload, { qos: Mqtt.QoS.AtLeastOnce }),
           ClientErrors.PacketTooLargeError,
           'Remaining Length',
         );
+        // The error of the encoder is kept as the cause.
+        assertInstanceOf(error.cause, MqttPackets.MqttPacketsError.MqttPacketSerializeError);
         assertEquals(await client.publishInflightCount(), 0);
 
         // The released packet ID 1 is used again.

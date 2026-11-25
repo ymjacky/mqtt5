@@ -1,7 +1,7 @@
 import { ClientErrors, KvOutgoingStore, Mqtt, MqttClient, MqttPackets, type MqttProperties } from '../../../deno/mod.ts';
 import { TestBroker } from '../broker/test_broker.ts';
 import { kvStore } from '../store/outgoing_store_contract.ts';
-import { assertEquals, assertRejects, assertStringIncludes, assertThrows } from '@std/assert';
+import { assertEquals, assertInstanceOf, assertRejects, assertStringIncludes, assertThrows } from '@std/assert';
 
 function logger(msg: string, ...args: unknown[]): void {
   console.log('[Test Client]', msg, ...args);
@@ -357,11 +357,14 @@ Deno.test({ name: '@session in Deno KV: client options', only: false }, async (c
       const outgoingStore = new KvOutgoingStore(kv);
       new MqttClient({ clientId: 'clientA', outgoingStore });
       new MqttClient({ clientId: 'clientA', outgoingStore });
-      assertThrows(
+      const error = assertThrows(
         () => new MqttClient({ clientId: 'clientB', outgoingStore }),
         ClientErrors.InvalidArgumentError,
         "already used with the Client Identifier 'clientA'",
       );
+      // The error of the store is kept as the cause.
+      assertInstanceOf(error.cause, Error);
+      assertStringIncludes(error.cause.message, "already used with the Client Identifier 'clientA'");
     } finally {
       kv.close();
     }

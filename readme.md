@@ -357,6 +357,10 @@ connection, e.g. `Deno.errors.ConnectionRefused` when the broker is not running,
 trusted; `WebSocketMqttClient.connect()` rejects with `ConnectionClosed` then. When `connect()` rejects, or resolves with a CONNACK that refuses the
 connection, the client has closed the connection and is offline again, so it can be called again right away.
 
+All the errors above extend `ClientErrors.MqttClientError`, and so do the other error classes of this library, e.g.
+`MqttPackets.MqttPacketsError.MqttPacketParseError`: catch it to handle all of them at once. The errors of opening the connection, e.g.
+`Deno.errors.ConnectionRefused`, and of a session store, e.g. Deno KV, are not of it. `err.cause` is the error that caused one, when there is one.
+
 ### Connecting
 
 ```ts
@@ -403,6 +407,8 @@ try {
     console.error('not connected');
   } else if (err instanceof ClientErrors.InvalidTopicNameError || err instanceof ClientErrors.InvalidArgumentError) {
     console.error(err.message); // e.g. a topic with a wildcard: 'sensors/+/temperature'
+  } else if (err instanceof ClientErrors.MqttClientError) {
+    console.error(`${err.name}: ${err.message}`); // another error of this library, e.g. PacketTooLargeError
   } else {
     throw err;
   }

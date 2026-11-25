@@ -17,7 +17,8 @@
  *   clients. They are listed under {@link BaseMqttClient}.
  * - Constants such as `Mqtt.QoS`, `Mqtt.ProtocolVersion` and `Mqtt.ReasonCode` are in the `Mqtt` namespace.
  * - Option and result types, such as `ClientTypes.ConnectOptions` and `ClientTypes.PublishOptions`, are in the `ClientTypes` namespace.
- * - Errors thrown by the client are in the `ClientErrors` namespace; check them with `instanceof`.
+ * - Errors thrown by the client are in the `ClientErrors` namespace; check them with `instanceof`. Every error class of this library
+ *   extends `ClientErrors.MqttClientError`, so catching it handles all of them at once.
  * - MQTT 5.0 properties are described by the types in the `MqttProperties` namespace.
  * - To keep QoS 1 / QoS 2 messages in flight across restarts, use {@link KvOutgoingStore} (Deno KV, unstable).
  *
@@ -202,6 +203,8 @@
  *     console.error('the broker is not running');
  *   } else if (err instanceof ClientErrors.InvalidTopicNameError) {
  *     console.error(err.message);
+ *   } else if (err instanceof ClientErrors.MqttClientError) {
+ *     console.error(`${err.name}: ${err.message}`); // another error of this library, e.g. StateIsNotOnlineError
  *   } else {
  *     throw err;
  *   }

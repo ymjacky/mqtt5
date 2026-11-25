@@ -1,5 +1,7 @@
+import { MqttClientError } from '../error/mod.ts';
+
 /** Received bytes could not be decoded as an MQTT packet. */
-export class MqttPacketParseError extends Error {
+export class MqttPacketParseError extends MqttClientError {
   /** The name of the error class. */
   override readonly name = 'MqttPacketParseError' as const;
   /** Creates the error. Pass the underlying error as `options.cause`. */
@@ -9,7 +11,7 @@ export class MqttPacketParseError extends Error {
 }
 
 /** A packet could not be encoded to bytes. */
-export class MqttPacketSerializeError extends Error {
+export class MqttPacketSerializeError extends MqttClientError {
   /** The name of the error class. */
   override readonly name = 'MqttPacketSerializeError' as const;
   /** Creates the error. Pass the underlying error as `options.cause`. */
@@ -19,21 +21,21 @@ export class MqttPacketSerializeError extends Error {
 }
 
 /** The packet type is not supported. */
-export class UnsupportedPacketError extends Error {
+export class UnsupportedPacketError extends MqttClientError {
   /** The name of the error class. */
   override readonly name = 'UnsupportedPacketError' as const;
-  /** Creates the error for the given packet type. */
-  constructor(packetType: string) {
-    super(`unsupported packet: ${packetType}`);
+  /** Creates the error for the given packet type. Pass the underlying error as `options.cause`. */
+  constructor(packetType: string, options?: ErrorOptions) {
+    super(`unsupported packet: ${packetType}`, options);
   }
 }
 
 /** The protocol version is not supported. */
-export class InvalidProtocolVersionError extends Error {
+export class InvalidProtocolVersionError extends MqttClientError {
   /** The name of the error class. */
   override readonly name = 'InvalidProtocolVersionError' as const;
-  /** Creates the error with the given details. */
-  constructor(message: string) {
-    super(`invalid protocol version: ${message}`);
+  /** Creates the error with the given details. Pass the underlying error as `options.cause`. */
+  constructor(message: string, options?: ErrorOptions) {
+    super(`invalid protocol version: ${message}`, options);
   }
 }

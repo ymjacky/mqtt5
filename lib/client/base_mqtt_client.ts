@@ -258,7 +258,7 @@ export abstract class BaseMqttClient {
     try {
       outgoingStore?.setClientId?.(this.#clientId);
     } catch (err) {
-      throw new InvalidArgumentError(`the outgoingStore cannot be used with the clientId '${this.#clientId}': ${(err as Error).message}`);
+      throw new InvalidArgumentError(`the outgoingStore cannot be used with the clientId '${this.#clientId}': ${(err as Error).message}`, { cause: err });
     }
     this.#session = new Session(this.#clientId, outgoingStore);
 
@@ -295,7 +295,9 @@ export abstract class BaseMqttClient {
     } catch (err) {
       // The encoder fails on the Remaining Length when it builds the fixed header, before copying a large payload.
       if (err instanceof MqttPackets.MqttPacketsError.MqttPacketSerializeError && err.cause instanceof MqttUtils.MqttUtilsError.RemainingLengthError) {
-        throw new PacketTooLargeError(`${name} has a Remaining Length larger than ${MqttUtils.maxVariableByteInteger} bytes, the largest MQTT allows`);
+        throw new PacketTooLargeError(`${name} has a Remaining Length larger than ${MqttUtils.maxVariableByteInteger} bytes, the largest MQTT allows`, {
+          cause: err,
+        });
       }
       throw err;
     }
