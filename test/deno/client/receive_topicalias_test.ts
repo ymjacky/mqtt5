@@ -55,7 +55,7 @@ Deno.test({ name: '@receive topic alias', only: false }, async (context) => {
           topicAlias: 1,
         };
         broker.sendPublish(
-          client.getClientId(),
+          client.clientId,
           0,
           'topicA',
           Mqtt.ProtocolVersion.MQTT_V5,
@@ -67,7 +67,7 @@ Deno.test({ name: '@receive topic alias', only: false }, async (context) => {
         );
 
         broker.sendPublish(
-          client.getClientId(),
+          client.clientId,
           0,
           '',
           Mqtt.ProtocolVersion.MQTT_V5,
@@ -79,7 +79,7 @@ Deno.test({ name: '@receive topic alias', only: false }, async (context) => {
         );
 
         broker.sendPublish(
-          client.getClientId(),
+          client.clientId,
           0,
           '',
           Mqtt.ProtocolVersion.MQTT_V5,
@@ -148,7 +148,7 @@ Deno.test({ name: '@receive topic alias', only: false }, async (context) => {
         });
 
         broker.sendPublish(
-          client.getClientId(),
+          client.clientId,
           0,
           'topicA',
           Mqtt.ProtocolVersion.MQTT_V5,
@@ -160,7 +160,7 @@ Deno.test({ name: '@receive topic alias', only: false }, async (context) => {
         );
 
         broker.sendPublish(
-          client.getClientId(),
+          client.clientId,
           0,
           'topicB',
           Mqtt.ProtocolVersion.MQTT_V5,
@@ -172,7 +172,7 @@ Deno.test({ name: '@receive topic alias', only: false }, async (context) => {
         );
 
         broker.sendPublish(
-          client.getClientId(),
+          client.clientId,
           0,
           'topicA',
           Mqtt.ProtocolVersion.MQTT_V5,
@@ -184,7 +184,7 @@ Deno.test({ name: '@receive topic alias', only: false }, async (context) => {
         );
 
         broker.sendPublish(
-          client.getClientId(),
+          client.clientId,
           0,
           '',
           Mqtt.ProtocolVersion.MQTT_V5,
@@ -241,7 +241,7 @@ Deno.test({ name: '@receive topic alias', only: false }, async (context) => {
         });
 
         broker.sendPublish(
-          client.getClientId(),
+          client.clientId,
           0,
           '',
           Mqtt.ProtocolVersion.MQTT_V5,
@@ -253,7 +253,7 @@ Deno.test({ name: '@receive topic alias', only: false }, async (context) => {
         );
 
         broker.sendPublish(
-          client.getClientId(),
+          client.clientId,
           0,
           'topicA',
           Mqtt.ProtocolVersion.MQTT_V5,

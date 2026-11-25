@@ -35,8 +35,8 @@ export class LruCache<K, V> {
     return this.#values.entries();
   }
 
-  /** Returns the maximum number of entries. */
-  public capacity(): number {
+  /** The maximum number of entries. */
+  public get capacity(): number {
     return this.#capacity;
   }
 
@@ -90,8 +90,8 @@ export class LruCache<K, V> {
     return this.#values.delete(key);
   }
 
-  /** Returns the number of entries. */
-  public size(): number {
+  /** The number of entries. */
+  public get size(): number {
     return this.#values.size;
   }
 

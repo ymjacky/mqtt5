@@ -116,7 +116,7 @@ Deno.test({ name: '@connect', only: false }, async (context) => {
           assertEquals(packet.protocolVersion, Mqtt.ProtocolVersion.MQTT_V3_1_1);
 
           await broker.sendConnack(packet.clientId, false, packet.protocolVersion, Mqtt.V3_1_1_ConnectReturnCode.NotAuthorized);
-          broker.closeConnectionFromBroker(client.getClientId());
+          broker.closeConnectionFromBroker(client.clientId);
         });
 
         const connack = await client.connect();
@@ -309,7 +309,7 @@ Deno.test({ name: '@connect', only: false }, async (context) => {
           };
 
           await broker.sendConnack(packet.clientId, false, packet.protocolVersion, Mqtt.ReasonCode.NotAuthorized, connackProperties);
-          broker.closeConnectionFromBroker(client.getClientId());
+          broker.closeConnectionFromBroker(client.clientId);
         });
 
         const connack = await client.connect();

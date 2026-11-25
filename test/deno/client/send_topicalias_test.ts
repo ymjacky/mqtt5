@@ -420,7 +420,7 @@ Deno.test({ name: '@send topic alias', only: false }, async (context) => {
         while (received.length < 2) {
           await new Promise((resolve) => setTimeout(resolve, 10));
         }
-        await broker.closeConnectionFromBroker(client.getClientId());
+        await broker.closeConnectionFromBroker(client.clientId);
         await closed.promise;
 
         sendPuback = true;

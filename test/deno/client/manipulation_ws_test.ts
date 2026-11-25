@@ -77,7 +77,7 @@ Deno.test({ name: '@manipulation', only: false }, async (context) => {
         broker.on('disconnect', (event) => {
           const packet = event.detail;
           assertExists(packet);
-          broker.closeConnectionFromBroker(client.getClientId());
+          broker.closeConnectionFromBroker(client.clientId);
         });
 
         let closedCount = 0;
@@ -325,7 +325,7 @@ Deno.test({ name: '@manipulation', only: false }, async (context) => {
         await client.connect();
 
         broker.on('disconnect', () => {
-          broker.closeConnectionFromBroker(client.getClientId());
+          broker.closeConnectionFromBroker(client.clientId);
         });
         await client.disconnect();
 
@@ -368,11 +368,11 @@ Deno.test({ name: '@manipulation', only: false }, async (context) => {
         });
 
         broker.on('disconnect', () => {
-          broker.closeConnectionFromBroker(client.getClientId());
+          broker.closeConnectionFromBroker(client.clientId);
           resolve();
         });
         broker.on('connect', () => {
-          broker.sendConnack(client.getClientId(), false, Mqtt.ProtocolVersion.MQTT_V5);
+          broker.sendConnack(client.clientId, false, Mqtt.ProtocolVersion.MQTT_V5);
         });
 
         client.connect();
@@ -408,7 +408,7 @@ Deno.test({ name: '@manipulation', only: false }, async (context) => {
         });
 
         broker.on('connect', () => {
-          broker.sendConnack(client.getClientId(), false, Mqtt.ProtocolVersion.MQTT_V5);
+          broker.sendConnack(client.clientId, false, Mqtt.ProtocolVersion.MQTT_V5);
           resolve();
         });
 
@@ -460,7 +460,7 @@ Deno.test({ name: '@manipulation', only: false }, async (context) => {
 
         await client.connect();
 
-        broker.sendPuback(client.getClientId(), 999, Mqtt.ProtocolVersion.MQTT_V5);
+        broker.sendPuback(client.clientId, 999, Mqtt.ProtocolVersion.MQTT_V5);
 
         await promise;
       } catch (err) {
@@ -504,7 +504,7 @@ Deno.test({ name: '@manipulation', only: false }, async (context) => {
 
         await client.connect();
 
-        broker.sendPubrec(client.getClientId(), 999, Mqtt.ProtocolVersion.MQTT_V5);
+        broker.sendPubrec(client.clientId, 999, Mqtt.ProtocolVersion.MQTT_V5);
 
         await promise;
       } catch (err) {
@@ -548,7 +548,7 @@ Deno.test({ name: '@manipulation', only: false }, async (context) => {
 
         await client.connect();
 
-        broker.sendPubrel(client.getClientId(), 999, Mqtt.ProtocolVersion.MQTT_V5);
+        broker.sendPubrel(client.clientId, 999, Mqtt.ProtocolVersion.MQTT_V5);
 
         await promise;
       } catch (err) {
@@ -589,7 +589,7 @@ Deno.test({ name: '@manipulation', only: false }, async (context) => {
 
         await client.connect();
 
-        broker.sendPubcomp(client.getClientId(), 999, Mqtt.ProtocolVersion.MQTT_V5);
+        broker.sendPubcomp(client.clientId, 999, Mqtt.ProtocolVersion.MQTT_V5);
 
         await promise;
       } catch (err) {
@@ -630,7 +630,7 @@ Deno.test({ name: '@manipulation', only: false }, async (context) => {
 
         await client.connect();
 
-        broker.sendSuback(client.getClientId(), 999, Mqtt.ProtocolVersion.MQTT_V5);
+        broker.sendSuback(client.clientId, 999, Mqtt.ProtocolVersion.MQTT_V5);
 
         await promise;
       } catch (err) {
@@ -671,7 +671,7 @@ Deno.test({ name: '@manipulation', only: false }, async (context) => {
 
         await client.connect();
 
-        broker.sendUnsuback(client.getClientId(), 999, Mqtt.ProtocolVersion.MQTT_V5);
+        broker.sendUnsuback(client.clientId, 999, Mqtt.ProtocolVersion.MQTT_V5);
 
         await promise;
       } catch (err) {

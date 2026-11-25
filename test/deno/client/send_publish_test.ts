@@ -1064,7 +1064,7 @@ Deno.test({ name: '@receive malformed puback', only: false }, async (context) =>
             0xFF, // Property ID: 0xFF (INVALID)
           ]);
 
-          broker.sendRawBytes(client.getClientId(), malformedPacket);
+          broker.sendRawBytes(client.clientId, malformedPacket);
         });
 
         client.publish('topicA', 'payload', { qos: Mqtt.QoS.AT_LEAST_ONCE });
@@ -1144,7 +1144,7 @@ Deno.test({ name: '@receive malformed pubrec', only: false }, async (context) =>
             0xFF, // Property ID: 0xFF (INVALID)
           ]);
 
-          broker.sendRawBytes(client.getClientId(), malformedPacket);
+          broker.sendRawBytes(client.clientId, malformedPacket);
         });
 
         client.publish('topicA', 'payload', { qos: Mqtt.QoS.EXACTLY_ONCE });
@@ -1211,7 +1211,7 @@ Deno.test({ name: '@receive malformed pubcomp', only: false }, async (context) =
         broker.on('publish', (event) => {
           const packet = event.detail;
           // First send valid PUBREC
-          broker.sendPubrec(client.getClientId(), packetIdOf(packet), Mqtt.ProtocolVersion.MQTT_V5);
+          broker.sendPubrec(client.clientId, packetIdOf(packet), Mqtt.ProtocolVersion.MQTT_V5);
         });
 
         broker.on('pubrel', (event) => {
@@ -1230,7 +1230,7 @@ Deno.test({ name: '@receive malformed pubcomp', only: false }, async (context) =
             0xFF, // Property ID: 0xFF (INVALID)
           ]);
 
-          broker.sendRawBytes(client.getClientId(), malformedPacket);
+          broker.sendRawBytes(client.clientId, malformedPacket);
         });
 
         client.publish('topicA', 'payload', { qos: Mqtt.QoS.EXACTLY_ONCE });

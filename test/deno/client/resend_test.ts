@@ -72,7 +72,7 @@ Deno.test({ name: '@resend from MemoryStore', only: false }, async (context) => 
             assertEquals(packet.packetId, expectedPacketId++);
             if (expectedPacketId > 3) {
               expectedPacketId = 1;
-              broker.closeConnectionFromBroker(client.getClientId());
+              broker.closeConnectionFromBroker(client.clientId);
             }
           }
         });
@@ -97,7 +97,7 @@ Deno.test({ name: '@resend from MemoryStore', only: false }, async (context) => 
         broker.on('disconnect', (event) => {
           const packet = event.detail;
           assertExists(packet);
-          broker.closeConnectionFromBroker(client.getClientId());
+          broker.closeConnectionFromBroker(client.clientId);
         });
 
         client.on('closed', async () => {
@@ -181,7 +181,7 @@ Deno.test({ name: '@resend from MemoryStore', only: false }, async (context) => 
             assertEquals(packet.packetId, expectedPacketId++);
             if (expectedPacketId > 3) {
               expectedPacketId = 1;
-              broker.closeConnectionFromBroker(client.getClientId());
+              broker.closeConnectionFromBroker(client.clientId);
             }
           }
         });
@@ -193,7 +193,7 @@ Deno.test({ name: '@resend from MemoryStore', only: false }, async (context) => 
         broker.on('disconnect', (event) => {
           const packet = event.detail;
           assertExists(packet);
-          broker.closeConnectionFromBroker(client.getClientId());
+          broker.closeConnectionFromBroker(client.clientId);
         });
 
         client.on('closed', async () => {
@@ -291,7 +291,7 @@ Deno.test({ name: '@resend from MemoryStore', only: false }, async (context) => 
             assertEquals(packet.packetId, expectedPacketId++);
             if (expectedPacketId > 3) {
               expectedPacketId = 1;
-              broker.closeConnectionFromBroker(client.getClientId());
+              broker.closeConnectionFromBroker(client.clientId);
             }
           }
         });
@@ -316,7 +316,7 @@ Deno.test({ name: '@resend from MemoryStore', only: false }, async (context) => 
         broker.on('disconnect', (event) => {
           const packet = event.detail;
           assertExists(packet);
-          broker.closeConnectionFromBroker(client.getClientId());
+          broker.closeConnectionFromBroker(client.clientId);
         });
 
         client.on('closed', async () => {
@@ -400,7 +400,7 @@ Deno.test({ name: '@resend from MemoryStore', only: false }, async (context) => 
             assertEquals(packet.packetId, expectedPacketId++);
             if (expectedPacketId > 3) {
               expectedPacketId = 1;
-              broker.closeConnectionFromBroker(client.getClientId());
+              broker.closeConnectionFromBroker(client.clientId);
             }
           }
         });
@@ -412,7 +412,7 @@ Deno.test({ name: '@resend from MemoryStore', only: false }, async (context) => 
         broker.on('disconnect', (event) => {
           const packet = event.detail;
           assertExists(packet);
-          broker.closeConnectionFromBroker(client.getClientId());
+          broker.closeConnectionFromBroker(client.clientId);
         });
 
         client.on('closed', async () => {
@@ -519,7 +519,7 @@ Deno.test({ name: '@resend from MemoryStore', only: false }, async (context) => 
               Mqtt.ProtocolVersion.MQTT_V5,
             );
           } else {
-            broker.closeConnectionFromBroker(client.getClientId());
+            broker.closeConnectionFromBroker(client.clientId);
           }
         });
 
@@ -543,7 +543,7 @@ Deno.test({ name: '@resend from MemoryStore', only: false }, async (context) => 
         broker.on('disconnect', (event) => {
           const packet = event.detail;
           assertExists(packet);
-          broker.closeConnectionFromBroker(client.getClientId());
+          broker.closeConnectionFromBroker(client.clientId);
         });
 
         client.on('closed', async () => {
@@ -634,7 +634,7 @@ Deno.test({ name: '@resend from MemoryStore', only: false }, async (context) => 
               Mqtt.ProtocolVersion.MQTT_V5,
             );
           } else {
-            broker.closeConnectionFromBroker(client.getClientId());
+            broker.closeConnectionFromBroker(client.clientId);
           }
         });
 
@@ -645,7 +645,7 @@ Deno.test({ name: '@resend from MemoryStore', only: false }, async (context) => 
         broker.on('disconnect', (event) => {
           const packet = event.detail;
           assertExists(packet);
-          broker.closeConnectionFromBroker(client.getClientId());
+          broker.closeConnectionFromBroker(client.clientId);
         });
 
         client.on('closed', async () => {
@@ -785,7 +785,7 @@ Deno.test({ name: '@resend from MemoryStore', only: false }, async (context) => 
             if (expectedPacketId > 3) {
               expectedPacketId = 2; // Since 1 has already returned puback, the next one should be retransmitted from 2.
 
-              broker.closeConnectionFromBroker(client.getClientId());
+              broker.closeConnectionFromBroker(client.clientId);
             }
           }
         });
@@ -810,7 +810,7 @@ Deno.test({ name: '@resend from MemoryStore', only: false }, async (context) => 
         broker.on('disconnect', (event) => {
           const packet = event.detail;
           assertExists(packet);
-          broker.closeConnectionFromBroker(client.getClientId());
+          broker.closeConnectionFromBroker(client.clientId);
         });
 
         client.on('closed', async () => {
@@ -913,7 +913,7 @@ Deno.test({ name: '@resend from MemoryStore', only: false }, async (context) => 
 
             if (packet.topic === 'topicC') {
               assertEquals(packet.packetId, 1); // 1 = reused packetId
-              broker.closeConnectionFromBroker(client.getClientId());
+              broker.closeConnectionFromBroker(client.clientId);
             }
           }
         });
@@ -925,7 +925,7 @@ Deno.test({ name: '@resend from MemoryStore', only: false }, async (context) => 
         broker.on('disconnect', (event) => {
           const packet = event.detail;
           assertExists(packet);
-          broker.closeConnectionFromBroker(client.getClientId());
+          broker.closeConnectionFromBroker(client.clientId);
         });
 
         client.on('closed', async () => {

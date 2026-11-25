@@ -150,7 +150,8 @@ export abstract class BaseMqttClient {
   protected url: URL;
   private userName?: string;
   private password?: string;
-  private clientId: string;
+  // A # field: `clientId` is the name of the public getter.
+  #clientId: string;
   // Keep Alive sent in CONNECT.
   private keepAlive: number;
   // Keep Alive used for the current connection: the Server Keep Alive in CONNACK if present, otherwise keepAlive.
@@ -243,7 +244,7 @@ export abstract class BaseMqttClient {
     this.log = options?.logger ?? (() => {});
     this.userName = options?.username;
     this.password = options?.password;
-    this.clientId = options?.clientId ?? '';
+    this.#clientId = options?.clientId ?? '';
     this.keepAlive = options?.keepAlive ?? defaultKeepAlive;
     this.currentKeepAlive = this.keepAlive;
     this.clean = options?.clean ?? true;
@@ -256,11 +257,11 @@ export abstract class BaseMqttClient {
     // the broker tells in CONNACK (Session Present) whether the stored packets are resent or removed.
     const outgoingStore = options?.outgoingStore;
     try {
-      outgoingStore?.setClientId?.(this.clientId);
+      outgoingStore?.setClientId?.(this.#clientId);
     } catch (err) {
-      throw new InvalidArgumentError(`the outgoingStore cannot be used with the clientId '${this.clientId}': ${(err as Error).message}`);
+      throw new InvalidArgumentError(`the outgoingStore cannot be used with the clientId '${this.#clientId}': ${(err as Error).message}`);
     }
-    this.session = new Session(this.clientId, outgoingStore);
+    this.session = new Session(this.#clientId, outgoingStore);
 
     this.caCerts = options?.caCerts;
     this.cert = options?.cert;
@@ -469,7 +470,7 @@ export abstract class BaseMqttClient {
 
     const connectPacket: AnyPacket = {
       type: 'connect',
-      clientId: this.clientId,
+      clientId: this.#clientId,
       username: this.userName,
       password: this.password,
       protocolVersion: this.protocolVersion,
@@ -1633,10 +1634,10 @@ export abstract class BaseMqttClient {
     this.session.resetSendQuota(packet.properties?.receiveMaximum);
     // server generates clientId
     if (packet.properties?.assignedClientIdentifier) {
-      this.clientId = packet.properties.assignedClientIdentifier;
+      this.#clientId = packet.properties.assignedClientIdentifier;
     }
     if (!packet.sessionPresent) {
-      await this.session.clearAllStores(this.clientId);
+      await this.session.clearAllStores(this.#clientId);
       if (!connectPending()) {
         return undefined;
       }
@@ -2136,12 +2137,11 @@ export abstract class BaseMqttClient {
   };
 
   /**
-   * Returns the client identifier: the one specified in the client options, or, after connecting with an empty ID to an MQTT 5.0 broker,
-   * the one assigned by the broker (Assigned Client Identifier).
-   * @returns client identifier
+   * The client identifier: the one specified in the client options, or, after connecting with an empty ID to an MQTT 5.0 broker,
+   * the one assigned by the broker (Assigned Client Identifier). Read-only.
    */
-  public getClientId(): string {
-    return this.clientId;
+  public get clientId(): string {
+    return this.#clientId;
   }
 
   /**

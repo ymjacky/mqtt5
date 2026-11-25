@@ -89,14 +89,14 @@ Deno.test({ name: '@packet handling', only: false }, async (context) => {
 
         // Send PUBREL right after PUBLISH without waiting for PUBREC.
         await broker.sendPublish(
-          client.getClientId(),
+          client.clientId,
           1,
           'topicA',
           Mqtt.ProtocolVersion.MQTT_V5,
           new TextEncoder().encode('payload A'),
           Mqtt.QoS.EXACTLY_ONCE,
         );
-        await broker.sendPubrel(client.getClientId(), 1, Mqtt.ProtocolVersion.MQTT_V5);
+        await broker.sendPubrel(client.clientId, 1, Mqtt.ProtocolVersion.MQTT_V5);
 
         await promise;
         await client.disconnect();
@@ -144,9 +144,9 @@ Deno.test({ name: '@packet handling', only: false }, async (context) => {
         });
 
         // handlePubrel() fails because incomingStore.has() rejects.
-        await broker.sendPubrel(client.getClientId(), 1, Mqtt.ProtocolVersion.MQTT_V5);
+        await broker.sendPubrel(client.clientId, 1, Mqtt.ProtocolVersion.MQTT_V5);
         await broker.sendPublish(
-          client.getClientId(),
+          client.clientId,
           0,
           'topicB',
           Mqtt.ProtocolVersion.MQTT_V5,

@@ -71,7 +71,7 @@ Deno.test({ name: '@receive framing ws', only: false }, async (context) => {
         });
 
         broker.sendRawBytes(
-          client.getClientId(),
+          client.clientId,
           concatBytes(
             publishBytes('topicA', new TextEncoder().encode('1st')),
             publishBytes('topicB', new TextEncoder().encode('2nd')),
@@ -130,10 +130,10 @@ Deno.test({ name: '@receive framing ws', only: false }, async (context) => {
         });
 
         const bytes = publishBytes('topicA', payload);
-        broker.sendRawBytes(client.getClientId(), bytes.slice(0, 2)); // fixed header byte and 1st Remaining Length byte
-        broker.sendRawBytes(client.getClientId(), bytes.slice(2, 10));
-        broker.sendRawBytes(client.getClientId(), bytes.slice(10, 200));
-        broker.sendRawBytes(client.getClientId(), bytes.slice(200));
+        broker.sendRawBytes(client.clientId, bytes.slice(0, 2)); // fixed header byte and 1st Remaining Length byte
+        broker.sendRawBytes(client.clientId, bytes.slice(2, 10));
+        broker.sendRawBytes(client.clientId, bytes.slice(10, 200));
+        broker.sendRawBytes(client.clientId, bytes.slice(200));
 
         await promise;
       } catch (err) {
@@ -184,9 +184,9 @@ Deno.test({ name: '@receive framing ws', only: false }, async (context) => {
         // The 2nd message carries the end of the 1st packet and the start of the 2nd packet.
         const first = publishBytes('topicA', new TextEncoder().encode('1st'));
         const second = publishBytes('topicB', new TextEncoder().encode('2nd'));
-        broker.sendRawBytes(client.getClientId(), first.slice(0, 5));
-        broker.sendRawBytes(client.getClientId(), concatBytes(first.slice(5), second.slice(0, 3)));
-        broker.sendRawBytes(client.getClientId(), second.slice(3));
+        broker.sendRawBytes(client.clientId, first.slice(0, 5));
+        broker.sendRawBytes(client.clientId, concatBytes(first.slice(5), second.slice(0, 3)));
+        broker.sendRawBytes(client.clientId, second.slice(3));
 
         await promise;
       } catch (err) {

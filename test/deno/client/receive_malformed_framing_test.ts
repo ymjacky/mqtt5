@@ -63,7 +63,7 @@ Deno.test({ name: '@receive malformed packet (framing error)', only: false }, as
         // integer.
         const malformedPacket = new Uint8Array([0x30, 0xFF, 0xFF, 0xFF, 0xFF]);
 
-        await broker.sendRawBytes(client.getClientId(), malformedPacket);
+        await broker.sendRawBytes(client.clientId, malformedPacket);
 
         await promise;
       } catch (err) {
@@ -122,7 +122,7 @@ Deno.test({ name: '@receive malformed packet (framing error)', only: false }, as
 
         const malformedPacket = new Uint8Array([0x30, 0xFF, 0xFF, 0xFF, 0xFF]);
 
-        await broker.sendRawBytes(client.getClientId(), malformedPacket);
+        await broker.sendRawBytes(client.clientId, malformedPacket);
 
         await promise;
       } catch (err) {

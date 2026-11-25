@@ -430,7 +430,7 @@ Deno.test({ name: '@receive malformed unsuback ws', only: false }, async (contex
             // Missing Reason Codes payload but that's okay for malformed packet test
           ]);
 
-          broker.sendRawBytes(client.getClientId(), malformedPacket);
+          broker.sendRawBytes(client.clientId, malformedPacket);
         });
 
         client.unsubscribe('topicA');

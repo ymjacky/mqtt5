@@ -54,7 +54,7 @@ Deno.test({ name: '@receive publish_qos0', only: false }, async (context) => {
         });
 
         broker.sendPublish(
-          client.getClientId(),
+          client.clientId,
           0,
           'topicA',
           Mqtt.ProtocolVersion.MQTT_V3_1_1,
@@ -152,7 +152,7 @@ Deno.test({ name: '@receive publish_qos0', only: false }, async (context) => {
           contentType: 'application/json',
         };
         broker.sendPublish(
-          client.getClientId(),
+          client.clientId,
           0,
           'topicA',
           Mqtt.ProtocolVersion.MQTT_V5,
@@ -225,7 +225,7 @@ Deno.test({ name: '@receive publish_qos1', only: false }, async (context) => {
         });
 
         broker.sendPublish(
-          client.getClientId(),
+          client.clientId,
           1,
           'topicA',
           Mqtt.ProtocolVersion.MQTT_V3_1_1,
@@ -331,7 +331,7 @@ Deno.test({ name: '@receive publish_qos1', only: false }, async (context) => {
           contentType: 'application/json',
         };
         broker.sendPublish(
-          client.getClientId(),
+          client.clientId,
           1,
           'topicA',
           Mqtt.ProtocolVersion.MQTT_V5,
@@ -402,7 +402,7 @@ Deno.test({ name: '@receive publish_qos2', only: false }, async (context) => {
           assertEquals(packet.packetId, 1);
 
           broker.sendPubrel(
-            client.getClientId(),
+            client.clientId,
             packet.packetId,
             Mqtt.ProtocolVersion.MQTT_V3_1_1,
           );
@@ -414,7 +414,7 @@ Deno.test({ name: '@receive publish_qos2', only: false }, async (context) => {
         });
 
         broker.sendPublish(
-          client.getClientId(),
+          client.clientId,
           1,
           'topicA',
           Mqtt.ProtocolVersion.MQTT_V3_1_1,
@@ -504,7 +504,7 @@ Deno.test({ name: '@receive publish_qos2', only: false }, async (context) => {
           assertEquals(packet.properties, undefined);
 
           broker.sendPubrel(
-            client.getClientId(),
+            client.clientId,
             packet.packetId,
             Mqtt.ProtocolVersion.MQTT_V5,
           );
@@ -533,7 +533,7 @@ Deno.test({ name: '@receive publish_qos2', only: false }, async (context) => {
           contentType: 'application/json',
         };
         broker.sendPublish(
-          client.getClientId(),
+          client.clientId,
           1,
           'topicA',
           Mqtt.ProtocolVersion.MQTT_V5,
@@ -622,7 +622,7 @@ Deno.test({ name: '@receive malformed publish', only: false }, async (context) =
           0x61, // Payload: "data"
         ]);
 
-        await broker.sendRawBytes(client.getClientId(), malformedPacket);
+        await broker.sendRawBytes(client.clientId, malformedPacket);
 
         await promise;
       } catch (err) {
@@ -700,7 +700,7 @@ Deno.test({ name: '@receive malformed publish', only: false }, async (context) =
           0x61, // Payload: "data"
         ]);
 
-        await broker.sendRawBytes(client.getClientId(), malformedPacket);
+        await broker.sendRawBytes(client.clientId, malformedPacket);
 
         await promise;
       } catch (err) {

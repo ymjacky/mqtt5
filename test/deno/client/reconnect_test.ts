@@ -33,7 +33,7 @@ Deno.test({ name: '@reconnect', only: false }, async (context) => {
         broker.on('disconnect', (event) => {
           const packet = event.detail;
           assertExists(packet);
-          broker.closeConnectionFromBroker(client.getClientId());
+          broker.closeConnectionFromBroker(client.clientId);
         });
 
         await client.disconnect();
@@ -81,7 +81,7 @@ Deno.test({ name: '@reconnect', only: false }, async (context) => {
         broker.on('disconnect', (event) => {
           const packet = event.detail;
           assertExists(packet);
-          broker.closeConnectionFromBroker(client.getClientId());
+          broker.closeConnectionFromBroker(client.clientId);
         });
 
         await client.disconnect();
@@ -145,7 +145,7 @@ Deno.test({ name: '@reconnect', only: false }, async (context) => {
           }
           const closed = Promise.withResolvers<void>();
           client.on('closed', () => closed.resolve());
-          await broker.closeConnectionFromBroker(client.getClientId());
+          await broker.closeConnectionFromBroker(client.clientId);
           await closed.promise;
 
           // rejected when the connection is closed, without waiting for a reconnect
@@ -217,7 +217,7 @@ Deno.test({ name: '@reconnect', only: false }, async (context) => {
         }
         const closed = Promise.withResolvers<void>();
         client.on('closed', () => closed.resolve());
-        await broker.closeConnectionFromBroker(client.getClientId());
+        await broker.closeConnectionFromBroker(client.clientId);
         await closed.promise;
 
         await client.connect(); // CONNACK Session Present is 0

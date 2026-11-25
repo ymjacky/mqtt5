@@ -83,14 +83,14 @@ Deno.test('the keys 0 and the empty string are removed like any other key', () =
   numbers.set(0, 'a');
   numbers.set(1, 'b'); // removes 0
 
-  assertEquals(numbers.size(), 1);
+  assertEquals(numbers.size, 1);
   assertEquals([...numbers], [[1, 'b']]);
 
   const strings = new LruCache<string, string>(1);
   strings.set('', 'a');
   strings.set('x', 'b'); // removes ''
 
-  assertEquals(strings.size(), 1);
+  assertEquals(strings.size, 1);
   assertEquals([...strings], [['x', 'b']]);
 });
 
@@ -133,7 +133,7 @@ Deno.test('maxAge: an entry is removed on its first read when maxAge is 1', () =
 
   assertEquals(cache.get('a'), 'A');
   assert(!cache.has('a'));
-  assertEquals(cache.size(), 0);
+  assertEquals(cache.size, 0);
 });
 
 Deno.test('maxAge: setting a key again starts counting its reads again', () => {
@@ -161,27 +161,27 @@ Deno.test('maxAge: with no maxAge, reads never remove an entry', () => {
 
 Deno.test('delete, clear, size and capacity', () => {
   const cache = new LruCache<string, number>(3, 2);
-  assertEquals(cache.capacity(), 3);
-  assertEquals(cache.size(), 0);
+  assertEquals(cache.capacity, 3);
+  assertEquals(cache.size, 0);
 
   cache.set('a', 1);
   cache.set('b', 2);
-  assertEquals(cache.size(), 2);
+  assertEquals(cache.size, 2);
 
   assert(cache.delete('a'));
   assert(!cache.delete('a'));
   assert(!cache.has('a'));
-  assertEquals(cache.size(), 1);
+  assertEquals(cache.size, 1);
 
   cache.clear();
-  assertEquals(cache.size(), 0);
+  assertEquals(cache.size, 0);
   assertEquals([...cache], []);
 
   // the cache can be used after it has been cleared
   cache.set('c', 3);
   assertEquals(cache.get('c'), 3);
   assertEquals(cache.get('c'), 3); // the 2nd read: removed
-  assertEquals(cache.size(), 0);
+  assertEquals(cache.size, 0);
 });
 
 Deno.test('the constructor throws a RangeError for a capacity that is not a positive integer, or a maxAge below 1', () => {
@@ -192,8 +192,8 @@ Deno.test('the constructor throws a RangeError for a capacity that is not a posi
     assertThrows(() => new LruCache(1, maxAge), RangeError, 'maxAge must be 1 or more');
   }
 
-  assertEquals(new LruCache(1, 1).capacity(), 1);
-  assertEquals(new LruCache(1, Infinity).capacity(), 1);
+  assertEquals(new LruCache(1, 1).capacity, 1);
+  assertEquals(new LruCache(1, Infinity).capacity, 1);
 });
 
 Deno.test('set and get do not slow down with the number of entries', () => {
@@ -207,6 +207,6 @@ Deno.test('set and get do not slow down with the number of entries', () => {
   }
   const elapsed = performance.now() - start;
 
-  assertEquals(cache.size(), capacity);
+  assertEquals(cache.size, capacity);
   assert(elapsed < 100, `took ${elapsed} ms`);
 });

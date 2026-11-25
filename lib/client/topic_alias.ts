@@ -19,7 +19,7 @@ export class TopicAliasManager {
 
   /** The Topic Alias Maximum: the aliases are 1 to it. */
   get capacity(): number {
-    return this.topicAliasMap.capacity();
+    return this.topicAliasMap.capacity;
   }
 
   /**
@@ -45,7 +45,7 @@ export class TopicAliasManager {
     if (released !== undefined) {
       return released;
     }
-    if (this.nextTopicId <= this.topicAliasMap.capacity()) {
+    if (this.nextTopicId <= this.topicAliasMap.capacity) {
       return this.nextTopicId++;
     }
     const [, lruTopicId] = this.topicAliasMap.entries().next().value as [string, number];
