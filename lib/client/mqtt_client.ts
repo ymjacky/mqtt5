@@ -3,7 +3,7 @@ import type { ClientOptions } from './client_types.ts';
 import { SendPacketError, UnexpectedUrlProtocol } from './error.ts';
 
 // The port to connect to when the URL has none.
-const defaultPorts: Record<string, number> = { 'mqtt:': 1883, 'mqtts:': 8883 };
+const defaultPorts = { 'mqtt:': 1883, 'mqtts:': 8883 } as const;
 
 /**
  * Waits for a connection that is being opened, unless `signal` aborts first: then rejects with the abort reason at once,
@@ -77,14 +77,18 @@ export class MqttClient extends BaseMqttClient {
    */
   protected override async open(signal: AbortSignal): Promise<void> {
     const openSocket = async () => {
+      const protocol = this.url.protocol;
+      if (protocol !== 'mqtt:' && protocol !== 'mqtts:') {
+        throw new UnexpectedUrlProtocol(`${protocol.slice(0, -1)}`);
+      }
       // A URL without a port has the default port of its protocol.
-      const port = this.url.port !== '' ? Number(this.url.port) : defaultPorts[this.url.protocol];
-      if (this.url.protocol === 'mqtt:') {
+      const port = this.url.port !== '' ? Number(this.url.port) : defaultPorts[protocol];
+      if (protocol === 'mqtt:') {
         return Deno.connect({
           hostname: this.url.hostname,
           port,
         });
-      } else if (this.url.protocol === 'mqtts:') {
+      } else {
         const conn = await Deno.connectTls({
           hostname: this.url.hostname,
           port,
@@ -100,8 +104,6 @@ export class MqttClient extends BaseMqttClient {
           throw err;
         }
         return conn;
-      } else {
-        throw new UnexpectedUrlProtocol(`${this.url.protocol.slice(0, -1)}`);
       }
     };
 

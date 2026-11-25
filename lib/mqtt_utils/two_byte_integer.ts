@@ -1,5 +1,5 @@
 import * as UtilsError from './error.ts';
-import { requireBytes } from './bounds.ts';
+import { byteAt, requireBytes } from './bounds.ts';
 
 export function numToTwoByteInteger(num: number): Uint8Array {
   if (num > 0xFFFF) {
@@ -18,6 +18,7 @@ export function twoByteIntegerToNum(
   buffer: Uint8Array,
   offset: number,
 ): number {
+  // requireBytes() tells the length of the whole integer when it is cut short.
   requireBytes(buffer, offset, 2);
-  return (buffer[offset] << 8) | buffer[offset + 1];
+  return (byteAt(buffer, offset) << 8) | byteAt(buffer, offset + 1);
 }

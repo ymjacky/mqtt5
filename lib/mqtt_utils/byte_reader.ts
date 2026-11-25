@@ -1,5 +1,5 @@
 import { MalformedDataError } from './error.ts';
-import { requireBytes } from './bounds.ts';
+import { byteAt, requireBytes } from './bounds.ts';
 import { twoByteIntegerToNum } from './two_byte_integer.ts';
 import { fourByteIntegerToNum } from './four_byte_integer.ts';
 import { variableByteIntegerToNum } from './variable_byte_integer.ts';
@@ -35,8 +35,9 @@ export class ByteReader {
 
   /** Reads a Byte. */
   readByte(): number {
-    requireBytes(this.#bytes, this.#pos, 1);
-    return this.#bytes[this.#pos++];
+    const byte = byteAt(this.#bytes, this.#pos);
+    this.#pos++;
+    return byte;
   }
 
   /** Reads a Two Byte Integer (big-endian). */

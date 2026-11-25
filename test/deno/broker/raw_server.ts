@@ -96,7 +96,11 @@ export class RawServer {
   /** Waits for the connection accepted `index`-th (from 0). */
   async connection(index: number): Promise<RawConnection> {
     await waitUntil(() => this.connections.length > index, `connection ${index}`);
-    return this.connections[index];
+    const connection = this.connections[index];
+    if (connection === undefined) {
+      throw new Error(`connection ${index} has not been accepted`);
+    }
+    return connection;
   }
 
   async close(): Promise<void> {

@@ -14,10 +14,11 @@ const maxRemainingLengthBytes = 4;
  */
 export function decodeRemainingLength(bytes: Uint8Array, offset: number): { number: number; size: number } | undefined {
   for (let i = 0; i < maxRemainingLengthBytes; i++) {
-    if (offset + i >= bytes.length) {
+    const byte = bytes[offset + i];
+    if (byte === undefined) {
       return undefined;
     }
-    if ((bytes[offset + i] >> 7) === 0) {
+    if ((byte >> 7) === 0) {
       return MqttUtils.variableByteIntegerToNum(bytes, offset);
     }
   }

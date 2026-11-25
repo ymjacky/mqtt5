@@ -14,7 +14,8 @@
     "@std/http": "jsr:@std/http@^1.1.4"
   },
   "compilerOptions": {
-    "noImplicitOverride": true
+    "noImplicitOverride": true,
+    "noUncheckedIndexedAccess": true
   },
   "publish": {
     "include": ["deno/", "browser/mod.ts", "lib/", "readme.md", "LICENSE"]

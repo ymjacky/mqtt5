@@ -1,4 +1,4 @@
-import { assert, assertEquals } from '@std/assert';
+import { assert, assertEquals, assertExists } from '@std/assert';
 import { TopicAliasManager } from '../../../lib/client/topic_alias.ts';
 
 Deno.test('getTopicId generates an alias for a new topic and returns it again for the same topic', () => {
@@ -77,6 +77,7 @@ Deno.test('getTopicId returns an alias without the Topic Name only for the topic
 
   for (let i = 0; i < 10_000; i++) {
     const topic = topics[random(topics.length)];
+    assertExists(topic);
     const [generated, topicAlias] = manager.getTopicId(topic);
     assert(1 <= topicAlias && topicAlias <= topicAliasMaximum, `alias ${topicAlias}`);
 

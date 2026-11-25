@@ -34,8 +34,8 @@ Deno.test({ name: '@subscribe ws', only: false }, async (context) => {
           const packet = event.detail;
 
           assertEquals(packet.packetId, 1);
-          assertEquals(packet.subscriptions[0].topicFilter, 'topicA');
-          assertEquals(packet.subscriptions[0].qos, Mqtt.QoS.AtMostOnce);
+          assertEquals(packet.subscriptions[0]?.topicFilter, 'topicA');
+          assertEquals(packet.subscriptions[0]?.qos, Mqtt.QoS.AtMostOnce);
 
           broker.sendSuback(
             'cid',
@@ -81,8 +81,8 @@ Deno.test({ name: '@subscribe ws', only: false }, async (context) => {
           const packet = event.detail;
 
           assertEquals(packet.packetId, 1);
-          assertEquals(packet.subscriptions[0].topicFilter, 'topicA');
-          assertEquals(packet.subscriptions[0].qos, Mqtt.QoS.AtLeastOnce);
+          assertEquals(packet.subscriptions[0]?.topicFilter, 'topicA');
+          assertEquals(packet.subscriptions[0]?.qos, Mqtt.QoS.AtLeastOnce);
 
           broker.sendSuback(
             'cid',
@@ -128,8 +128,8 @@ Deno.test({ name: '@subscribe ws', only: false }, async (context) => {
           const packet = event.detail;
 
           assertEquals(packet.packetId, 1);
-          assertEquals(packet.subscriptions[0].topicFilter, 'topicA');
-          assertEquals(packet.subscriptions[0].qos, Mqtt.QoS.ExactlyOnce);
+          assertEquals(packet.subscriptions[0]?.topicFilter, 'topicA');
+          assertEquals(packet.subscriptions[0]?.qos, Mqtt.QoS.ExactlyOnce);
 
           broker.sendSuback(
             'cid',
@@ -176,8 +176,8 @@ Deno.test({ name: '@subscribe ws', only: false }, async (context) => {
           const packet = event.detail;
 
           assertEquals(packet.packetId, 1);
-          assertEquals(packet.subscriptions[0].topicFilter, 'topicA');
-          assertEquals(packet.subscriptions[0].qos, Mqtt.QoS.AtMostOnce);
+          assertEquals(packet.subscriptions[0]?.topicFilter, 'topicA');
+          assertEquals(packet.subscriptions[0]?.qos, Mqtt.QoS.AtMostOnce);
 
           broker.sendSuback(
             'cid',
@@ -224,8 +224,8 @@ Deno.test({ name: '@subscribe ws', only: false }, async (context) => {
           const packet = event.detail;
 
           assertEquals(packet.packetId, 1);
-          assertEquals(packet.subscriptions[0].topicFilter, 'topicA');
-          assertEquals(packet.subscriptions[0].qos, Mqtt.QoS.AtLeastOnce);
+          assertEquals(packet.subscriptions[0]?.topicFilter, 'topicA');
+          assertEquals(packet.subscriptions[0]?.qos, Mqtt.QoS.AtLeastOnce);
 
           broker.sendSuback(
             'cid',
@@ -272,8 +272,8 @@ Deno.test({ name: '@subscribe ws', only: false }, async (context) => {
           const packet = event.detail;
 
           assertEquals(packet.packetId, 1);
-          assertEquals(packet.subscriptions[0].topicFilter, 'topicA');
-          assertEquals(packet.subscriptions[0].qos, Mqtt.QoS.ExactlyOnce);
+          assertEquals(packet.subscriptions[0]?.topicFilter, 'topicA');
+          assertEquals(packet.subscriptions[0]?.qos, Mqtt.QoS.ExactlyOnce);
 
           broker.sendSuback(
             'cid',
@@ -319,17 +319,17 @@ Deno.test({ name: '@subscribe ws', only: false }, async (context) => {
           const packet = event.detail;
 
           assertEquals(packet.packetId, 1);
-          assertEquals(packet.subscriptions[0].topicFilter, 'topicA');
-          assertEquals(packet.subscriptions[0].qos, Mqtt.QoS.AtMostOnce);
+          assertEquals(packet.subscriptions[0]?.topicFilter, 'topicA');
+          assertEquals(packet.subscriptions[0]?.qos, Mqtt.QoS.AtMostOnce);
 
-          assertEquals(packet.subscriptions[1].topicFilter, 'topicB');
-          assertEquals(packet.subscriptions[1].qos, Mqtt.QoS.AtLeastOnce);
+          assertEquals(packet.subscriptions[1]?.topicFilter, 'topicB');
+          assertEquals(packet.subscriptions[1]?.qos, Mqtt.QoS.AtLeastOnce);
 
-          assertEquals(packet.subscriptions[2].topicFilter, 'topicC');
-          assertEquals(packet.subscriptions[2].qos, Mqtt.QoS.ExactlyOnce);
+          assertEquals(packet.subscriptions[2]?.topicFilter, 'topicC');
+          assertEquals(packet.subscriptions[2]?.qos, Mqtt.QoS.ExactlyOnce);
 
-          assertEquals(packet.subscriptions[3].topicFilter, 'unspecified');
-          assertEquals(packet.subscriptions[3].qos, Mqtt.QoS.ExactlyOnce);
+          assertEquals(packet.subscriptions[3]?.topicFilter, 'unspecified');
+          assertEquals(packet.subscriptions[3]?.qos, Mqtt.QoS.ExactlyOnce);
 
           broker.sendSuback(
             'cid',
@@ -388,17 +388,17 @@ Deno.test({ name: '@subscribe ws', only: false }, async (context) => {
           const packet = event.detail;
 
           assertEquals(packet.packetId, 1);
-          assertEquals(packet.subscriptions[0].topicFilter, 'topicA');
-          assertEquals(packet.subscriptions[0].qos, Mqtt.QoS.AtMostOnce);
+          assertEquals(packet.subscriptions[0]?.topicFilter, 'topicA');
+          assertEquals(packet.subscriptions[0]?.qos, Mqtt.QoS.AtMostOnce);
 
-          assertEquals(packet.subscriptions[1].topicFilter, 'topicB');
-          assertEquals(packet.subscriptions[1].qos, Mqtt.QoS.AtLeastOnce);
+          assertEquals(packet.subscriptions[1]?.topicFilter, 'topicB');
+          assertEquals(packet.subscriptions[1]?.qos, Mqtt.QoS.AtLeastOnce);
 
-          assertEquals(packet.subscriptions[2].topicFilter, 'topicC');
-          assertEquals(packet.subscriptions[2].qos, Mqtt.QoS.ExactlyOnce);
+          assertEquals(packet.subscriptions[2]?.topicFilter, 'topicC');
+          assertEquals(packet.subscriptions[2]?.qos, Mqtt.QoS.ExactlyOnce);
 
-          assertEquals(packet.subscriptions[3].topicFilter, 'unspecified');
-          assertEquals(packet.subscriptions[3].qos, Mqtt.QoS.ExactlyOnce);
+          assertEquals(packet.subscriptions[3]?.topicFilter, 'unspecified');
+          assertEquals(packet.subscriptions[3]?.qos, Mqtt.QoS.ExactlyOnce);
 
           broker.sendSuback(
             'cid',
@@ -461,11 +461,11 @@ Deno.test({ name: '@subscribe ws', only: false }, async (context) => {
           const packet = event.detail;
 
           assertEquals(packet.packetId, 1);
-          assertEquals(packet.subscriptions[0].topicFilter, 'topicA');
-          assertEquals(packet.subscriptions[0].qos, Mqtt.QoS.AtMostOnce);
-          assertEquals(packet.subscriptions[0].retainHandling, Mqtt.RetainHandling.DoNotSend);
-          assertEquals(packet.subscriptions[0].retainAsPublished, true);
-          assertEquals(packet.subscriptions[0].noLocal, true);
+          assertEquals(packet.subscriptions[0]?.topicFilter, 'topicA');
+          assertEquals(packet.subscriptions[0]?.qos, Mqtt.QoS.AtMostOnce);
+          assertEquals(packet.subscriptions[0]?.retainHandling, Mqtt.RetainHandling.DoNotSend);
+          assertEquals(packet.subscriptions[0]?.retainAsPublished, true);
+          assertEquals(packet.subscriptions[0]?.noLocal, true);
 
           broker.sendSuback(
             'cid',
@@ -514,23 +514,23 @@ Deno.test({ name: '@subscribe ws', only: false }, async (context) => {
           const packet = event.detail;
 
           assertEquals(packet.packetId, 1);
-          assertEquals(packet.subscriptions[0].topicFilter, 'topicA');
-          assertEquals(packet.subscriptions[0].qos, Mqtt.QoS.AtMostOnce);
-          assertEquals(packet.subscriptions[0].retainHandling, Mqtt.RetainHandling.AtTheTimeOfTheSubscribe);
-          assertEquals(packet.subscriptions[0].retainAsPublished, true);
-          assertEquals(packet.subscriptions[0].noLocal, true);
+          assertEquals(packet.subscriptions[0]?.topicFilter, 'topicA');
+          assertEquals(packet.subscriptions[0]?.qos, Mqtt.QoS.AtMostOnce);
+          assertEquals(packet.subscriptions[0]?.retainHandling, Mqtt.RetainHandling.AtTheTimeOfTheSubscribe);
+          assertEquals(packet.subscriptions[0]?.retainAsPublished, true);
+          assertEquals(packet.subscriptions[0]?.noLocal, true);
 
-          assertEquals(packet.subscriptions[1].topicFilter, 'topicB');
-          assertEquals(packet.subscriptions[1].qos, Mqtt.QoS.AtLeastOnce);
-          assertEquals(packet.subscriptions[1].retainHandling, Mqtt.RetainHandling.AtSubscribeOnlyIfTheSubscriptionDoesNotCurrentlyExist);
-          assertEquals(packet.subscriptions[1].retainAsPublished, false);
-          assertEquals(packet.subscriptions[1].noLocal, false);
+          assertEquals(packet.subscriptions[1]?.topicFilter, 'topicB');
+          assertEquals(packet.subscriptions[1]?.qos, Mqtt.QoS.AtLeastOnce);
+          assertEquals(packet.subscriptions[1]?.retainHandling, Mqtt.RetainHandling.AtSubscribeOnlyIfTheSubscriptionDoesNotCurrentlyExist);
+          assertEquals(packet.subscriptions[1]?.retainAsPublished, false);
+          assertEquals(packet.subscriptions[1]?.noLocal, false);
 
-          assertEquals(packet.subscriptions[2].topicFilter, 'topicC');
-          assertEquals(packet.subscriptions[2].qos, Mqtt.QoS.ExactlyOnce);
-          assertEquals(packet.subscriptions[2].retainHandling, Mqtt.RetainHandling.DoNotSend);
-          assertEquals(packet.subscriptions[2].retainAsPublished, false);
-          assertEquals(packet.subscriptions[2].noLocal, true);
+          assertEquals(packet.subscriptions[2]?.topicFilter, 'topicC');
+          assertEquals(packet.subscriptions[2]?.qos, Mqtt.QoS.ExactlyOnce);
+          assertEquals(packet.subscriptions[2]?.retainHandling, Mqtt.RetainHandling.DoNotSend);
+          assertEquals(packet.subscriptions[2]?.retainAsPublished, false);
+          assertEquals(packet.subscriptions[2]?.noLocal, true);
 
           broker.sendSuback(
             'cid',
@@ -604,8 +604,8 @@ Deno.test({ name: '@subscribe ws', only: false }, async (context) => {
           const packet = event.detail;
 
           assertEquals(packet.packetId, 1);
-          assertEquals(packet.subscriptions[0].topicFilter, 'topicA');
-          assertEquals(packet.subscriptions[0].qos, Mqtt.QoS.AtMostOnce);
+          assertEquals(packet.subscriptions[0]?.topicFilter, 'topicA');
+          assertEquals(packet.subscriptions[0]?.qos, Mqtt.QoS.AtMostOnce);
 
           assertEquals(packet.properties?.subscriptionIdentifier, 3);
           assertEquals(
@@ -670,23 +670,23 @@ Deno.test({ name: '@subscribe ws', only: false }, async (context) => {
           const packet = event.detail;
 
           assertEquals(packet.packetId, 1);
-          assertEquals(packet.subscriptions[0].topicFilter, 'topicA');
-          assertEquals(packet.subscriptions[0].qos, Mqtt.QoS.AtLeastOnce);
-          assertEquals(packet.subscriptions[0].retainHandling, Mqtt.RetainHandling.AtTheTimeOfTheSubscribe);
-          assertEquals(packet.subscriptions[0].retainAsPublished, false);
-          assertEquals(packet.subscriptions[0].noLocal, false);
+          assertEquals(packet.subscriptions[0]?.topicFilter, 'topicA');
+          assertEquals(packet.subscriptions[0]?.qos, Mqtt.QoS.AtLeastOnce);
+          assertEquals(packet.subscriptions[0]?.retainHandling, Mqtt.RetainHandling.AtTheTimeOfTheSubscribe);
+          assertEquals(packet.subscriptions[0]?.retainAsPublished, false);
+          assertEquals(packet.subscriptions[0]?.noLocal, false);
 
-          assertEquals(packet.subscriptions[1].topicFilter, 'topicB');
-          assertEquals(packet.subscriptions[1].qos, Mqtt.QoS.AtLeastOnce);
-          assertEquals(packet.subscriptions[1].retainHandling, Mqtt.RetainHandling.AtTheTimeOfTheSubscribe);
-          assertEquals(packet.subscriptions[1].retainAsPublished, false);
-          assertEquals(packet.subscriptions[1].noLocal, false);
+          assertEquals(packet.subscriptions[1]?.topicFilter, 'topicB');
+          assertEquals(packet.subscriptions[1]?.qos, Mqtt.QoS.AtLeastOnce);
+          assertEquals(packet.subscriptions[1]?.retainHandling, Mqtt.RetainHandling.AtTheTimeOfTheSubscribe);
+          assertEquals(packet.subscriptions[1]?.retainAsPublished, false);
+          assertEquals(packet.subscriptions[1]?.noLocal, false);
 
-          assertEquals(packet.subscriptions[2].topicFilter, 'topicC');
-          assertEquals(packet.subscriptions[2].qos, Mqtt.QoS.AtLeastOnce);
-          assertEquals(packet.subscriptions[2].retainHandling, Mqtt.RetainHandling.AtTheTimeOfTheSubscribe);
-          assertEquals(packet.subscriptions[2].retainAsPublished, false);
-          assertEquals(packet.subscriptions[2].noLocal, false);
+          assertEquals(packet.subscriptions[2]?.topicFilter, 'topicC');
+          assertEquals(packet.subscriptions[2]?.qos, Mqtt.QoS.AtLeastOnce);
+          assertEquals(packet.subscriptions[2]?.retainHandling, Mqtt.RetainHandling.AtTheTimeOfTheSubscribe);
+          assertEquals(packet.subscriptions[2]?.retainAsPublished, false);
+          assertEquals(packet.subscriptions[2]?.noLocal, false);
 
           assertEquals(packet.properties?.subscriptionIdentifier, 3);
           assertEquals(

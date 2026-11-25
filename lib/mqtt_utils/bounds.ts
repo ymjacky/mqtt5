@@ -9,6 +9,24 @@ import { MalformedDataError } from './error.ts';
 export function requireBytes(buffer: Uint8Array, offset: number, length: number): void {
   const left = Math.max(buffer.length - offset, 0);
   if (length > left) {
-    throw new MalformedDataError(`${length} bytes are needed at byte ${offset}, but only ${left} are left`);
+    throw notEnoughBytes(buffer, offset, length);
   }
+}
+
+/**
+ * Reads the byte at `offset`. An index past the end of a Uint8Array gives `undefined`: this checks it, as
+ * {@link requireBytes} does for 1 byte.
+ * @throws {MalformedDataError} if `buffer` ends before the byte.
+ */
+export function byteAt(buffer: Uint8Array, offset: number): number {
+  const byte = buffer[offset];
+  if (byte === undefined) {
+    throw notEnoughBytes(buffer, offset, 1);
+  }
+  return byte;
+}
+
+function notEnoughBytes(buffer: Uint8Array, offset: number, length: number): MalformedDataError {
+  const left = Math.max(buffer.length - offset, 0);
+  return new MalformedDataError(`${length} bytes are needed at byte ${offset}, but only ${left} are left`);
 }

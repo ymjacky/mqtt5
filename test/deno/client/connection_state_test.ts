@@ -865,7 +865,7 @@ Deno.test({ name: '@connection state: publish() and the next connection', only: 
         assertEquals(receivedPacketTypes(first), ['connect']);
         assertEquals(receivedPacketTypes(second), ['connect', 'publish']);
         const publish = receivedPackets(second)[1];
-        assert(publish.type === 'publish');
+        assert(publish?.type === 'publish');
         assertEquals(publish.topic, 'topicA');
 
         // The flow completes on the second connection.

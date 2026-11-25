@@ -1,5 +1,5 @@
 import * as UtilsError from './error.ts';
-import { requireBytes } from './bounds.ts';
+import { byteAt } from './bounds.ts';
 
 /** The largest Variable Byte Integer. It is also the largest Remaining Length. */
 export const maxVariableByteInteger = 268_435_455;
@@ -51,8 +51,7 @@ export function variableByteIntegerToNum(buffer: Uint8Array, offset: number): { 
   let value = 0;
   let multiplier = 1;
   for (let i = 0; i < maxVariableByteIntegerBytes; i++) {
-    requireBytes(buffer, offset + i, 1);
-    const byte = buffer[offset + i];
+    const byte = byteAt(buffer, offset + i);
     value += (byte & 0b01111111) * multiplier;
     if ((byte & 0b10000000) === 0) {
       return { number: value, size: i + 1 };

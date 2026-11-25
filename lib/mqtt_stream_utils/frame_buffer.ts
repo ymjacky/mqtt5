@@ -98,9 +98,8 @@ export class MqttFrameBuffer {
    * @throws {PacketTooLargeToReceiveError} if the packet is larger than the Maximum Packet Size.
    */
   private readFixedHeader(): number | undefined {
-    while (this.buffered > 0) {
-      this.header[this.headerLength++] = this.chunks[0][this.offset];
-      this.consume(1);
+    for (let byte = this.takeByte(); byte !== undefined; byte = this.takeByte()) {
+      this.header[this.headerLength++] = byte;
       // header[0] is the byte of packet type and flags, followed by the Remaining Length.
       const remainingLength = this.headerLength > 1 ? decodeRemainingLength(this.header.subarray(0, this.headerLength), 1) : undefined;
       if (!remainingLength) {
@@ -132,6 +131,10 @@ export class MqttFrameBuffer {
     let filled = this.headerLength;
     while (filled < packetSize) {
       const chunk = this.chunks[0];
+      if (chunk === undefined) {
+        // Not reached: the check above makes sure that all the bytes of the packet are buffered.
+        throw new Error('the bytes of the packet are not buffered');
+      }
       const length = Math.min(chunk.length - this.offset, packetSize - filled);
       packet.set(chunk.subarray(this.offset, this.offset + length), filled);
       filled += length;
@@ -142,11 +145,21 @@ export class MqttFrameBuffer {
     return packet;
   }
 
+  /** Takes the next byte, or returns undefined if no byte is buffered. */
+  private takeByte(): number | undefined {
+    // The first chunk has a byte at `offset` whenever bytes are buffered: consume() drops it when all its bytes are taken.
+    const byte = this.chunks[0]?.[this.offset];
+    if (byte !== undefined) {
+      this.consume(1);
+    }
+    return byte;
+  }
+
   /** Moves past `length` bytes of the first chunk, and drops the chunk when all its bytes are taken. */
   private consume(length: number): void {
     this.offset += length;
     this.buffered -= length;
-    if (this.offset === this.chunks[0].length) {
+    if (this.offset === this.chunks[0]?.length) {
       this.chunks.shift();
       this.offset = 0;
     }
