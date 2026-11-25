@@ -1086,3 +1086,160 @@ Deno.test({ name: '@resend from a store with packets of a previous process', onl
     },
   );
 }); // @resend from a store with packets of a previous process
+
+Deno.test({ name: '@resend: the payload and properties given to publish()', only: false }, async (context) => {
+  const encoder = new TextEncoder();
+  const decoder = new TextDecoder();
+
+  /** What the broker received, in a form that is easy to compare. */
+  function summary(packet: MqttPackets.PublishPacket) {
+    return {
+      payload: decoder.decode(packet.payload),
+      dup: packet.dup,
+      correlationData: packet.properties?.correlationData && decoder.decode(packet.properties.correlationData),
+      userProperties: packet.properties?.userProperties,
+      contentType: packet.properties?.contentType,
+    };
+  }
+
+  for (const qos of [Mqtt.QoS.AT_LEAST_ONCE, Mqtt.QoS.EXACTLY_ONCE]) {
+    await context.step(
+      `QoS ${qos}: changing them after the PUBLISH has been written does not change the PUBLISH resent after reconnecting`,
+      async () => {
+        const broker = new TestBroker();
+        try {
+          broker.listen();
+          let sessionPresent = false;
+          broker.on('connect', (event) => {
+            const packet = event.detail;
+            broker.sendConnack(packet.clientId, sessionPresent, packet.protocolVersion);
+          });
+          const received: ReturnType<typeof summary>[] = [];
+          const written = Promise.withResolvers<void>();
+          broker.on('publish', (event) => {
+            const packet = event.detail;
+            received.push(summary(packet));
+            if (!sessionPresent) {
+              // No acknowledgment: the flow stays in the session, to be resent after reconnecting.
+              written.resolve();
+              return;
+            }
+            if (qos === Mqtt.QoS.AT_LEAST_ONCE) {
+              broker.sendPuback('cid', packet.packetId!, Mqtt.ProtocolVersion.MQTT_V5);
+            } else {
+              broker.sendPubrec('cid', packet.packetId!, Mqtt.ProtocolVersion.MQTT_V5);
+            }
+          });
+          broker.on('pubrel', (event) => {
+            broker.sendPubcomp('cid', event.detail.packetId, Mqtt.ProtocolVersion.MQTT_V5);
+          });
+
+          const client = new MqttClient({ clientId: 'cid', logger: logger, clean: false });
+          await client.connect();
+
+          const payload = encoder.encode('payloadA');
+          const properties: MqttProperties.UserPublishProperties = {
+            correlationData: encoder.encode('correlationA'),
+            userProperties: [{ key: 'key1', val: 'val1' }],
+            contentType: 'text/plain',
+          };
+          const publishing = client.publish('topicA', payload, { qos }, properties);
+          await written.promise;
+
+          // The application reuses the objects for its next message while the flow is not complete yet.
+          payload.set(encoder.encode('payloadB'));
+          properties.correlationData!.set(encoder.encode('correlationB'));
+          properties.userProperties![0].val = 'val2';
+          properties.userProperties!.push({ key: 'key3', val: 'val3' });
+          properties.contentType = 'application/json';
+
+          const closed = Promise.withResolvers<void>();
+          client.on('closed', () => closed.resolve());
+          broker.closeConnectionFromBroker('cid');
+          await closed.promise;
+          sessionPresent = true;
+          await client.connect();
+
+          assertEquals((await publishing).result, Mqtt.ReasonCode.Success);
+          const given = {
+            payload: 'payloadA',
+            correlationData: 'correlationA',
+            userProperties: [{ key: 'key1', val: 'val1' }],
+            contentType: 'text/plain',
+          };
+          assertEquals(received, [{ ...given, dup: false }, { ...given, dup: true }]);
+
+          await client.disconnect();
+        } catch (err) {
+          fail(`error occured: ${err}`);
+        } finally {
+          await broker.destroy();
+        }
+      },
+    );
+  }
+
+  for (const qos of [Mqtt.QoS.AT_MOST_ONCE, Mqtt.QoS.AT_LEAST_ONCE, Mqtt.QoS.EXACTLY_ONCE]) {
+    await context.step(
+      `QoS ${qos}: changing them right after the call does not change the PUBLISH`,
+      async () => {
+        const broker = new TestBroker();
+        try {
+          broker.listen();
+          broker.on('connect', (event) => {
+            const packet = event.detail;
+            broker.sendConnack(packet.clientId, false, packet.protocolVersion);
+          });
+          const received: ReturnType<typeof summary>[] = [];
+          const written = Promise.withResolvers<void>();
+          broker.on('publish', (event) => {
+            const packet = event.detail;
+            received.push(summary(packet));
+            written.resolve();
+            if (qos === Mqtt.QoS.AT_LEAST_ONCE) {
+              broker.sendPuback('cid', packet.packetId!, Mqtt.ProtocolVersion.MQTT_V5);
+            } else if (qos === Mqtt.QoS.EXACTLY_ONCE) {
+              broker.sendPubrec('cid', packet.packetId!, Mqtt.ProtocolVersion.MQTT_V5);
+            }
+          });
+          broker.on('pubrel', (event) => {
+            broker.sendPubcomp('cid', event.detail.packetId, Mqtt.ProtocolVersion.MQTT_V5);
+          });
+
+          const client = new MqttClient({ clientId: 'cid', logger: logger });
+          await client.connect();
+
+          const payload = encoder.encode('payloadA');
+          const properties: MqttProperties.UserPublishProperties = {
+            correlationData: encoder.encode('correlationA'),
+            userProperties: [{ key: 'key1', val: 'val1' }],
+            contentType: 'text/plain',
+          };
+          const publishing = client.publish('topicA', payload, { qos }, properties);
+          // The application does not wait for publish() and reuses the objects for its next message.
+          payload.set(encoder.encode('payloadB'));
+          properties.correlationData!.set(encoder.encode('correlationB'));
+          properties.userProperties![0].val = 'val2';
+          properties.userProperties!.push({ key: 'key3', val: 'val3' });
+          properties.contentType = 'application/json';
+
+          assertEquals((await publishing).result, Mqtt.ReasonCode.Success);
+          await written.promise;
+          assertEquals(received, [{
+            payload: 'payloadA',
+            dup: false,
+            correlationData: 'correlationA',
+            userProperties: [{ key: 'key1', val: 'val1' }],
+            contentType: 'text/plain',
+          }]);
+
+          await client.disconnect();
+        } catch (err) {
+          fail(`error occured: ${err}`);
+        } finally {
+          await broker.destroy();
+        }
+      },
+    );
+  }
+}); // @resend: the payload and properties given to publish()
