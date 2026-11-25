@@ -235,3 +235,204 @@ Deno.test({ name: '@receive before CONNACK: a packet that the client cannot acce
     }
   });
 });
+
+/** Encodes a packet, for MQTT 5.0 unless `protocolVersion` is given. */
+function bytesOf(packet: MqttPackets.AnyPacket, protocolVersion: Mqtt.ProtocolVersion = Mqtt.ProtocolVersion.MQTT_V5): number[] {
+  return [...MqttPackets.packetToBytes(packet, protocolVersion)];
+}
+
+const payload = new Uint8Array([1]);
+const publishQoS1: MqttPackets.PublishPacket = { type: 'publish', topic: 'a', payload, dup: false, retain: false, qos: Mqtt.QoS.AT_LEAST_ONCE, packetId: 7 };
+
+/** Packets that the broker must not send before CONNACK: with MQTT 5.0, it sends AUTH only [MQTT-3.2.0-1]. */
+const packetsBeforeConnack: [string, MqttPackets.AnyPacket][] = [
+  ['a PUBLISH with QoS 0', { type: 'publish', topic: 'a', payload, dup: false, retain: false, qos: Mqtt.QoS.AT_MOST_ONCE }],
+  ['a PUBLISH with QoS 1', publishQoS1],
+  ['a PUBLISH with QoS 2', { type: 'publish', topic: 'a', payload, dup: false, retain: false, qos: Mqtt.QoS.EXACTLY_ONCE, packetId: 7 }],
+  ['a PUBACK', { type: 'puback', packetId: 1 }],
+  ['a PUBREC', { type: 'pubrec', packetId: 1 }],
+  ['a PUBREL', { type: 'pubrel', packetId: 1 }],
+  ['a PUBCOMP', { type: 'pubcomp', packetId: 1 }],
+  ['a SUBACK', { type: 'suback', packetId: 1, reasonCodes: [Mqtt.ReasonCode.GrantedQoS0] }],
+  ['an UNSUBACK', { type: 'unsuback', packetId: 1, reasonCodes: [Mqtt.ReasonCode.Success] }],
+  ['a PINGRESP', { type: 'pingresp' }],
+];
+
+/** A CONNACK (MQTT 3.1.1) that accepts the connection. */
+const validConnackV3_1_1 = [0x20, 0x02, 0x00, 0x00];
+
+/** What the client does with a packet: the events it emits, and the acknowledgments that the broker gets. */
+function recordHandling(client: MqttClient | WebSocketMqttClient, broker: TestBroker | TestWsBroker) {
+  const recorded = {
+    publishEvents: 0,
+    authEvents: 0,
+    acknowledgments: [] as string[],
+  };
+  client.on('publish', () => {
+    recorded.publishEvents++;
+  });
+  client.on('auth', () => {
+    recorded.authEvents++;
+  });
+  for (const type of ['puback', 'pubrec', 'pubrel', 'pubcomp'] as const) {
+    broker.on(type, () => {
+      recorded.acknowledgments.push(type);
+    });
+  }
+  return recorded;
+}
+
+Deno.test({ name: '@receive before CONNACK: a packet that the broker must not send before CONNACK', only: false }, async (context) => {
+  for (const [name, packet] of packetsBeforeConnack) {
+    await context.step(
+      `MQTT 5.0: on ${name}, the client does not handle it, closes the connection without DISCONNECT, and connect() rejects`,
+      async () => {
+        const broker = new TestBroker();
+        const client = new MqttClient({ clientId: 'cid', logger, connectTimeoutMS });
+        try {
+          broker.listen();
+          const recorded = record(client, broker);
+          const handling = recordHandling(client, broker);
+          // Both in one write: the client reads the valid CONNACK before the connection is closed.
+          answerFirstConnect(broker, new Uint8Array([...bytesOf(packet), ...validConnack]));
+
+          assertInvalidPacketBeforeConnack(await connectError(client.connect()), Mqtt.ReasonCode.ProtocolError);
+          await waitFor(() => recorded.brokerSawClose, 'the close');
+          assertEquals(recorded.disconnects, []);
+          assertEquals(recorded.closedEvents, 1);
+          assertEquals(handling.publishEvents, 0);
+          assertEquals(handling.acknowledgments, []);
+        } finally {
+          await client.disconnect(true);
+          await broker.destroy();
+        }
+      },
+    );
+  }
+
+  await context.step('MQTT 5.0: a PUBLISH right after CONNACK in the same write is handled as usual', async () => {
+    const broker = new TestBroker();
+    const client = new MqttClient({ clientId: 'cid', logger, connectTimeoutMS });
+    try {
+      broker.listen();
+      const recorded = record(client, broker);
+      const handling = recordHandling(client, broker);
+      // Both in one write: the client reads them at once.
+      answerFirstConnect(broker, new Uint8Array([...validConnack, ...bytesOf(publishQoS1)]));
+
+      const connack = await settleWithin(client.connect(), 'connect()', 1000);
+      assertEquals(connack.reasonCode, Mqtt.ReasonCode.Success);
+      await waitFor(() => handling.acknowledgments.length > 0, 'the PUBACK');
+      assertEquals(handling.publishEvents, 1);
+      assertEquals(handling.acknowledgments, ['puback']);
+      // The connection stays open.
+      assertEquals(recorded.disconnects, []);
+      assertEquals(recorded.closedEvents, 0);
+    } finally {
+      await client.disconnect(true);
+      await broker.destroy();
+    }
+  });
+
+  await context.step('WebSocket: a PUBLISH right after CONNACK in the same message is handled as usual', async () => {
+    const broker = new TestWsBroker();
+    const client = new WebSocketMqttClient({ clientId: 'cid', url: new URL('ws://127.0.0.1:3000/'), logger, connectTimeoutMS });
+    try {
+      broker.listen();
+      const recorded = record(client, broker);
+      const handling = recordHandling(client, broker);
+      // One message: the client receives both packets at once, without waiting between them, so it receives the PUBLISH
+      // before it has handled the CONNACK.
+      answerFirstConnect(broker, new Uint8Array([...validConnack, ...bytesOf(publishQoS1)]));
+
+      const connack = await settleWithin(client.connect(), 'connect()', 1000);
+      assertEquals(connack.reasonCode, Mqtt.ReasonCode.Success);
+      await waitFor(() => handling.acknowledgments.length > 0, 'the PUBACK');
+      assertEquals(handling.publishEvents, 1);
+      assertEquals(handling.acknowledgments, ['puback']);
+      // The connection stays open.
+      assertEquals(recorded.disconnects, []);
+      assertEquals(recorded.closedEvents, 0);
+    } finally {
+      await client.disconnect(true);
+      await broker.destroy();
+    }
+  });
+
+  await context.step(
+    'MQTT 5.0: on a DISCONNECT, the client emits `disconnect` and closes the connection, and connect() rejects with ConnectionClosed',
+    async () => {
+      const broker = new TestBroker();
+      const client = new MqttClient({ clientId: 'cid', logger, connectTimeoutMS });
+      try {
+        broker.listen();
+        const recorded = record(client, broker);
+        const disconnectEvents: (number | undefined)[] = [];
+        client.on('disconnect', (event) => {
+          disconnectEvents.push(event.detail.reasonCode);
+        });
+        answerFirstConnect(broker, new Uint8Array(bytesOf({ type: 'disconnect', reasonCode: Mqtt.ReasonCode.ServerBusy })));
+
+        const error = await connectError(client.connect());
+        assert(error instanceof ClientErrors.ConnectionClosed, String(error));
+        assertEquals(disconnectEvents, [Mqtt.ReasonCode.ServerBusy]);
+        await waitFor(() => recorded.brokerSawClose, 'the close');
+        assertEquals(recorded.disconnects, []);
+        assertEquals(recorded.closedEvents, 1);
+      } finally {
+        await client.disconnect(true);
+        await broker.destroy();
+      }
+    },
+  );
+
+  // MQTT 3.1.1 has no AUTH: CONNACK is the first packet that the broker sends [MQTT-3.2.0-1].
+  const packetsBeforeConnackV3_1_1: [string, number[]][] = [
+    ['a PUBLISH with QoS 1', bytesOf(publishQoS1, Mqtt.ProtocolVersion.MQTT_V3_1_1)],
+    ['an AUTH', [0xF0, 0x00]],
+  ];
+  for (const [name, bytes] of packetsBeforeConnackV3_1_1) {
+    await context.step(`MQTT 3.1.1: on ${name}, the client does not handle it, closes the connection, and connect() rejects`, async () => {
+      const broker = new TestBroker();
+      const client = new MqttClient({ clientId: 'cid', logger, connectTimeoutMS, protocolVersion: Mqtt.ProtocolVersion.MQTT_V3_1_1 });
+      try {
+        broker.listen();
+        const recorded = record(client, broker);
+        const handling = recordHandling(client, broker);
+        answerFirstConnect(broker, new Uint8Array([...bytes, ...validConnackV3_1_1]));
+
+        assertInvalidPacketBeforeConnack(await connectError(client.connect()), Mqtt.ReasonCode.ProtocolError);
+        await waitFor(() => recorded.brokerSawClose, 'the close');
+        assertEquals(recorded.disconnects, []);
+        assertEquals(recorded.closedEvents, 1);
+        assertEquals(handling.publishEvents, 0);
+        assertEquals(handling.authEvents, 0);
+        assertEquals(handling.acknowledgments, []);
+      } finally {
+        await client.disconnect(true);
+        await broker.destroy();
+      }
+    });
+  }
+
+  await context.step('WebSocket: on a PUBLISH, the client does not handle it, closes the connection without DISCONNECT, and connect() rejects', async () => {
+    const broker = new TestWsBroker();
+    const client = new WebSocketMqttClient({ clientId: 'cid', url: new URL('ws://127.0.0.1:3000/'), logger, connectTimeoutMS });
+    try {
+      broker.listen();
+      const recorded = record(client, broker);
+      const handling = recordHandling(client, broker);
+      answerFirstConnect(broker, new Uint8Array([...bytesOf(publishQoS1), ...validConnack]));
+
+      assertInvalidPacketBeforeConnack(await connectError(client.connect()), Mqtt.ReasonCode.ProtocolError);
+      await waitFor(() => recorded.brokerSawClose, 'the close');
+      assertEquals(recorded.disconnects, []);
+      assertEquals(recorded.closedEvents, 1);
+      assertEquals(handling.publishEvents, 0);
+      assertEquals(handling.acknowledgments, []);
+    } finally {
+      await client.disconnect(true);
+      await broker.destroy();
+    }
+  });
+});
