@@ -5,6 +5,12 @@ on: [pull_request]
 jobs:
   test:
     runs-on: ubuntu-latest
+    strategy:
+      # Let both versions run to the end, to see which of them fails.
+      fail-fast: false
+      matrix:
+        # The lowest version the readme supports ("Deno 2.3.1 or later"), and the latest 2.x.
+        deno: ['2.3.1', 'v2.x']
     steps:
       - name: clone repository
         uses: actions/checkout@v7
@@ -12,18 +18,23 @@ jobs:
       - name: install deno
         uses: denoland/setup-deno@v2
         with:
-          deno-version: v2.x
+          deno-version: ${{ matrix.deno }}
 
+      # Format, lint and publish are checked with the latest version only: an older Deno may format or lint differently
+      # (Deno 2.3.1 indents the script in browser/index.html one more level), and publish.yml publishes with the latest.
       - name: check format
+        if: matrix.deno == 'v2.x'
         run: deno fmt --check
 
       - name: check linting
+        if: matrix.deno == 'v2.x'
         run: deno lint
 
       - name: type check
         run: deno task tsc
 
       - name: check publish
+        if: matrix.deno == 'v2.x'
         run: deno publish --dry-run
 
       - name: run tests generating coverage
