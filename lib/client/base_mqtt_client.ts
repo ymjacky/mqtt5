@@ -112,6 +112,21 @@ function createRequestDeferred<T>(): Deferred<T> {
 }
 
 /**
+ * Copies the PUBLISH properties given to publish(), with the Uint8Array and the arrays in them, so that the caller may
+ * change or reuse its objects as soon as publish() returns.
+ */
+function copyPublishProperties(properties: MqttProperties.UserPublishProperties): MqttProperties.UserPublishProperties {
+  const copy = { ...properties };
+  if (properties.correlationData) {
+    copy.correlationData = new Uint8Array(properties.correlationData);
+  }
+  if (properties.userProperties) {
+    copy.userProperties = properties.userProperties.map(({ key, val }) => ({ key, val }));
+  }
+  return copy;
+}
+
+/**
  * The API shared by {@link MqttClient} and {@link WebSocketMqttClient}: connecting, publishing, subscribing and events.
  *
  * It is exported as a type only, e.g. to write a function that accepts either client.
@@ -527,6 +542,9 @@ export abstract class BaseMqttClient {
    * Messages are sent in the order publish() is called, whatever their QoS: each PUBLISH is sent after the PUBLISH
    * of the previous call has been written to the connection, or has failed.
    *
+   * The payload and the properties are copied when publish() is called: changing or reusing them afterwards does not
+   * change the message, also when it is resent after reconnecting.
+   *
    * The broker limits, in CONNACK, what the client may send. QoS 1 and QoS 2: no more PUBLISH packets are in flight than its
    * Receive Maximum (MQTT 5.0, 65,535 if it has none), so a call waits until the PUBACK or PUBCOMP of an earlier message
    * arrives, and the calls after it wait too. If the connection is closed while waiting, the call rejects with `StateIsNotOnlineError`.
@@ -611,7 +629,11 @@ export abstract class BaseMqttClient {
     // Check the topic given by the caller: with a topic alias, the client itself sends an empty Topic Name.
     validatePublish(topic, qos, dup, properties, this.protocolVersion);
 
-    const buffer: Uint8Array = (typeof payload === 'string') ? MqttUtils.stringToBytes(payload) : payload;
+    // Copies, taken before the first await: the caller may change or reuse its objects as soon as publish() returns,
+    // while the PUBLISH waits for its turn and, for QoS 1 and 2, is kept in the session to be resent after reconnecting.
+    // new Uint8Array() makes a plain copy, also of a subclass whose slice() shares the memory, such as Buffer.
+    const buffer: Uint8Array = (typeof payload === 'string') ? MqttUtils.stringToBytes(payload) : new Uint8Array(payload);
+    const publishProperties = properties && copyPublishProperties(properties);
 
     const finished = await this.waitForPublishTurn();
     try {
@@ -646,8 +668,7 @@ export abstract class BaseMqttClient {
         retain,
         qos,
         packetId,
-        // a copy: the caller may change or reuse the object while the packet is kept in the session
-        properties: properties && { ...properties },
+        properties: publishProperties,
       };
 
       let bytes: Uint8Array | undefined;
