@@ -2148,4 +2148,38 @@ export abstract class BaseMqttClient {
   public getClientId(): string {
     return this.clientId;
   }
+
+  /**
+   * Calls {@link BaseMqttClient.disconnect} (without `force` and properties), so that the client can be declared with
+   * `await using`: it is disconnected when the scope is left, also when an error is thrown. Resolves immediately if the
+   * client is not connected.
+   *
+   * The method exists only where the runtime has `Symbol.asyncDispose` when this library is loaded: Deno, and the browsers
+   * that support `await using`. Safari does not support it yet; there, call disconnect() in a `finally` block instead.
+   * @example
+   * ```ts
+   * import { Mqtt, MqttClient } from '@ymjacky/mqtt5';
+   *
+   * {
+   *   await using client = new MqttClient({ clientId: 'clientA' });
+   *   await client.connect();
+   *   await client.publish('topicA', 'hello', { qos: Mqtt.QoS.AT_LEAST_ONCE });
+   * } // client.disconnect() is called here
+   * ```
+   */
+  // Only the type: the method is defined right after the class, only where Symbol.asyncDispose exists.
+  declare readonly [Symbol.asyncDispose]: () => Promise<void>;
+}
+
+// `await using` calls [Symbol.asyncDispose](). This file is shared with the browser, and Safari has no Symbol.asyncDispose
+// yet: a method written in the class as `[Symbol.asyncDispose]()` would be named "undefined" there. So the method is added
+// only where the symbol exists, with the attributes of a method written in the class (not enumerable).
+if (typeof Symbol.asyncDispose === 'symbol') {
+  Object.defineProperty(BaseMqttClient.prototype, Symbol.asyncDispose, {
+    value: async function asyncDispose(this: BaseMqttClient): Promise<void> {
+      await this.disconnect();
+    },
+    writable: true,
+    configurable: true,
+  });
 }

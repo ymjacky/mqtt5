@@ -284,6 +284,44 @@ While `connect()` is in progress, `disconnect()` waits for it and then disconnec
 [examples/deno/reconnect.ts](https://github.com/ymjacky/mqtt5/blob/main/examples/deno/reconnect.ts) reconnects when the broker closes the connection, keeping
 the session so that QoS 1 / QoS 2 messages in flight are resent.
 
+### Disconnecting with `await using`
+
+`MqttClient` and `WebSocketMqttClient` implement `Symbol.asyncDispose`, so a client can be declared with
+[`await using`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/await_using). When the scope is left, also because of an error,
+`client.disconnect()` is called. It does nothing if the client is not connected, e.g. when `connect()` has failed.
+
+```ts
+import { Mqtt, MqttClient } from '@ymjacky/mqtt5';
+
+async function publishOnce(): Promise<void> {
+  await using client = new MqttClient({ clientId: 'clientA' });
+  await client.connect();
+  await client.publish('topicA', 'hello', { qos: Mqtt.QoS.AT_LEAST_ONCE });
+} // client.disconnect() is called here
+```
+
+What is declared later is disposed of first. Deno KV (`Deno.Kv`) can be declared with `using` too, so with the [session store](#session-store), declare the
+database before the client: the client disconnects first, and then the database is closed.
+
+```ts
+import { KvOutgoingStore, Mqtt, MqttClient } from '@ymjacky/mqtt5';
+
+async function publishWithStore(): Promise<void> {
+  using kv = await Deno.openKv();
+  await using client = new MqttClient({
+    clientId: 'clientA',
+    clean: false,
+    outgoingStore: new KvOutgoingStore(kv),
+  });
+
+  await client.connect({ properties: { sessionExpiryInterval: 3600 } });
+  await client.publish('topicA', 'payload', { qos: Mqtt.QoS.AT_LEAST_ONCE });
+} // client.disconnect(), then kv.close()
+```
+
+All the Deno versions this library supports (2.3.1 or later) can run `await using`. In the browser, Safari does not support it yet: see
+[`await using` in the browser](#await-using-in-the-browser).
+
 ## Error handling
 
 A call that fails is reported in one of two ways:
@@ -497,6 +535,48 @@ await client.subscribe('topicA', Mqtt.QoS.AT_LEAST_ONCE);
 
 `browser/index.html` in this repository is a sample page that subscribes to a topic and lists received messages.
 
+### `await using` in the browser
+
+`WebSocketMqttClient` can be declared with `await using` (see [Disconnecting with `await using`](#disconnecting-with-await-using)) in the browsers that
+support it: Chrome and Edge 134 or later, and Firefox 141 or later.
+
+```ts
+import { Mqtt, WebSocketMqttClient } from '@ymjacky/mqtt5/browser';
+
+async function publishOnce(): Promise<void> {
+  await using client = new WebSocketMqttClient({
+    url: new URL('wss://broker.example.com:8081'),
+    clientId: 'browserClient',
+    protocolVersion: Mqtt.ProtocolVersion.MQTT_V5,
+  });
+  await client.connect();
+  await client.publish('topicA', 'hello', { qos: Mqtt.QoS.AT_LEAST_ONCE });
+} // client.disconnect() is called here
+```
+
+> **Safari does not support `await using` yet** (checked with Safari 27.2). The same goes for every browser on iOS and iPadOS, Chrome and Firefox included,
+> as they use the engine of Safari. There a module that contains `await using` fails to load with a `SyntaxError`, and the client has no
+> `[Symbol.asyncDispose]()` method, because the browser has no `Symbol.asyncDispose`. A page that has to work in Safari calls `disconnect()` in a `finally`
+> block instead:
+
+```ts
+import { Mqtt, WebSocketMqttClient } from '@ymjacky/mqtt5/browser';
+
+async function publishOnce(): Promise<void> {
+  const client = new WebSocketMqttClient({
+    url: new URL('wss://broker.example.com:8081'),
+    clientId: 'browserClient',
+    protocolVersion: Mqtt.ProtocolVersion.MQTT_V5,
+  });
+  try {
+    await client.connect();
+    await client.publish('topicA', 'hello', { qos: Mqtt.QoS.AT_LEAST_ONCE });
+  } finally {
+    await client.disconnect();
+  }
+}
+```
+
 ## Features
 
 - MQTT 3.1.1 and MQTT 5.0
@@ -603,7 +683,8 @@ kv.close(); // after the client has disconnected
 - **One process per database, one client per Client Identifier.** Use a database file of its own for each process: processes that share a file wait
   for each other on every write. Never use the same Client Identifier from more than one client at the same time: the stored messages and their
   order get mixed up. Clients with different Client Identifiers in the same process can share the database.
-- The application opens and closes the database. Close it after the client has disconnected.
+- The application opens and closes the database. Close it after the client has disconnected. Declaring the database with `using` before the client with
+  `await using` does this in the right order: see [Disconnecting with `await using`](#disconnecting-with-await-using).
 - The promise of a `publish()` is gone with its process: the next process resends the message and completes the flow, but nothing reports it.
 - Received QoS 2 messages are not kept: a message that was being received when the process exited can be delivered again.
 
