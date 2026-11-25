@@ -102,10 +102,10 @@ Deno.test({ name: '@session in Deno KV: after the process restarts', only: false
       assertEquals(await second.publishInflightCount(), 2);
       const publishingD = second.publish('topicA', 'D', { qos: Mqtt.QoS.AT_LEAST_ONCE });
       await waitFor(() => b.received.length === 3, 'the resent and the new messages');
-      // 'D' does not get the packet ID 2 or 3, which are not acknowledged yet
-      assertEquals(b.received, ['PUBLISH 2 B dup', 'PUBLISH 3 C dup', 'PUBLISH 4 D']);
+      // 'D' does not get the packet ID 2 or 3, which are not acknowledged yet, but gets 1, which 'A' gave back
+      assertEquals(b.received, ['PUBLISH 2 B dup', 'PUBLISH 3 C dup', 'PUBLISH 1 D']);
 
-      for (const packetId of [2, 3, 4]) {
+      for (const packetId of [2, 3, 1]) {
         b.broker.sendPuback('cid', packetId, v5);
       }
       assertEquals((await publishingD).result, Mqtt.ReasonCode.Success);
