@@ -9,7 +9,7 @@ async function main() {
     clientId: 'WillUser',
     clean: true,
     logger: logger,
-    protocolVersion: Mqtt.ProtocolVersion.MQTT_V5,
+    protocolVersion: Mqtt.ProtocolVersion.MqttV5,
     keepAlive: 60,
   });
 
@@ -17,7 +17,7 @@ async function main() {
   await client.connect({
     will: {
       topic: 'topicA',
-      qos: Mqtt.QoS.AT_LEAST_ONCE,
+      qos: Mqtt.QoS.AtLeastOnce,
       payload: willPayload,
       properties: { userProperties: [{ key: 'userProp1', val: 'userData1' }] },
     },

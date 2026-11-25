@@ -30,7 +30,7 @@ Deno.test({ name: '@receive malformed packet (framing error) ws', only: false },
           clean: false,
           connectTimeoutMS: 10000,
           keepAlive: 10,
-          protocolVersion: Mqtt.ProtocolVersion.MQTT_V3_1_1,
+          protocolVersion: Mqtt.ProtocolVersion.MqttV3_1_1,
         });
 
         broker.on('connect', (event) => {
@@ -64,7 +64,7 @@ Deno.test({ name: '@receive malformed packet (framing error) ws', only: false },
         // integer.
         const malformedPacket = new Uint8Array([0x30, 0xFF, 0xFF, 0xFF, 0xFF]);
 
-        broker.sendRawBytes(client.getClientId(), malformedPacket);
+        broker.sendRawBytes(client.clientId, malformedPacket);
 
         await promise;
       } catch (err) {
@@ -93,7 +93,7 @@ Deno.test({ name: '@receive malformed packet (framing error) ws', only: false },
           clean: false,
           connectTimeoutMS: 10000,
           keepAlive: 10,
-          protocolVersion: Mqtt.ProtocolVersion.MQTT_V5,
+          protocolVersion: Mqtt.ProtocolVersion.MqttV5,
         });
 
         broker.on('connect', (event) => {
@@ -124,7 +124,7 @@ Deno.test({ name: '@receive malformed packet (framing error) ws', only: false },
 
         const malformedPacket = new Uint8Array([0x30, 0xFF, 0xFF, 0xFF, 0xFF]);
 
-        broker.sendRawBytes(client.getClientId(), malformedPacket);
+        broker.sendRawBytes(client.clientId, malformedPacket);
 
         await promise;
       } catch (err) {

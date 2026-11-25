@@ -22,10 +22,10 @@ async function waitFor(condition: () => boolean, label: string, ms = 3000) {
 }
 
 /** The bytes of a QoS 0 PUBLISH to 'topicA' that is `size` bytes long. */
-function publishOfSize(size: number, protocolVersion: Mqtt.ProtocolVersion = Mqtt.ProtocolVersion.MQTT_V5): Uint8Array {
+function publishOfSize(size: number, protocolVersion: Mqtt.ProtocolVersion = Mqtt.ProtocolVersion.MqttV5): Uint8Array {
   const encode = (payloadLength: number) =>
     MqttPackets.packetToBytes(
-      { type: 'publish', topic: 'topicA', payload: new Uint8Array(payloadLength), dup: false, retain: false, qos: Mqtt.QoS.AT_MOST_ONCE },
+      { type: 'publish', topic: 'topicA', payload: new Uint8Array(payloadLength), dup: false, retain: false, qos: Mqtt.QoS.AtMostOnce },
       protocolVersion,
     );
   let payloadLength = size - encode(0).length;
@@ -102,14 +102,14 @@ Deno.test({ name: '@receive packets larger than the Maximum Packet Size', only: 
 
   await context.step('MQTT 3.1.1: CONNECT has no Maximum Packet Size, so a larger packet is received', async () => {
     const broker = new TestBroker();
-    const client = new MqttClient({ clientId: 'cid', logger, protocolVersion: Mqtt.ProtocolVersion.MQTT_V3_1_1 });
+    const client = new MqttClient({ clientId: 'cid', logger, protocolVersion: Mqtt.ProtocolVersion.MqttV3_1_1 });
     try {
       broker.listen();
       const recorded = record(client, broker);
       // The property is not sent in MQTT 3.1.1, so the broker does not know of the limit.
       await client.connect({ properties: { maximumPacketSize: 1024 } });
 
-      await broker.sendRawBytes('cid', publishOfSize(2048, Mqtt.ProtocolVersion.MQTT_V3_1_1));
+      await broker.sendRawBytes('cid', publishOfSize(2048, Mqtt.ProtocolVersion.MqttV3_1_1));
       await waitFor(() => recorded.published.length === 1, 'the PUBLISH of 2048 bytes');
       assertEquals(recorded.disconnects, []);
       assertEquals(recorded.closed, false);

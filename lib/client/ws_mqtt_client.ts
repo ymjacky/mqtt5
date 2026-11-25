@@ -21,7 +21,7 @@ const closingHandshakeTimeout = 1 * 1000;
  * const client = new WebSocketMqttClient({
  *   url: new URL('ws://127.0.0.1:8080'),
  *   clientId: 'clientA',
- *   protocolVersion: Mqtt.ProtocolVersion.MQTT_V5,
+ *   protocolVersion: Mqtt.ProtocolVersion.MqttV5,
  * });
  * await client.connect();
  * ```
@@ -32,11 +32,11 @@ export class WebSocketMqttClient extends BaseMqttClient {
    * @ignore
    */
   protected conn?: WebSocket;
-  private frameBuffer = new MqttStream.MqttFrameBuffer();
+  #frameBuffer = new MqttStream.MqttFrameBuffer();
   // Reports that `conn` is closed. Set until it is closed.
-  private connectionClosed?: () => void;
+  #connectionClosed?: () => void;
   // Gives up `conn` when the peer does not complete the closing handshake started by close().
-  private closingTimer?: ReturnType<typeof setTimeout>;
+  #closingTimer?: ReturnType<typeof setTimeout>;
 
   /**
    * Creates a client. It does not connect until {@link WebSocketMqttClient.connect} is called.
@@ -60,7 +60,7 @@ export class WebSocketMqttClient extends BaseMqttClient {
     const deferred = new Deferred<void>();
 
     // Discard any partial packet left over from a previous connection.
-    this.frameBuffer = this.createFrameBuffer();
+    this.#frameBuffer = this.createFrameBuffer();
     this.conn = new WebSocket(this.url, 'mqtt');
     this.conn.binaryType = 'arraybuffer';
 
@@ -71,16 +71,16 @@ export class WebSocketMqttClient extends BaseMqttClient {
       conn.onmessage = null;
       conn.onerror = null;
       conn.onclose = null;
-      if (this.connectionClosed === closed) {
-        this.connectionClosed = undefined;
-        clearTimeout(this.closingTimer);
-        this.closingTimer = undefined;
+      if (this.#connectionClosed === closed) {
+        this.#connectionClosed = undefined;
+        clearTimeout(this.#closingTimer);
+        this.#closingTimer = undefined;
       }
       this.detectClosed();
       // Closed before it opened: it could not be opened, or close() stopped it (connect timeout).
       deferred.reject(new ConnectionClosed());
     };
-    this.connectionClosed = closed;
+    this.#connectionClosed = closed;
 
     this.conn.onclose = (_e: CloseEvent) => {
       closed();
@@ -93,12 +93,12 @@ export class WebSocketMqttClient extends BaseMqttClient {
     };
     this.conn.onmessage = (e: MessageEvent<unknown>) => {
       try {
-        this.frameBuffer.append(new Uint8Array(e.data as ArrayBuffer));
+        this.#frameBuffer.append(new Uint8Array(e.data as ArrayBuffer));
 
         while (true) {
           let receiveBytes: Uint8Array | undefined;
           try {
-            receiveBytes = this.frameBuffer.takePacket();
+            receiveBytes = this.#frameBuffer.takePacket();
           } catch (streamError) {
             // Rejects for an error that is not a framing error.
             this.handleFramingError(streamError).catch(fatalError);
@@ -165,10 +165,10 @@ export class WebSocketMqttClient extends BaseMqttClient {
    * @ignore
    */
   protected override close(): Promise<void> {
-    const closed = this.connectionClosed;
-    if (this.conn && closed && this.closingTimer === undefined) {
+    const closed = this.#connectionClosed;
+    if (this.conn && closed && this.#closingTimer === undefined) {
       this.conn.close();
-      this.closingTimer = setTimeout(() => {
+      this.#closingTimer = setTimeout(() => {
         this.log('the closing handshake was not completed in time, giving up the connection');
         closed();
       }, closingHandshakeTimeout);

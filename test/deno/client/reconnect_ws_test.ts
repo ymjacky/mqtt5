@@ -35,7 +35,7 @@ Deno.test({ name: '@reconnect', only: false }, async (context) => {
         broker.on('disconnect', (event) => {
           const packet = event.detail;
           assertExists(packet);
-          broker.closeConnectionFromBroker(client.getClientId());
+          broker.closeConnectionFromBroker(client.clientId);
         });
 
         await client.disconnect();
@@ -85,7 +85,7 @@ Deno.test({ name: '@reconnect', only: false }, async (context) => {
         broker.on('disconnect', (event) => {
           const packet = event.detail;
           assertExists(packet);
-          broker.closeConnectionFromBroker(client.getClientId());
+          broker.closeConnectionFromBroker(client.clientId);
         });
 
         await client.disconnect();

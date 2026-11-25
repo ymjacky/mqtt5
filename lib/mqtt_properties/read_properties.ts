@@ -142,7 +142,7 @@ export function readPropertyList(reader: ByteReader): Properties {
         properties.topicAlias = reader.readTwoByteInteger();
         break;
       case 0x24: // (36) Maximum QoS , type: Byte, 0 or 1 (MQTT 5.0 3.2.2.3.4)
-        properties.maximumQoS = readBoolean(reader, 'Maximum QoS') ? Mqtt.QoS.AT_LEAST_ONCE : Mqtt.QoS.AT_MOST_ONCE;
+        properties.maximumQoS = readBoolean(reader, 'Maximum QoS') ? Mqtt.QoS.AtLeastOnce : Mqtt.QoS.AtMostOnce;
         break;
       case 0x25: // (37) Retain Available , type: Byte
         properties.retainAvailable = readBoolean(reader, 'Retain Available');

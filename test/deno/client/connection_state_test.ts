@@ -1,6 +1,6 @@
 import { ClientErrors, Mqtt, MqttClient, MqttPackets, type PublishResult, Store } from '../../../deno/mod.ts';
 import * as MqttStream from '../../../lib/mqtt_stream_utils/mod.ts';
-import { TestBroker } from '../broker/test_broker.ts';
+import { packetIdOf, TestBroker } from '../broker/test_broker.ts';
 import { connackBytes, type RawConnection, RawServer, waitUntil } from '../broker/raw_server.ts';
 import { assert, assertEquals, assertRejects } from '@std/assert';
 
@@ -52,7 +52,7 @@ function receivedPackets(connection: RawConnection): MqttPackets.AnyPacket[] {
   frames.append(connection.received);
   const packets: MqttPackets.AnyPacket[] = [];
   for (let bytes = frames.takePacket(); bytes; bytes = frames.takePacket()) {
-    packets.push(MqttPackets.decode(bytes, Mqtt.ProtocolVersion.MQTT_V5));
+    packets.push(MqttPackets.decode(bytes, Mqtt.ProtocolVersion.MqttV5));
   }
   return packets;
 }
@@ -66,7 +66,7 @@ function receivedPacketTypes(connection: RawConnection): string[] {
 class GatedStore extends Store.MemoryStore {
   storing = Promise.withResolvers<void>();
   gate = Promise.withResolvers<void>();
-  override async store(packet: MqttPackets.PublishPacket | MqttPackets.PubrelPacket): Promise<void> {
+  override async store(packet: MqttPackets.PublishPacketWithId | MqttPackets.PubrelPacket): Promise<void> {
     this.storing.resolve();
     await this.gate.promise;
     await super.store(packet);
@@ -126,8 +126,8 @@ Deno.test({ name: '@connection state: keep alive', only: false }, async (context
 Deno.test({ name: '@connection state: packets a broker must not send', only: false }, async (context) => {
   for (
     const [version, protocolVersion, expected] of [
-      ['v5.0 sends DISCONNECT with the ProtocolError reason code', Mqtt.ProtocolVersion.MQTT_V5, [`DISCONNECT ${Mqtt.ReasonCode.ProtocolError}`, 'closed']],
-      ['v3.1.1 closes without sending DISCONNECT', Mqtt.ProtocolVersion.MQTT_V3_1_1, ['closed']],
+      ['v5.0 sends DISCONNECT with the ProtocolError reason code', Mqtt.ProtocolVersion.MqttV5, [`DISCONNECT ${Mqtt.ReasonCode.ProtocolError}`, 'closed']],
+      ['v3.1.1 closes without sending DISCONNECT', Mqtt.ProtocolVersion.MqttV3_1_1, ['closed']],
     ] as const
   ) {
     await context.step(
@@ -172,8 +172,8 @@ Deno.test({ name: '@connection state: packets a broker must not send', only: fal
 Deno.test({ name: '@connection state: connection refused by the broker', only: false }, async (context) => {
   for (
     const [version, protocolVersion, refusal] of [
-      ['v5.0', Mqtt.ProtocolVersion.MQTT_V5, Mqtt.ReasonCode.NotAuthorized],
-      ['v3.1.1', Mqtt.ProtocolVersion.MQTT_V3_1_1, Mqtt.V3_1_1_ConnectReturnCode.NotAuthorized],
+      ['v5.0', Mqtt.ProtocolVersion.MqttV5, Mqtt.ReasonCode.NotAuthorized],
+      ['v3.1.1', Mqtt.ProtocolVersion.MqttV3_1_1, Mqtt.V3_1_1_ConnectReturnCode.NotAuthorized],
     ] as const
   ) {
     await context.step(
@@ -355,7 +355,7 @@ Deno.test({ name: '@connection state: session store while CONNACK is handled', o
     }
   }
   class FailingResendStore extends Store.MemoryStore {
-    override async *resendIterator(): AsyncIterableIterator<MqttPackets.PublishPacket | MqttPackets.PubrelPacket> {
+    override async *resendIterator(): AsyncIterableIterator<MqttPackets.PublishPacketWithId | MqttPackets.PubrelPacket> {
       if (failures++ === 0) {
         throw new Error('store failed');
       }
@@ -591,7 +591,7 @@ Deno.test({ name: '@connection state: after DISCONNECT is sent', only: false }, 
 
         await settleWithin(disconnectReceived.promise, 'DISCONNECT');
         await assertRejects(() => client.publish('topicA', 'x'), ClientErrors.StateIsNotOnlineError);
-        await assertRejects(() => client.publish('topicA', 'x', { qos: Mqtt.QoS.AT_LEAST_ONCE }), ClientErrors.StateIsNotOnlineError);
+        await assertRejects(() => client.publish('topicA', 'x', { qos: Mqtt.QoS.AtLeastOnce }), ClientErrors.StateIsNotOnlineError);
         await assertRejects(() => client.subscribe('topicA'), ClientErrors.StateIsNotOnlineError);
         await assertRejects(() => client.unsubscribe('topicA'), ClientErrors.StateIsNotOnlineError);
         await assertRejects(() => client.auth(Mqtt.ReasonCode.ReAuthenticate), ClientErrors.SendPacketError);
@@ -632,8 +632,8 @@ Deno.test({ name: '@connection state: after DISCONNECT is sent', only: false }, 
         broker.on('disconnect', async () => {
           seenByBroker.push('disconnect');
           // Messages that the broker had sent before it received DISCONNECT.
-          await broker.sendPublish('cid', 1, 'qos1', Mqtt.ProtocolVersion.MQTT_V5, payload, Mqtt.QoS.AT_LEAST_ONCE);
-          await broker.sendPublish('cid', 2, 'qos2', Mqtt.ProtocolVersion.MQTT_V5, payload, Mqtt.QoS.EXACTLY_ONCE);
+          await broker.sendPublish('cid', 1, 'qos1', Mqtt.ProtocolVersion.MqttV5, payload, Mqtt.QoS.AtLeastOnce);
+          await broker.sendPublish('cid', 2, 'qos2', Mqtt.ProtocolVersion.MqttV5, payload, Mqtt.QoS.ExactlyOnce);
         });
         broker.on('closed', () => {
           seenByBroker.push('closed');
@@ -655,9 +655,9 @@ Deno.test({ name: '@connection state: after DISCONNECT is sent', only: false }, 
 
         // After reconnecting, the broker sends the QoS 2 message again (DUP): the flow is completed, and the message is not emitted again.
         await client.connect();
-        await broker.sendPublish('cid', 2, 'qos2', Mqtt.ProtocolVersion.MQTT_V5, payload, Mqtt.QoS.EXACTLY_ONCE, true);
+        await broker.sendPublish('cid', 2, 'qos2', Mqtt.ProtocolVersion.MqttV5, payload, Mqtt.QoS.ExactlyOnce, true);
         await waitUntil(() => seenByBroker.includes('pubrec'), 'PUBREC');
-        await broker.sendPubrel('cid', 2, Mqtt.ProtocolVersion.MQTT_V5);
+        await broker.sendPubrel('cid', 2, Mqtt.ProtocolVersion.MqttV5);
         await waitUntil(() => seenByBroker.includes('pubcomp'), 'PUBCOMP');
         assertEquals(seenByBroker, ['disconnect', 'closed', 'pubrec', 'pubcomp']);
         assertEquals(messages, ['qos1', 'qos2']);
@@ -776,7 +776,7 @@ Deno.test({ name: '@connection state: disconnect() and the next connection', onl
         await settleWithin(connecting, 'the first connect()');
 
         // publish() waits for the store, and disconnect() waits for the publish() made before it.
-        const publishing = client.publish('topicA', 'x', { qos: Mqtt.QoS.AT_LEAST_ONCE });
+        const publishing = client.publish('topicA', 'x', { qos: Mqtt.QoS.AtLeastOnce });
         publishing.catch(() => {
           // How the publish() ends does not matter here.
         });
@@ -833,7 +833,7 @@ Deno.test({ name: '@connection state: publish() and the next connection', only: 
     await first.send(connackBytes());
     await settleWithin(connecting, 'the first connect()');
 
-    const publishing = client.publish('topicA', 'x', { qos: Mqtt.QoS.AT_LEAST_ONCE });
+    const publishing = client.publish('topicA', 'x', { qos: Mqtt.QoS.AtLeastOnce });
     // Settled by the test that awaits it.
     publishing.catch(() => {});
     await settleWithin(store.storing.promise, 'store()');
@@ -865,11 +865,11 @@ Deno.test({ name: '@connection state: publish() and the next connection', only: 
         assertEquals(receivedPacketTypes(first), ['connect']);
         assertEquals(receivedPacketTypes(second), ['connect', 'publish']);
         const publish = receivedPackets(second)[1];
-        assert(publish.type === 'publish');
+        assert(publish?.type === 'publish');
         assertEquals(publish.topic, 'topicA');
 
         // The flow completes on the second connection.
-        await second.send(MqttPackets.packetToBytes({ type: 'puback', packetId: publish.packetId! }, Mqtt.ProtocolVersion.MQTT_V5));
+        await second.send(MqttPackets.packetToBytes({ type: 'puback', packetId: packetIdOf(publish) }, Mqtt.ProtocolVersion.MqttV5));
         assertEquals((await settleWithin(publishing, 'publish()')).result, 0);
       } finally {
         store.gate.resolve();
@@ -925,12 +925,12 @@ Deno.test({ name: '@connection state: QoS 2 PUBLISH sent again by the broker', o
 
         await client.connect();
         const payload = new TextEncoder().encode('x');
-        await broker.sendPublish('cid', 1, 'topicA', Mqtt.ProtocolVersion.MQTT_V5, payload, Mqtt.QoS.EXACTLY_ONCE);
+        await broker.sendPublish('cid', 1, 'topicA', Mqtt.ProtocolVersion.MqttV5, payload, Mqtt.QoS.ExactlyOnce);
         await waitUntil(() => pubrecCount === 1, 'PUBREC');
         assertEquals(messageCount, 1);
 
         // The broker did not receive the PUBREC: it sends the PUBLISH again.
-        await broker.sendPublish('cid', 1, 'topicA', Mqtt.ProtocolVersion.MQTT_V5, payload, Mqtt.QoS.EXACTLY_ONCE, true);
+        await broker.sendPublish('cid', 1, 'topicA', Mqtt.ProtocolVersion.MqttV5, payload, Mqtt.QoS.ExactlyOnce, true);
         await waitUntil(() => pubrecCount === 2, 'PUBREC for the PUBLISH with DUP');
         assertEquals(messageCount, 1);
       } finally {
@@ -1007,7 +1007,7 @@ Deno.test({ name: '@connection state: topic aliases of the broker', only: false 
           messages.push(`${event.detail.topic}:${new TextDecoder().decode(event.detail.payload)}`);
         });
         const send = (topic: string, payload: string) =>
-          broker.sendPublish('cid', 0, topic, Mqtt.ProtocolVersion.MQTT_V5, new TextEncoder().encode(payload), Mqtt.QoS.AT_MOST_ONCE, false, false, {
+          broker.sendPublish('cid', 0, topic, Mqtt.ProtocolVersion.MqttV5, new TextEncoder().encode(payload), Mqtt.QoS.AtMostOnce, false, false, {
             topicAlias: 1,
           });
 

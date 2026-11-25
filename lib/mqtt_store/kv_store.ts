@@ -2,7 +2,7 @@ import * as Mqtt from '../mqtt/mod.ts';
 import * as MqttPackets from '../mqtt_packets/mod.ts';
 import type { OutgoingStore } from './store.ts';
 
-type StoredPacket = MqttPackets.PublishPacket | MqttPackets.PubrelPacket;
+type StoredPacket = MqttPackets.PublishPacketWithId | MqttPackets.PubrelPacket;
 
 /** The value kept in Deno KV for a packet. */
 type Entry = {
@@ -55,7 +55,7 @@ const maximumEntryBytes = 65499;
  * const client = new MqttClient({ clientId: 'clientA', clean: false, outgoingStore: new KvOutgoingStore(kv) });
  *
  * await client.connect({ properties: { sessionExpiryInterval: 3600 } });
- * await client.publish('topicA', 'payload', { qos: Mqtt.QoS.AT_LEAST_ONCE });
+ * await client.publish('topicA', 'payload', { qos: Mqtt.QoS.AtLeastOnce });
  * await client.disconnect();
  * kv.close();
  * ```
@@ -71,23 +71,23 @@ export class KvOutgoingStore implements OutgoingStore {
   /** The size in bytes of the largest packet the store can keep. */
   readonly maximumPacketSize: number = KvOutgoingStore.maximumPacketSize;
 
-  private kv: Deno.Kv;
-  private prefix: Deno.KvKey;
-  private clientId?: string;
-  private log: (msg: string, ...args: unknown[]) => void;
+  #kv: Deno.Kv;
+  #prefix: Deno.KvKey;
+  #clientId?: string;
+  #log: (msg: string, ...args: unknown[]) => void;
 
   // The seq of the stored packets by packet ID, read from the database when the store is first used.
-  private sequences?: Promise<Map<number, number>>;
-  private nextSeq = 1;
+  #sequences?: Promise<Map<number, number>>;
+  #nextSeq = 1;
 
   /**
    * Creates a store. The client it is given to tells it its Client Identifier.
    * @param kv the database, opened with `Deno.openKv()`.
    */
   constructor(kv: Deno.Kv, options?: KvOutgoingStoreOptions) {
-    this.kv = kv;
-    this.prefix = options?.prefix ?? ['mqtt5'];
-    this.log = options?.logger ?? (() => {});
+    this.#kv = kv;
+    this.#prefix = options?.prefix ?? ['mqtt5'];
+    this.#log = options?.logger ?? (() => {});
   }
 
   /**
@@ -99,10 +99,10 @@ export class KvOutgoingStore implements OutgoingStore {
     if (!clientId) {
       throw new Error('KvOutgoingStore needs a client with a clientId: the session is found again by it after the process restarts');
     }
-    if (this.clientId !== undefined && this.clientId !== clientId) {
-      throw new Error(`the KvOutgoingStore is already used with the Client Identifier '${this.clientId}'`);
+    if (this.#clientId !== undefined && this.#clientId !== clientId) {
+      throw new Error(`the KvOutgoingStore is already used with the Client Identifier '${this.#clientId}'`);
     }
-    this.clientId = clientId;
+    this.#clientId = clientId;
   }
 
   /** Stores a packet by its packet ID. Rejects if the packet has no packet ID or cannot be kept in Deno KV. */
@@ -110,16 +110,16 @@ export class KvOutgoingStore implements OutgoingStore {
     if (!packet.packetId) {
       throw new Error('missing packet.packetId');
     }
-    const bytes = MqttPackets.packetToBytes(packet, Mqtt.ProtocolVersion.MQTT_V5);
+    const bytes = MqttPackets.packetToBytes(packet, Mqtt.ProtocolVersion.MqttV5);
     if (bytes.length > maximumEntryBytes) {
       throw new Error(`${packet.type.toUpperCase()} is ${bytes.length} bytes, larger than the ${maximumEntryBytes} bytes Deno KV can keep`);
     }
 
     const sequences = await this.load();
     // No await between reading and updating nextSeq: concurrent calls get different positions.
-    const seq = sequences.get(packet.packetId) ?? this.nextSeq++;
+    const seq = sequences.get(packet.packetId) ?? this.#nextSeq++;
     const entry: Entry = { seq, bytes };
-    await this.kv.set(this.key(packet.packetId), entry);
+    await this.#kv.set(this.key(packet.packetId), entry);
     sequences.set(packet.packetId, seq);
   }
 
@@ -131,7 +131,7 @@ export class KvOutgoingStore implements OutgoingStore {
   /** Removes the packet with the packet ID. */
   async discard(packetId: number): Promise<void> {
     const sequences = await this.load();
-    await this.kv.delete(this.key(packetId));
+    await this.#kv.delete(this.key(packetId));
     sequences.delete(packetId);
   }
 
@@ -142,18 +142,18 @@ export class KvOutgoingStore implements OutgoingStore {
 
   /** Removes all packets of the Client Identifier. */
   async clear(): Promise<void> {
-    for await (const { key } of this.kv.list({ prefix: this.keyPrefix() })) {
-      await this.kv.delete(key);
+    for await (const { key } of this.#kv.list({ prefix: this.keyPrefix() })) {
+      await this.#kv.delete(key);
     }
-    this.sequences = Promise.resolve(new Map<number, number>());
-    this.nextSeq = 1;
+    this.#sequences = Promise.resolve(new Map<number, number>());
+    this.#nextSeq = 1;
   }
 
   /** Iterates over the stored packets to resend, in the order they were first stored. */
   async *resendIterator(): AsyncIterableIterator<StoredPacket> {
     await this.load();
     const stored: { seq: number; packet: StoredPacket }[] = [];
-    for await (const { key, value } of this.kv.list({ prefix: this.keyPrefix() })) {
+    for await (const { key, value } of this.#kv.list({ prefix: this.keyPrefix() })) {
       const read = this.read(key, value);
       if (read) {
         stored.push(read);
@@ -167,10 +167,10 @@ export class KvOutgoingStore implements OutgoingStore {
 
   /** The first parts of the keys of the Client Identifier. */
   private keyPrefix(): Deno.KvKey {
-    if (this.clientId === undefined) {
+    if (this.#clientId === undefined) {
       throw new Error('the KvOutgoingStore is not used by a client yet: give it to a client as `outgoingStore`');
     }
-    return [...this.prefix, this.clientId, 'outgoing'];
+    return [...this.#prefix, this.#clientId, 'outgoing'];
   }
 
   /** The key of the stored packet with the packet ID. */
@@ -183,41 +183,42 @@ export class KvOutgoingStore implements OutgoingStore {
    * is removed: it must not prevent the client from connecting.
    */
   private load(): Promise<Map<number, number>> {
-    if (!this.sequences) {
+    if (!this.#sequences) {
       const loading = (async () => {
         const sequences = new Map<number, number>();
-        for await (const { key, value } of this.kv.list({ prefix: this.keyPrefix() })) {
+        for await (const { key, value } of this.#kv.list({ prefix: this.keyPrefix() })) {
           const read = this.read(key, value);
           if (read) {
-            sequences.set(read.packet.packetId!, read.seq);
-            this.nextSeq = Math.max(this.nextSeq, read.seq + 1);
+            sequences.set(read.packet.packetId, read.seq);
+            this.#nextSeq = Math.max(this.#nextSeq, read.seq + 1);
           } else {
-            this.log('removing an entry that cannot be read from the store', key);
-            await this.kv.delete(key);
+            this.#log('removing an entry that cannot be read from the store', key);
+            await this.#kv.delete(key);
           }
         }
         return sequences;
       })();
-      this.sequences = loading;
+      this.#sequences = loading;
       // Read again on the next call when the database cannot be read now.
       loading.catch(() => {
-        if (this.sequences === loading) {
-          this.sequences = undefined;
+        if (this.#sequences === loading) {
+          this.#sequences = undefined;
         }
       });
     }
-    return this.sequences;
+    return this.#sequences;
   }
 
-  /** Decodes an entry. Returns undefined if it is not a PUBLISH or PUBREL stored under its packet ID. */
+  /** Decodes an entry. Returns undefined if it is not a QoS 1 / QoS 2 PUBLISH or a PUBREL stored under its packet ID. */
   private read(key: Deno.KvKey, value: unknown): { seq: number; packet: StoredPacket } | undefined {
     const entry = value as Partial<Entry> | null;
     if (typeof entry?.seq !== 'number' || !(entry.bytes instanceof Uint8Array)) {
       return undefined;
     }
     try {
-      const packet = MqttPackets.decode(entry.bytes, Mqtt.ProtocolVersion.MQTT_V5);
-      if ((packet.type === 'publish' || packet.type === 'pubrel') && packet.packetId === key.at(-1)) {
+      const packet = MqttPackets.decode(entry.bytes, Mqtt.ProtocolVersion.MqttV5);
+      const stored = packet.type === 'pubrel' || (packet.type === 'publish' && packet.qos !== Mqtt.QoS.AtMostOnce);
+      if (stored && packet.packetId === key.at(-1)) {
         return { seq: entry.seq, packet };
       }
     } catch {

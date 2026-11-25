@@ -2,9 +2,13 @@ import { KvOutgoingStore, Mqtt, type MqttPackets, type Store } from '../../../de
 import type { KvOutgoingStoreOptions } from '../../../deno/mod.ts';
 import { assertEquals, assertRejects } from '@std/assert';
 
-type StoredPacket = MqttPackets.PublishPacket | MqttPackets.PubrelPacket;
+type StoredPacket = MqttPackets.PublishPacketWithId | MqttPackets.PubrelPacket;
 
-export function publishPacket(packetId: number, payload: string, qos: Mqtt.QoS = Mqtt.QoS.AT_LEAST_ONCE): MqttPackets.PublishPacket {
+export function publishPacket(
+  packetId: number,
+  payload: string,
+  qos: MqttPackets.PublishPacketWithId['qos'] = Mqtt.QoS.AtLeastOnce,
+): MqttPackets.PublishPacketWithId {
   return { type: 'publish', topic: 'topicA', payload: new TextEncoder().encode(payload), dup: false, retain: false, qos, packetId };
 }
 
@@ -44,13 +48,13 @@ export async function testOutgoingStoreContract(
   }
 
   await step('a stored packet is returned with the same content', async (store) => {
-    const packet: MqttPackets.PublishPacket = {
+    const packet: MqttPackets.PublishPacketWithId = {
       type: 'publish',
       topic: 'topic/日本語',
       payload: new Uint8Array([0, 1, 2, 255]),
       dup: false,
       retain: true,
-      qos: Mqtt.QoS.EXACTLY_ONCE,
+      qos: Mqtt.QoS.ExactlyOnce,
       packetId: 10,
       properties: {
         payloadFormatIndicator: 1,
@@ -90,9 +94,9 @@ export async function testOutgoingStoreContract(
   });
 
   await step('PUBREL replaces the PUBLISH of its packet ID and keeps its position', async (store) => {
-    await store.store(publishPacket(1, 'A', Mqtt.QoS.EXACTLY_ONCE));
-    await store.store(publishPacket(2, 'B', Mqtt.QoS.EXACTLY_ONCE));
-    await store.store(publishPacket(3, 'C', Mqtt.QoS.EXACTLY_ONCE));
+    await store.store(publishPacket(1, 'A', Mqtt.QoS.ExactlyOnce));
+    await store.store(publishPacket(2, 'B', Mqtt.QoS.ExactlyOnce));
+    await store.store(publishPacket(3, 'C', Mqtt.QoS.ExactlyOnce));
     await store.store({ type: 'pubrel', packetId: 2 });
     assertEquals(await resendOrder(store), ['publish 1 A', 'pubrel 2', 'publish 3 C']);
     assertEquals(await store.count(), 3);
@@ -118,7 +122,7 @@ export async function testOutgoingStoreContract(
 
   await step('count follows store, replace, discard and clear', async (store) => {
     assertEquals(await store.count(), 0);
-    await store.store(publishPacket(1, 'A', Mqtt.QoS.EXACTLY_ONCE));
+    await store.store(publishPacket(1, 'A', Mqtt.QoS.ExactlyOnce));
     await store.store(publishPacket(2, 'B'));
     assertEquals(await store.count(), 2);
     await store.store({ type: 'pubrel', packetId: 1 });
@@ -141,7 +145,8 @@ export async function testOutgoingStoreContract(
   });
 
   await step('a packet without a packet ID is rejected', async (store) => {
-    await assertRejects(() => store.store({ ...publishPacket(1, 'A'), packetId: undefined }));
+    // The type does not allow it, but a JavaScript caller can pass one.
+    await assertRejects(() => store.store({ ...publishPacket(1, 'A'), packetId: undefined } as unknown as StoredPacket));
     await assertRejects(() => store.store({ ...publishPacket(1, 'A'), packetId: 0 }));
     assertEquals(await store.count(), 0);
   });

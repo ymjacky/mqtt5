@@ -10,7 +10,7 @@ async function main() {
     clientId: 'subscriberA',
     logger: logger,
     clean: true,
-    protocolVersion: Mqtt.ProtocolVersion.MQTT_V5,
+    protocolVersion: Mqtt.ProtocolVersion.MqttV5,
     keepAlive: 30,
   });
 
@@ -24,7 +24,7 @@ async function main() {
     logger(`topic: ${packet.topic}`, `message: ${receiveMessage}`);
   });
 
-  await client.subscribe(['topicA', 'topicB', 'topicC'], Mqtt.QoS.AT_LEAST_ONCE);
+  await client.subscribe(['topicA', 'topicB', 'topicC'], Mqtt.QoS.AtLeastOnce);
 }
 
 main();

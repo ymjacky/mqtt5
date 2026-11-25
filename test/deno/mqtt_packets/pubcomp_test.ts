@@ -9,7 +9,7 @@ Deno.test('encodePubcompPacket', function () {
     toBytes({
       type: 'pubcomp',
       packetId: 1337,
-    }, Mqtt.ProtocolVersion.MQTT_V3_1_1),
+    }, Mqtt.ProtocolVersion.MqttV3_1_1),
     new Uint8Array([
       // fixedHeader
       0x70, // packetType + flags
@@ -28,7 +28,7 @@ Deno.test('encodePubcompPacketMQTT5WithSuccessReasonCode', function () {
       type: 'pubcomp',
       packetId: 1337,
       reasonCode: Mqtt.ReasonCode.Success,
-    }, Mqtt.ProtocolVersion.MQTT_V5),
+    }, Mqtt.ProtocolVersion.MqttV5),
     new Uint8Array([
       // fixedHeader
       0x70, // packetType + flags
@@ -48,7 +48,7 @@ Deno.test('encodePubcompPacketMQTT5WithErrorReasonCode', function () {
       type: 'pubcomp',
       packetId: 1337,
       reasonCode: Mqtt.ReasonCode.PacketIdentifierNotFound,
-    }, Mqtt.ProtocolVersion.MQTT_V5),
+    }, Mqtt.ProtocolVersion.MqttV5),
     new Uint8Array([
       // fixedHeader
       0x70, // packetType + flags
@@ -74,7 +74,7 @@ Deno.test('encodePubcompPacketMQTT5WithProperties', function () {
           { key: 'clientId', val: 'mqtt-client-123' },
         ],
       },
-    }, Mqtt.ProtocolVersion.MQTT_V5),
+    }, Mqtt.ProtocolVersion.MqttV5),
     new Uint8Array([
       // fixedHeader
       0x70, // packetType + flags
@@ -157,7 +157,7 @@ Deno.test('decodePubcompPacket', function () {
         57, // id LSB
       ]),
       2, // remainingLength
-      Mqtt.ProtocolVersion.MQTT_V3_1_1, // ProtocolVersion
+      Mqtt.ProtocolVersion.MqttV3_1_1, // ProtocolVersion
     ),
     {
       type: 'pubcomp',
@@ -177,7 +177,7 @@ Deno.test('decodePubcompPacketMQTT5WithReasonCode', function () {
         0x92, // reasonCode = PacketIdentifierNotFound (146)
       ]),
       3, // remainingLength
-      Mqtt.ProtocolVersion.MQTT_V5, // ProtocolVersion
+      Mqtt.ProtocolVersion.MqttV5, // ProtocolVersion
     ),
     {
       type: 'pubcomp',
@@ -258,7 +258,7 @@ Deno.test('decodePubcompPacketMQTT5WithProperties', function () {
         51, // 'mqtt-client-123'
       ]),
       62, // remainingLength (packetId: 2 bytes + reasonCode: 1 byte + properties length: 1 byte + properties: 58 bytes = 62 bytes)
-      Mqtt.ProtocolVersion.MQTT_V5, // ProtocolVersion
+      Mqtt.ProtocolVersion.MqttV5, // ProtocolVersion
     ),
     {
       type: 'pubcomp',
@@ -276,6 +276,6 @@ Deno.test('decodePubcompPacketMQTT5WithProperties', function () {
 
 // Test handling of short PUBCOMP packets (error cases)
 Deno.test('decodeShortPubcompPackets', function () {
-  assertThrows(() => parse(Uint8Array.from([]), 0, Mqtt.ProtocolVersion.MQTT_V3_1_1));
-  assertThrows(() => parse(Uint8Array.from([5]), 1, Mqtt.ProtocolVersion.MQTT_V3_1_1));
+  assertThrows(() => parse(Uint8Array.from([]), 0, Mqtt.ProtocolVersion.MqttV3_1_1));
+  assertThrows(() => parse(Uint8Array.from([5]), 1, Mqtt.ProtocolVersion.MqttV3_1_1));
 });

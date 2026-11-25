@@ -78,7 +78,7 @@ Deno.test({ name: '@closing', only: false }, async (context) => {
         broker.on('disconnect', (event) => {
           const packet = event.detail;
           assertExists(packet);
-          broker.closeConnectionFromBroker(client.getClientId());
+          broker.closeConnectionFromBroker(client.clientId);
         });
 
         client.on('closed', () => {

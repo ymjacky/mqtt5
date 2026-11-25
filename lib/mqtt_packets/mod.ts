@@ -144,7 +144,7 @@ export function packetToBytes(
  */
 export function decode(
   buffer: Uint8Array,
-  protocolVersion: Mqtt.ProtocolVersion = Mqtt.ProtocolVersion.MQTT_V5,
+  protocolVersion: Mqtt.ProtocolVersion = Mqtt.ProtocolVersion.MqttV5,
 ): AnyPacket {
   try {
     // fixed header
@@ -183,13 +183,13 @@ function parsePacket(
   let packet;
 
   switch (packetTypeId) {
-    case Mqtt.PacketType.CONNECT:
+    case Mqtt.PacketType.Connect:
       packet = connectParse(variableHeaderAndPayload, remainingLength);
       break;
-    case Mqtt.PacketType.CONNACK:
+    case Mqtt.PacketType.Connack:
       packet = connackParse(variableHeaderAndPayload, remainingLength, protocolVersion);
       break;
-    case Mqtt.PacketType.PUBLISH:
+    case Mqtt.PacketType.Publish:
       packet = publishParse(
         packetFlags,
         variableHeaderAndPayload,
@@ -197,40 +197,40 @@ function parsePacket(
         protocolVersion,
       );
       break;
-    case Mqtt.PacketType.PUBACK:
+    case Mqtt.PacketType.Puback:
       packet = pubackParse(variableHeaderAndPayload, remainingLength, protocolVersion);
       break;
-    case Mqtt.PacketType.PUBREC:
+    case Mqtt.PacketType.Pubrec:
       packet = pubrecParse(variableHeaderAndPayload, remainingLength, protocolVersion);
       break;
-    case Mqtt.PacketType.PUBREL:
+    case Mqtt.PacketType.Pubrel:
       packet = pubrelParse(variableHeaderAndPayload, remainingLength, protocolVersion);
       break;
-    case Mqtt.PacketType.PUBCOMP:
+    case Mqtt.PacketType.Pubcomp:
       packet = pubcompParse(variableHeaderAndPayload, remainingLength, protocolVersion);
       break;
-    case Mqtt.PacketType.SUBSCRIBE:
+    case Mqtt.PacketType.Subscribe:
       packet = subscribeParse(variableHeaderAndPayload, remainingLength, protocolVersion);
       break;
-    case Mqtt.PacketType.SUBACK:
+    case Mqtt.PacketType.Suback:
       packet = subackParse(variableHeaderAndPayload, remainingLength, protocolVersion);
       break;
-    case Mqtt.PacketType.UNSUBSCRIBE:
+    case Mqtt.PacketType.Unsubscribe:
       packet = unsubscribeParse(variableHeaderAndPayload, remainingLength, protocolVersion);
       break;
-    case Mqtt.PacketType.UNSUBACK:
+    case Mqtt.PacketType.Unsuback:
       packet = unsubackParse(variableHeaderAndPayload, remainingLength, protocolVersion);
       break;
-    case Mqtt.PacketType.PINGREQ:
+    case Mqtt.PacketType.Pingreq:
       packet = pingreqParse(remainingLength);
       break;
-    case Mqtt.PacketType.PINGRESP:
+    case Mqtt.PacketType.Pingresp:
       packet = pingrespParse(remainingLength);
       break;
-    case Mqtt.PacketType.DISCONNECT:
+    case Mqtt.PacketType.Disconnect:
       packet = disconnectParse(variableHeaderAndPayload, remainingLength, protocolVersion);
       break;
-    case Mqtt.PacketType.AUTH:
+    case Mqtt.PacketType.Auth:
       packet = authParse(variableHeaderAndPayload, remainingLength, protocolVersion);
       break;
     default:

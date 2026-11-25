@@ -1,4 +1,4 @@
-import { assert, assertEquals, assertFalse, assertThrows } from '@std/assert';
+import { assert, assertEquals, assertExists, assertFalse, assertThrows } from '@std/assert';
 
 import { ReuseIdProvider as IdProvider } from '../../../lib/id_provider/reuse_id_provider.ts';
 
@@ -315,14 +315,17 @@ Deno.test('the IDs become small again once a burst is acknowledged', () => {
   const inFlight: number[] = [];
   const handedOut: number[] = [];
   for (let i = 0; i < 2000; i++) {
-    if (burst.length > 0) {
-      assert(idProvider.release(burst.shift()!));
+    const acknowledged = burst.shift();
+    if (acknowledged !== undefined) {
+      assert(idProvider.release(acknowledged));
     }
     const id = idProvider.acquire();
     handedOut.push(id);
     inFlight.push(id);
     if (inFlight.length > 10) {
-      assert(idProvider.release(inFlight.shift()!));
+      const oldest = inFlight.shift();
+      assertExists(oldest);
+      assert(idProvider.release(oldest));
     }
   }
 
@@ -385,8 +388,10 @@ Deno.test('acquire, release and inUse do not slow down with the number of IDs in
   const start = performance.now();
   for (let i = 0; i < 100_000; i++) {
     const k = random(inFlight.length); // the acknowledgments come back in any order
-    assert(idProvider.release(inFlight[k]));
-    assertFalse(idProvider.inUse(inFlight[k]));
+    const id = inFlight[k];
+    assertExists(id);
+    assert(idProvider.release(id));
+    assertFalse(idProvider.inUse(id));
     inFlight[k] = idProvider.acquire();
   }
   const elapsed = performance.now() - start;
@@ -396,7 +401,7 @@ Deno.test('acquire, release and inUse do not slow down with the number of IDs in
 });
 
 Deno.test('the constructor rejects a range that is not one', () => {
-  for (const [start, end] of [[1, 1], [2, 1], [0.5, 9], [1, NaN]]) {
+  for (const [start, end] of [[1, 1], [2, 1], [0.5, 9], [1, NaN]] as const) {
     assertThrows(() => new IdProvider(start, end), RangeError, 'must be integers, and start must be less than end');
   }
 });

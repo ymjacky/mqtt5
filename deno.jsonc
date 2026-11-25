@@ -14,7 +14,8 @@
     "@std/http": "jsr:@std/http@^1.1.4"
   },
   "compilerOptions": {
-    "noImplicitOverride": true
+    "noImplicitOverride": true,
+    "noUncheckedIndexedAccess": true
   },
   "publish": {
     "include": ["deno/", "browser/mod.ts", "lib/", "readme.md", "LICENSE"]
@@ -36,7 +37,7 @@
 
     "rules": {
       "tags": ["recommended", "jsr"],
-      "include": ["eqeqeq", "explicit-module-boundary-types"]
+      "include": ["eqeqeq", "explicit-module-boundary-types", "no-non-null-assertion"]
     },
 
     "report": "pretty"

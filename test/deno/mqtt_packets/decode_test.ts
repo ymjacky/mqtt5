@@ -3,8 +3,8 @@ import * as Mqtt from '../../../lib/mqtt/mod.ts';
 import { decode, MqttPacketsError } from '../../../lib/mqtt_packets/mod.ts';
 import { MqttUtilsError } from '../../../lib/mqtt_utils/mod.ts';
 
-const V5 = Mqtt.ProtocolVersion.MQTT_V5;
-const V3 = Mqtt.ProtocolVersion.MQTT_V3_1_1;
+const V5 = Mqtt.ProtocolVersion.MqttV5;
+const V3 = Mqtt.ProtocolVersion.MqttV3_1_1;
 
 /** Checks that decode() throws MqttPacketParseError, and returns its cause. */
 function decodeError(bytes: number[], protocolVersion: Mqtt.ProtocolVersion, name: string): unknown {

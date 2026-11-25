@@ -11,7 +11,7 @@ Deno.test('encodePubrecPacket', function () {
         type: 'pubrec',
         packetId: 1337,
       },
-      Mqtt.ProtocolVersion.MQTT_V3_1_1, // ProtocolVersion
+      Mqtt.ProtocolVersion.MqttV3_1_1, // ProtocolVersion
     ),
     new Uint8Array([
       // fixedHeader
@@ -33,7 +33,7 @@ Deno.test('encodePubrecPacketMQTT5WithSuccessReasonCode', function () {
         packetId: 1337,
         reasonCode: Mqtt.ReasonCode.Success,
       },
-      Mqtt.ProtocolVersion.MQTT_V5,
+      Mqtt.ProtocolVersion.MqttV5,
     ),
     new Uint8Array([
       // fixedHeader
@@ -56,7 +56,7 @@ Deno.test('encodePubrecPacketMQTT5WithErrorReasonCode', function () {
         packetId: 1337,
         reasonCode: Mqtt.ReasonCode.NoMatchingSubscribers,
       },
-      Mqtt.ProtocolVersion.MQTT_V5,
+      Mqtt.ProtocolVersion.MqttV5,
     ),
     new Uint8Array([
       // fixedHeader
@@ -85,7 +85,7 @@ Deno.test('encodePubrecPacketMQTT5WithProperties', function () {
           ],
         },
       },
-      Mqtt.ProtocolVersion.MQTT_V5,
+      Mqtt.ProtocolVersion.MqttV5,
     ),
     new Uint8Array([
       // fixedHeader
@@ -170,7 +170,7 @@ Deno.test('decodePubrecPacket', function () {
         57, // id LSB
       ]),
       2, // remainingLength
-      Mqtt.ProtocolVersion.MQTT_V3_1_1, // ProtocolVersion
+      Mqtt.ProtocolVersion.MqttV3_1_1, // ProtocolVersion
     ),
     {
       type: 'pubrec',
@@ -190,7 +190,7 @@ Deno.test('decodePubrecPacketMQTT5WithReasonCode', function () {
         0x10, // reasonCode = NoMatchingSubscribers (16)
       ]),
       3, // remainingLength
-      Mqtt.ProtocolVersion.MQTT_V5, // ProtocolVersion
+      Mqtt.ProtocolVersion.MqttV5, // ProtocolVersion
     ),
     {
       type: 'pubrec',
@@ -272,7 +272,7 @@ Deno.test('decodePubrecPacketMQTT5WithProperties', function () {
         101, // 'sensors/temperature'
       ]),
       63, // remainingLength (packetId: 2 bytes + reasonCode: 1 byte + properties length: 1 byte + properties: 59 bytes = 63 bytes)
-      Mqtt.ProtocolVersion.MQTT_V5, // ProtocolVersion
+      Mqtt.ProtocolVersion.MqttV5, // ProtocolVersion
     ),
     {
       type: 'pubrec',
@@ -290,6 +290,6 @@ Deno.test('decodePubrecPacketMQTT5WithProperties', function () {
 
 // Test handling of short PUBREC packets (error cases)
 Deno.test('decodeShortPubrecPackets', function () {
-  assertThrows(() => parse(Uint8Array.from([]), 0, Mqtt.ProtocolVersion.MQTT_V3_1_1));
-  assertThrows(() => parse(Uint8Array.from([5]), 1, Mqtt.ProtocolVersion.MQTT_V3_1_1));
+  assertThrows(() => parse(Uint8Array.from([]), 0, Mqtt.ProtocolVersion.MqttV3_1_1));
+  assertThrows(() => parse(Uint8Array.from([5]), 1, Mqtt.ProtocolVersion.MqttV3_1_1));
 });

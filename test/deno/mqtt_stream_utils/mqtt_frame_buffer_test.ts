@@ -1,4 +1,4 @@
-import { assert, assertEquals, assertThrows } from '@std/assert';
+import { assert, assertEquals, assertExists, assertThrows } from '@std/assert';
 import * as MqttStream from '../../../lib/mqtt_stream_utils/mod.ts';
 import * as Publish from '../../../lib/mqtt_packets/publish.ts';
 import * as Mqtt from '../../../lib/mqtt/mod.ts';
@@ -15,9 +15,8 @@ function publishBytes(payloadSize: number): Uint8Array {
       dup: false,
       retain: false,
       qos: 0,
-      packetId: 0,
     },
-    Mqtt.ProtocolVersion.MQTT_V3_1_1,
+    Mqtt.ProtocolVersion.MqttV3_1_1,
   );
 }
 
@@ -91,7 +90,7 @@ Deno.test('mqttFrameBufferWithPacketSplitAcrossChunks', function () {
   // split inside the payload
   assertEquals(appendAndTake(frameBuffer, publish.slice(2, 100)), []);
   // rest of the packet followed by the head of the next one
-  assertEquals(appendAndTake(frameBuffer, new Uint8Array([...publish.slice(100), pingresp[0]])), [publish]);
+  assertEquals(appendAndTake(frameBuffer, new Uint8Array([...publish.slice(100), ...pingresp.slice(0, 1)])), [publish]);
   assertEquals(appendAndTake(frameBuffer, pingresp.slice(1)), [pingresp]);
 });
 
@@ -120,7 +119,9 @@ Deno.test('mqttFrameBufferWithLargePacketInManyChunks', function () {
   const elapsed = performance.now() - start;
 
   assertEquals(packets.length, 1);
-  assert(sameBytes(packets[0], publish), 'the packet has the received bytes');
+  const [packet] = packets;
+  assertExists(packet);
+  assert(sameBytes(packet, publish), 'the packet has the received bytes');
   assert(elapsed < 300, `putting the packet together took ${elapsed.toFixed(0)} ms`);
 });
 

@@ -40,7 +40,7 @@ Deno.test({ name: '@keepAliveTimeout', only: false }, async (context) => {
         let pingreqCount = 0;
         broker.on('pingreq', () => {
           pingreqCount++;
-          broker.sendPingresp('cid', Mqtt.ProtocolVersion.MQTT_V5);
+          broker.sendPingresp('cid', Mqtt.ProtocolVersion.MqttV5);
           if (pingreqCount === 2) {
             resolve();
           }
@@ -70,7 +70,7 @@ Deno.test({ name: '@keepAliveTimeout', only: false }, async (context) => {
         const client = new MqttClient({
           clientId: 'cid',
           logger: logger,
-          protocolVersion: Mqtt.ProtocolVersion.MQTT_V3_1_1,
+          protocolVersion: Mqtt.ProtocolVersion.MqttV3_1_1,
           keepAlive: 1,
           pingrespTimeoutMS: 500,
         });
@@ -89,7 +89,7 @@ Deno.test({ name: '@keepAliveTimeout', only: false }, async (context) => {
         let pingreqCount = 0;
         broker.on('pingreq', () => {
           pingreqCount++;
-          broker.sendPingresp('cid', Mqtt.ProtocolVersion.MQTT_V3_1_1);
+          broker.sendPingresp('cid', Mqtt.ProtocolVersion.MqttV3_1_1);
           if (pingreqCount === 2) {
             resolve();
           }
@@ -261,7 +261,7 @@ Deno.test({ name: '@keepAliveTimeout', only: false }, async (context) => {
         });
 
         broker.on('pingreq', () => {
-          broker.sendPingresp('cid', Mqtt.ProtocolVersion.MQTT_V5);
+          broker.sendPingresp('cid', Mqtt.ProtocolVersion.MqttV5);
           resolve();
         });
 
@@ -297,7 +297,7 @@ Deno.test({ name: '@keepAliveTimeout', only: false }, async (context) => {
 
         let connectedAt = 0;
         broker.on('pingreq', () => {
-          broker.sendPingresp('cid', Mqtt.ProtocolVersion.MQTT_V5);
+          broker.sendPingresp('cid', Mqtt.ProtocolVersion.MqttV5);
           resolve(Date.now() - connectedAt);
         });
 

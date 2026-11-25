@@ -53,7 +53,7 @@ function hasLoneSurrogate(str: string): boolean {
 
 /** Whether the packets of the protocol version have properties and the other MQTT 5.0 fields. */
 function isMqtt5(protocolVersion: Mqtt.ProtocolVersion): boolean {
-  return protocolVersion > Mqtt.ProtocolVersion.MQTT_V3_1_1;
+  return protocolVersion > Mqtt.ProtocolVersion.MqttV3_1_1;
 }
 
 /**
@@ -273,7 +273,7 @@ export function validatePublish(
 ): void {
   validateTopicName(topic, 'topic');
   validateZeroToTwo(qos, 'qos');
-  if (dup && qos === Mqtt.QoS.AT_MOST_ONCE) {
+  if (dup && qos === Mqtt.QoS.AtMostOnce) {
     // [MQTT-3.3.1-2]
     throw new InvalidArgumentError('dup must be false for QoS 0');
   }

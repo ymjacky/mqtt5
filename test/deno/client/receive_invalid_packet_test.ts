@@ -22,9 +22,9 @@ async function waitFor(condition: () => boolean, label: string, ms = 3000) {
 }
 
 /** The bytes of a valid QoS 0 PUBLISH to `topic`. */
-function validPublish(topic: string, protocolVersion: Mqtt.ProtocolVersion = Mqtt.ProtocolVersion.MQTT_V5): Uint8Array {
+function validPublish(topic: string, protocolVersion: Mqtt.ProtocolVersion = Mqtt.ProtocolVersion.MqttV5): Uint8Array {
   return MqttPackets.packetToBytes(
-    { type: 'publish', topic, payload: new Uint8Array([0x78]), dup: false, retain: false, qos: Mqtt.QoS.AT_MOST_ONCE },
+    { type: 'publish', topic, payload: new Uint8Array([0x78]), dup: false, retain: false, qos: Mqtt.QoS.AtMostOnce },
     protocolVersion,
   );
 }
@@ -99,7 +99,7 @@ Deno.test({ name: '@receive packets whose fields do not fit them', only: false }
 
   await context.step('MQTT 3.1.1: the client closes the connection without sending DISCONNECT', async () => {
     const broker = new TestBroker();
-    const client = new MqttClient({ clientId: 'cid', logger, protocolVersion: Mqtt.ProtocolVersion.MQTT_V3_1_1 });
+    const client = new MqttClient({ clientId: 'cid', logger, protocolVersion: Mqtt.ProtocolVersion.MqttV3_1_1 });
     try {
       broker.listen();
       const recorded = record(client, broker);

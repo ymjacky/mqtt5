@@ -12,7 +12,7 @@ Deno.test('encodeSubackPacket', function () {
         packetId: 1,
         returnCodes: [0, 1],
       },
-      Mqtt.ProtocolVersion.MQTT_V3_1_1, // ProtocolVersion
+      Mqtt.ProtocolVersion.MqttV3_1_1, // ProtocolVersion
     ),
     new Uint8Array([
       // fixedHeader
@@ -51,7 +51,7 @@ Deno.test('encodeSubackPacketMQTT5WithReasonCodes', function () {
         ],
         properties: {},
       },
-      Mqtt.ProtocolVersion.MQTT_V5, // ProtocolVersion
+      Mqtt.ProtocolVersion.MqttV5, // ProtocolVersion
     ),
     new Uint8Array([
       // fixedHeader
@@ -94,7 +94,7 @@ Deno.test('encodeSubackPacketMQTT5WithProperties', function () {
           ],
         },
       },
-      Mqtt.ProtocolVersion.MQTT_V5, // ProtocolVersion
+      Mqtt.ProtocolVersion.MqttV5, // ProtocolVersion
     ),
     new Uint8Array([
       // fixedHeader
@@ -179,7 +179,7 @@ Deno.test('decodeSubackPacket', function () {
         1, // Success QoS 1
       ]),
       4, // remainingLength
-      Mqtt.ProtocolVersion.MQTT_V3_1_1, // ProtocolVersion
+      Mqtt.ProtocolVersion.MqttV3_1_1, // ProtocolVersion
     ),
     {
       type: 'suback',
@@ -214,7 +214,7 @@ Deno.test('decodeSubackPacketMQTT5WithReasonCodes', function () {
         0xA2, // WildcardSubscriptionsNotSupported
       ]),
       15, // remainingLength (packetId: 2 bytes + properties length: 1 byte + reasonCodes: 12 bytes = 15 bytes)
-      Mqtt.ProtocolVersion.MQTT_V5, // ProtocolVersion
+      Mqtt.ProtocolVersion.MqttV5, // ProtocolVersion
     ),
     {
       type: 'suback',
@@ -306,7 +306,7 @@ Deno.test('decodeSubackPacketMQTT5WithProperties', function () {
         0x87, // NotAuthorized
       ]),
       59, // remainingLength (packetId: 2 bytes + properties length: 1 byte + properties: 54 bytes + reasonCodes: 2 bytes = 59 bytes)
-      Mqtt.ProtocolVersion.MQTT_V5, // ProtocolVersion
+      Mqtt.ProtocolVersion.MqttV5, // ProtocolVersion
     ),
     {
       type: 'suback',

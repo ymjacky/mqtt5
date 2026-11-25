@@ -1,4 +1,5 @@
 import { type ClientTypes, Mqtt, type MqttProperties, WebSocketMqttClient } from '../../../deno/mod.ts';
+import { packetIdOf } from '../broker/test_broker.ts';
 import { TestWsBroker } from '../broker/test_ws_broker.ts';
 import { assertEquals, fail } from '@std/assert';
 
@@ -24,7 +25,7 @@ Deno.test({ name: '@publish_qos0 ws', only: false }, async (context) => {
           clean: true,
           connectTimeoutMS: 10000,
           keepAlive: 10,
-          protocolVersion: Mqtt.ProtocolVersion.MQTT_V3_1_1,
+          protocolVersion: Mqtt.ProtocolVersion.MqttV3_1_1,
         });
 
         broker.on('connect', (event) => {
@@ -37,7 +38,7 @@ Deno.test({ name: '@publish_qos0 ws', only: false }, async (context) => {
         // test
         broker.on('publish', (event) => {
           const packet = event.detail;
-          assertEquals(packet.qos, Mqtt.QoS.AT_MOST_ONCE);
+          assertEquals(packet.qos, Mqtt.QoS.AtMostOnce);
           assertEquals(packet.dup, false);
           assertEquals(packet.retain, false);
 
@@ -87,7 +88,7 @@ Deno.test({ name: '@publish_qos0 ws', only: false }, async (context) => {
         // test
         broker.on('publish', (event) => {
           const packet = event.detail;
-          assertEquals(packet.qos, Mqtt.QoS.AT_MOST_ONCE);
+          assertEquals(packet.qos, Mqtt.QoS.AtMostOnce);
           assertEquals(packet.dup, false);
           assertEquals(packet.retain, false);
 
@@ -137,7 +138,7 @@ Deno.test({ name: '@publish_qos0 ws', only: false }, async (context) => {
         // test
         broker.on('publish', (event) => {
           const packet = event.detail;
-          assertEquals(packet.qos, Mqtt.QoS.AT_MOST_ONCE);
+          assertEquals(packet.qos, Mqtt.QoS.AtMostOnce);
           assertEquals(packet.dup, false);
           assertEquals(packet.retain, false);
 
@@ -188,7 +189,7 @@ Deno.test({ name: '@publish_qos0 ws', only: false }, async (context) => {
         broker.on('publish', (event) => {
           const packet = event.detail;
           // QoS 1: publish() rejects `dup: true` with QoS 0 ([MQTT-3.3.1-2]).
-          assertEquals(packet.qos, Mqtt.QoS.AT_LEAST_ONCE);
+          assertEquals(packet.qos, Mqtt.QoS.AtLeastOnce);
           assertEquals(packet.dup, true);
           assertEquals(packet.retain, true);
 
@@ -196,14 +197,14 @@ Deno.test({ name: '@publish_qos0 ws', only: false }, async (context) => {
           assertEquals(packet.payload, new TextEncoder().encode('payloadA'));
 
           assertEquals(packet.properties, undefined);
-          broker.sendPuback('cid', packet.packetId!, Mqtt.ProtocolVersion.MQTT_V5);
+          broker.sendPuback('cid', packetIdOf(packet), Mqtt.ProtocolVersion.MqttV5);
           resolve();
         });
         await client.publish(
           'topicA',
           new TextEncoder().encode('payloadA'), // payload
           {
-            qos: Mqtt.QoS.AT_LEAST_ONCE,
+            qos: Mqtt.QoS.AtLeastOnce,
             dup: true,
             retain: true,
           },
@@ -260,7 +261,7 @@ Deno.test({ name: '@publish_qos0 ws', only: false }, async (context) => {
 
         broker.on('publish', (event) => {
           const packet = event.detail;
-          assertEquals(packet.qos, Mqtt.QoS.AT_MOST_ONCE);
+          assertEquals(packet.qos, Mqtt.QoS.AtMostOnce);
 
           assertEquals(packet.topic, 'topicA');
           assertEquals(
@@ -322,7 +323,7 @@ Deno.test({ name: '@publish_qos1 ws', only: false }, async (context) => {
           clean: true,
           connectTimeoutMS: 10000,
           keepAlive: 10,
-          protocolVersion: Mqtt.ProtocolVersion.MQTT_V3_1_1,
+          protocolVersion: Mqtt.ProtocolVersion.MqttV3_1_1,
         });
 
         broker.on('connect', (event) => {
@@ -335,7 +336,7 @@ Deno.test({ name: '@publish_qos1 ws', only: false }, async (context) => {
         // test
         broker.on('publish', (event) => {
           const packet = event.detail;
-          assertEquals(packet.qos, Mqtt.QoS.AT_LEAST_ONCE);
+          assertEquals(packet.qos, Mqtt.QoS.AtLeastOnce);
           assertEquals(packet.dup, false);
           assertEquals(packet.retain, false);
           assertEquals(packet.packetId, 1);
@@ -346,8 +347,8 @@ Deno.test({ name: '@publish_qos1 ws', only: false }, async (context) => {
 
           broker.sendPuback(
             'cid',
-            packet.packetId!,
-            Mqtt.ProtocolVersion.MQTT_V3_1_1,
+            packetIdOf(packet),
+            Mqtt.ProtocolVersion.MqttV3_1_1,
           );
           resolve();
         });
@@ -355,7 +356,7 @@ Deno.test({ name: '@publish_qos1 ws', only: false }, async (context) => {
           'topicA',
           new TextEncoder().encode('payloadA'),
           {
-            qos: Mqtt.QoS.AT_LEAST_ONCE,
+            qos: Mqtt.QoS.AtLeastOnce,
           },
         );
         assertEquals(result.result, 0); // 0 success
@@ -400,7 +401,7 @@ Deno.test({ name: '@publish_qos1 ws', only: false }, async (context) => {
         // test
         broker.on('publish', (event) => {
           const packet = event.detail;
-          assertEquals(packet.qos, Mqtt.QoS.AT_LEAST_ONCE);
+          assertEquals(packet.qos, Mqtt.QoS.AtLeastOnce);
           assertEquals(packet.dup, false);
           assertEquals(packet.retain, false);
           assertEquals(packet.packetId, 1);
@@ -411,15 +412,15 @@ Deno.test({ name: '@publish_qos1 ws', only: false }, async (context) => {
 
           broker.sendPuback(
             'cid',
-            packet.packetId!,
-            Mqtt.ProtocolVersion.MQTT_V5,
+            packetIdOf(packet),
+            Mqtt.ProtocolVersion.MqttV5,
           );
           resolve();
         });
         const result = await client.publish(
           'topicA',
           new TextEncoder().encode('payloadA'),
-          { qos: Mqtt.QoS.AT_LEAST_ONCE },
+          { qos: Mqtt.QoS.AtLeastOnce },
         );
         assertEquals(result.result, Mqtt.ReasonCode.Success);
         assertEquals(result.reason, undefined);
@@ -463,7 +464,7 @@ Deno.test({ name: '@publish_qos1 ws', only: false }, async (context) => {
         // test
         broker.on('publish', (event) => {
           const packet = event.detail;
-          assertEquals(packet.qos, Mqtt.QoS.AT_LEAST_ONCE);
+          assertEquals(packet.qos, Mqtt.QoS.AtLeastOnce);
           assertEquals(packet.dup, false);
           assertEquals(packet.retain, false);
           assertEquals(packet.packetId, 1);
@@ -478,8 +479,8 @@ Deno.test({ name: '@publish_qos1 ws', only: false }, async (context) => {
           };
           broker.sendPuback(
             'cid',
-            packet.packetId!,
-            Mqtt.ProtocolVersion.MQTT_V5,
+            packetIdOf(packet),
+            Mqtt.ProtocolVersion.MqttV5,
             Mqtt.ReasonCode.QuotaExceeded,
             pubAckProperties,
           );
@@ -488,7 +489,7 @@ Deno.test({ name: '@publish_qos1 ws', only: false }, async (context) => {
         const result = await client.publish(
           'topicA',
           new TextEncoder().encode('payloadA'),
-          { qos: Mqtt.QoS.AT_LEAST_ONCE },
+          { qos: Mqtt.QoS.AtLeastOnce },
         );
         assertEquals(result.result, Mqtt.ReasonCode.QuotaExceeded);
         assertEquals(result.reason, 'Quota exceeded');
@@ -546,7 +547,7 @@ Deno.test({ name: '@publish_qos1 ws', only: false }, async (context) => {
 
         broker.on('publish', (event) => {
           const packet = event.detail;
-          assertEquals(packet.qos, Mqtt.QoS.AT_LEAST_ONCE);
+          assertEquals(packet.qos, Mqtt.QoS.AtLeastOnce);
           assertEquals(packet.packetId, 1);
           assertEquals(packet.topic, 'topicA');
           assertEquals(
@@ -573,8 +574,8 @@ Deno.test({ name: '@publish_qos1 ws', only: false }, async (context) => {
 
           broker.sendPuback(
             'cid',
-            packet.packetId!,
-            Mqtt.ProtocolVersion.MQTT_V5,
+            packetIdOf(packet),
+            Mqtt.ProtocolVersion.MqttV5,
           );
           resolve();
         });
@@ -582,7 +583,7 @@ Deno.test({ name: '@publish_qos1 ws', only: false }, async (context) => {
         const result = await client.publish(
           'topicA',
           new TextEncoder().encode('payloadA'),
-          { qos: Mqtt.QoS.AT_LEAST_ONCE },
+          { qos: Mqtt.QoS.AtLeastOnce },
           properties,
         );
         assertEquals(result.result, Mqtt.ReasonCode.Success);
@@ -618,7 +619,7 @@ Deno.test({ name: '@publish_qos2 ws', only: false }, async (context) => {
           clean: true,
           connectTimeoutMS: 10000,
           keepAlive: 10,
-          protocolVersion: Mqtt.ProtocolVersion.MQTT_V3_1_1,
+          protocolVersion: Mqtt.ProtocolVersion.MqttV3_1_1,
         });
 
         broker.on('connect', (event) => {
@@ -631,7 +632,7 @@ Deno.test({ name: '@publish_qos2 ws', only: false }, async (context) => {
         // test
         broker.on('publish', (event) => {
           const packet = event.detail;
-          assertEquals(packet.qos, Mqtt.QoS.EXACTLY_ONCE);
+          assertEquals(packet.qos, Mqtt.QoS.ExactlyOnce);
           assertEquals(packet.dup, false);
           assertEquals(packet.retain, false);
           assertEquals(packet.packetId, 1);
@@ -642,8 +643,8 @@ Deno.test({ name: '@publish_qos2 ws', only: false }, async (context) => {
 
           broker.sendPubrec(
             'cid',
-            packet.packetId!,
-            Mqtt.ProtocolVersion.MQTT_V3_1_1,
+            packetIdOf(packet),
+            Mqtt.ProtocolVersion.MqttV3_1_1,
           );
         });
 
@@ -654,8 +655,8 @@ Deno.test({ name: '@publish_qos2 ws', only: false }, async (context) => {
 
           broker.sendPubcomp(
             'cid',
-            packet.packetId!,
-            Mqtt.ProtocolVersion.MQTT_V3_1_1,
+            packet.packetId,
+            Mqtt.ProtocolVersion.MqttV3_1_1,
           );
           resolve();
         });
@@ -664,7 +665,7 @@ Deno.test({ name: '@publish_qos2 ws', only: false }, async (context) => {
           'topicA',
           new TextEncoder().encode('payloadA'),
           {
-            qos: Mqtt.QoS.EXACTLY_ONCE,
+            qos: Mqtt.QoS.ExactlyOnce,
           },
         );
         assertEquals(result.result, 0); // 0 success
@@ -709,7 +710,7 @@ Deno.test({ name: '@publish_qos2 ws', only: false }, async (context) => {
         // test
         broker.on('publish', (event) => {
           const packet = event.detail;
-          assertEquals(packet.qos, Mqtt.QoS.EXACTLY_ONCE);
+          assertEquals(packet.qos, Mqtt.QoS.ExactlyOnce);
           assertEquals(packet.dup, false);
           assertEquals(packet.retain, false);
           assertEquals(packet.packetId, 1);
@@ -720,8 +721,8 @@ Deno.test({ name: '@publish_qos2 ws', only: false }, async (context) => {
 
           broker.sendPubrec(
             'cid',
-            packet.packetId!,
-            Mqtt.ProtocolVersion.MQTT_V5,
+            packetIdOf(packet),
+            Mqtt.ProtocolVersion.MqttV5,
           );
         });
 
@@ -732,8 +733,8 @@ Deno.test({ name: '@publish_qos2 ws', only: false }, async (context) => {
 
           broker.sendPubcomp(
             'cid',
-            packet.packetId!,
-            Mqtt.ProtocolVersion.MQTT_V3_1_1,
+            packet.packetId,
+            Mqtt.ProtocolVersion.MqttV3_1_1,
           );
           resolve();
         });
@@ -741,7 +742,7 @@ Deno.test({ name: '@publish_qos2 ws', only: false }, async (context) => {
         const result = await client.publish(
           'topicA',
           new TextEncoder().encode('payloadA'),
-          { qos: Mqtt.QoS.EXACTLY_ONCE },
+          { qos: Mqtt.QoS.ExactlyOnce },
         );
         assertEquals(result.result, Mqtt.ReasonCode.Success);
         assertEquals(result.reason, undefined);
@@ -786,7 +787,7 @@ Deno.test({ name: '@publish_qos2 ws', only: false }, async (context) => {
         // test
         broker.on('publish', (event) => {
           const packet = event.detail;
-          assertEquals(packet.qos, Mqtt.QoS.EXACTLY_ONCE);
+          assertEquals(packet.qos, Mqtt.QoS.ExactlyOnce);
           assertEquals(packet.dup, false);
           assertEquals(packet.retain, false);
           assertEquals(packet.packetId, 1);
@@ -801,8 +802,8 @@ Deno.test({ name: '@publish_qos2 ws', only: false }, async (context) => {
           };
           broker.sendPubrec(
             'cid',
-            packet.packetId!,
-            Mqtt.ProtocolVersion.MQTT_V5,
+            packetIdOf(packet),
+            Mqtt.ProtocolVersion.MqttV5,
             Mqtt.ReasonCode.QuotaExceeded,
             pubAckProperties,
           );
@@ -812,7 +813,7 @@ Deno.test({ name: '@publish_qos2 ws', only: false }, async (context) => {
         const result = await client.publish(
           'topicA',
           new TextEncoder().encode('payloadA'),
-          { qos: Mqtt.QoS.EXACTLY_ONCE },
+          { qos: Mqtt.QoS.ExactlyOnce },
         );
         assertEquals(result.result, Mqtt.ReasonCode.QuotaExceeded);
         assertEquals(result.reason, 'Quota exceeded');
@@ -870,7 +871,7 @@ Deno.test({ name: '@publish_qos2 ws', only: false }, async (context) => {
 
         broker.on('publish', (event) => {
           const packet = event.detail;
-          assertEquals(packet.qos, Mqtt.QoS.EXACTLY_ONCE);
+          assertEquals(packet.qos, Mqtt.QoS.ExactlyOnce);
           assertEquals(packet.packetId, 1);
           assertEquals(packet.topic, 'topicA');
           assertEquals(
@@ -897,8 +898,8 @@ Deno.test({ name: '@publish_qos2 ws', only: false }, async (context) => {
 
           broker.sendPubrec(
             'cid',
-            packet.packetId!,
-            Mqtt.ProtocolVersion.MQTT_V5,
+            packetIdOf(packet),
+            Mqtt.ProtocolVersion.MqttV5,
           );
         });
 
@@ -909,8 +910,8 @@ Deno.test({ name: '@publish_qos2 ws', only: false }, async (context) => {
 
           broker.sendPubcomp(
             'cid',
-            packet.packetId!,
-            Mqtt.ProtocolVersion.MQTT_V3_1_1,
+            packet.packetId,
+            Mqtt.ProtocolVersion.MqttV3_1_1,
           );
           resolve();
         });
@@ -918,7 +919,7 @@ Deno.test({ name: '@publish_qos2 ws', only: false }, async (context) => {
         const result = await client.publish(
           'topicA',
           new TextEncoder().encode('payloadA'),
-          { qos: Mqtt.QoS.EXACTLY_ONCE },
+          { qos: Mqtt.QoS.ExactlyOnce },
           properties,
         );
         assertEquals(result.result, Mqtt.ReasonCode.Success);
@@ -964,13 +965,13 @@ Deno.test({ name: '@publish_qos2 ws', only: false }, async (context) => {
         // test
         broker.on('publish', (event) => {
           const packet = event.detail;
-          assertEquals(packet.qos, Mqtt.QoS.EXACTLY_ONCE);
+          assertEquals(packet.qos, Mqtt.QoS.ExactlyOnce);
           assertEquals(packet.packetId, 1);
 
           broker.sendPubrec(
             'cid',
-            packet.packetId!,
-            Mqtt.ProtocolVersion.MQTT_V5,
+            packetIdOf(packet),
+            Mqtt.ProtocolVersion.MqttV5,
           );
         });
 
@@ -983,8 +984,8 @@ Deno.test({ name: '@publish_qos2 ws', only: false }, async (context) => {
           };
           broker.sendPubcomp(
             'cid',
-            packet.packetId!,
-            Mqtt.ProtocolVersion.MQTT_V5,
+            packet.packetId,
+            Mqtt.ProtocolVersion.MqttV5,
             Mqtt.ReasonCode.PacketIdentifierNotFound,
             pubcompProperties,
           );
@@ -994,7 +995,7 @@ Deno.test({ name: '@publish_qos2 ws', only: false }, async (context) => {
         const result = await client.publish(
           'topicA',
           new TextEncoder().encode('payloadA'),
-          { qos: Mqtt.QoS.EXACTLY_ONCE },
+          { qos: Mqtt.QoS.ExactlyOnce },
         );
         assertEquals(result.result, Mqtt.ReasonCode.PacketIdentifierNotFound);
         assertEquals(result.reason, 'Packet identifier not found');
@@ -1029,7 +1030,7 @@ Deno.test({ name: '@receive malformed puback ws', only: false }, async (context)
           clean: false,
           connectTimeoutMS: 10000,
           keepAlive: 10,
-          protocolVersion: Mqtt.ProtocolVersion.MQTT_V5,
+          protocolVersion: Mqtt.ProtocolVersion.MqttV5,
         });
 
         broker.on('connect', (event) => {
@@ -1072,17 +1073,17 @@ Deno.test({ name: '@receive malformed puback ws', only: false }, async (context)
           const malformedPacket = new Uint8Array([
             0x40, // Fixed header: PUBACK packet type
             0x05, // Remaining length: 5 bytes
-            (packet.packetId! >> 8) & 0xFF, // Packet ID high byte
-            packet.packetId! & 0xFF, // Packet ID low byte
+            (packetIdOf(packet) >> 8) & 0xFF, // Packet ID high byte
+            packetIdOf(packet) & 0xFF, // Packet ID low byte
             0x00, // Reason Code: Success
             0x01, // Properties Length: 1 byte
             0xFF, // Property ID: 0xFF (INVALID)
           ]);
 
-          broker.sendRawBytes(client.getClientId(), malformedPacket);
+          broker.sendRawBytes(client.clientId, malformedPacket);
         });
 
-        client.publish('topicA', 'payload', { qos: Mqtt.QoS.AT_LEAST_ONCE });
+        client.publish('topicA', 'payload', { qos: Mqtt.QoS.AtLeastOnce });
 
         await promise;
       } catch (err) {
@@ -1113,7 +1114,7 @@ Deno.test({ name: '@receive malformed pubrec ws', only: false }, async (context)
           clean: false,
           connectTimeoutMS: 10000,
           keepAlive: 10,
-          protocolVersion: Mqtt.ProtocolVersion.MQTT_V5,
+          protocolVersion: Mqtt.ProtocolVersion.MqttV5,
         });
 
         broker.on('connect', (event) => {
@@ -1153,17 +1154,17 @@ Deno.test({ name: '@receive malformed pubrec ws', only: false }, async (context)
           const malformedPacket = new Uint8Array([
             0x50, // Fixed header: PUBREC packet type
             0x05, // Remaining length: 5 bytes
-            (packet.packetId! >> 8) & 0xFF, // Packet ID high byte
-            packet.packetId! & 0xFF, // Packet ID low byte
+            (packetIdOf(packet) >> 8) & 0xFF, // Packet ID high byte
+            packetIdOf(packet) & 0xFF, // Packet ID low byte
             0x00, // Reason Code: Success
             0x01, // Properties Length: 1 byte
             0xFF, // Property ID: 0xFF (INVALID)
           ]);
 
-          broker.sendRawBytes(client.getClientId(), malformedPacket);
+          broker.sendRawBytes(client.clientId, malformedPacket);
         });
 
-        client.publish('topicA', 'payload', { qos: Mqtt.QoS.EXACTLY_ONCE });
+        client.publish('topicA', 'payload', { qos: Mqtt.QoS.ExactlyOnce });
 
         await promise;
       } catch (err) {
@@ -1194,7 +1195,7 @@ Deno.test({ name: '@receive malformed pubcomp ws', only: false }, async (context
           clean: false,
           connectTimeoutMS: 10000,
           keepAlive: 10,
-          protocolVersion: Mqtt.ProtocolVersion.MQTT_V5,
+          protocolVersion: Mqtt.ProtocolVersion.MqttV5,
         });
 
         broker.on('connect', (event) => {
@@ -1228,7 +1229,7 @@ Deno.test({ name: '@receive malformed pubcomp ws', only: false }, async (context
         broker.on('publish', (event) => {
           const packet = event.detail;
           // First send valid PUBREC
-          broker.sendPubrec(client.getClientId(), packet.packetId!, Mqtt.ProtocolVersion.MQTT_V5);
+          broker.sendPubrec(client.clientId, packetIdOf(packet), Mqtt.ProtocolVersion.MqttV5);
         });
 
         broker.on('pubrel', (event) => {
@@ -1247,10 +1248,10 @@ Deno.test({ name: '@receive malformed pubcomp ws', only: false }, async (context
             0xFF, // Property ID: 0xFF (INVALID)
           ]);
 
-          broker.sendRawBytes(client.getClientId(), malformedPacket);
+          broker.sendRawBytes(client.clientId, malformedPacket);
         });
 
-        client.publish('topicA', 'payload', { qos: Mqtt.QoS.EXACTLY_ONCE });
+        client.publish('topicA', 'payload', { qos: Mqtt.QoS.ExactlyOnce });
 
         await promise;
       } catch (err) {

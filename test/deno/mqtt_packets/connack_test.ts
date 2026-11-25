@@ -12,7 +12,7 @@ Deno.test('encodeConnackPacket', function () {
         sessionPresent: false,
         returnCode: 0,
       },
-      Mqtt.ProtocolVersion.MQTT_V3_1_1, // ProtocolVersion
+      Mqtt.ProtocolVersion.MqttV3_1_1, // ProtocolVersion
     ),
     new Uint8Array([
       // fixedHeader
@@ -37,7 +37,7 @@ Deno.test('decodeConnackPacket', function () {
         ],
       ),
       2, // remainingLength
-      Mqtt.ProtocolVersion.MQTT_V3_1_1, // ProtocolVersion
+      Mqtt.ProtocolVersion.MqttV3_1_1, // ProtocolVersion
     ),
     {
       type: 'connack',
@@ -80,7 +80,7 @@ Deno.test(
           0, // return code
         ]),
         2, // remainingLength
-        Mqtt.ProtocolVersion.MQTT_V3_1_1,
+        Mqtt.ProtocolVersion.MqttV3_1_1,
       ),
       {
         type: 'connack',
@@ -102,7 +102,7 @@ Deno.test(
           4, // return code (bad username or password)
         ]),
         2, // remainingLength
-        Mqtt.ProtocolVersion.MQTT_V3_1_1,
+        Mqtt.ProtocolVersion.MqttV3_1_1,
       ),
       {
         type: 'connack',
@@ -114,8 +114,8 @@ Deno.test(
 );
 
 Deno.test('decodeShortConnackPackets', function () {
-  assertThrows(() => parse(Uint8Array.from([32, 2]), 0, Mqtt.ProtocolVersion.MQTT_V3_1_1));
-  assertThrows(() => parse(Uint8Array.from([32, 2, 0]), 1, Mqtt.ProtocolVersion.MQTT_V3_1_1));
+  assertThrows(() => parse(Uint8Array.from([32, 2]), 0, Mqtt.ProtocolVersion.MqttV3_1_1));
+  assertThrows(() => parse(Uint8Array.from([32, 2, 0]), 1, Mqtt.ProtocolVersion.MqttV3_1_1));
 });
 
 // Test encoding a CONNACK packet with MQTT v5
@@ -149,7 +149,7 @@ Deno.test('encodeConnackPacketMQTT5', function () {
           authenticationData: new Uint8Array([1, 2, 3, 4]),
         },
       },
-      Mqtt.ProtocolVersion.MQTT_V5, // ProtocolVersion
+      Mqtt.ProtocolVersion.MqttV5, // ProtocolVersion
     ),
     new Uint8Array([
       // fixedHeader
@@ -308,7 +308,7 @@ Deno.test('encodeConnackPacketMQTT5NoProperties', function () {
         sessionPresent: true,
         reasonCode: 0, // Success
       },
-      Mqtt.ProtocolVersion.MQTT_V5, // ProtocolVersion
+      Mqtt.ProtocolVersion.MqttV5, // ProtocolVersion
     ),
     new Uint8Array([
       // fixedHeader
@@ -472,7 +472,7 @@ Deno.test('decodeConnackPacketMQTT5Dynamic', function () {
     parse(
       packet,
       remainingLength, // Pass the actual length
-      Mqtt.ProtocolVersion.MQTT_V5, // ProtocolVersion
+      Mqtt.ProtocolVersion.MqttV5, // ProtocolVersion
     ),
     {
       type: 'connack',
@@ -649,7 +649,7 @@ Deno.test('decodeConnackPacketMQTT5', function () {
         0x01, // true (shared subscription available value)
       ]),
       136, // remainingLength
-      Mqtt.ProtocolVersion.MQTT_V5, // ProtocolVersion
+      Mqtt.ProtocolVersion.MqttV5, // ProtocolVersion
     ),
     {
       type: 'connack',
@@ -692,7 +692,7 @@ Deno.test('decodeConnackPacketMQTT5NoProperties', function () {
         0, // properties length (0 = no properties)
       ]),
       3, // remainingLength
-      Mqtt.ProtocolVersion.MQTT_V5, // ProtocolVersion
+      Mqtt.ProtocolVersion.MqttV5, // ProtocolVersion
     ),
     {
       type: 'connack',
@@ -713,7 +713,7 @@ Deno.test('decodeConnackPacketMQTT5WithReasonCode', function () {
         0, // properties length (0 = no properties)
       ]),
       3, // remainingLength
-      Mqtt.ProtocolVersion.MQTT_V5, // ProtocolVersion
+      Mqtt.ProtocolVersion.MqttV5, // ProtocolVersion
     ),
     {
       type: 'connack',
@@ -725,8 +725,8 @@ Deno.test('decodeConnackPacketMQTT5WithReasonCode', function () {
 
 // Test for malformed MQTT v5 CONNACK packets
 Deno.test('decodeShortConnackPacketsMQTT5', function () {
-  assertThrows(() => parse(Uint8Array.from([32, 2]), 0, Mqtt.ProtocolVersion.MQTT_V5));
-  assertThrows(() => parse(Uint8Array.from([32, 2, 0]), 1, Mqtt.ProtocolVersion.MQTT_V5));
+  assertThrows(() => parse(Uint8Array.from([32, 2]), 0, Mqtt.ProtocolVersion.MqttV5));
+  assertThrows(() => parse(Uint8Array.from([32, 2, 0]), 1, Mqtt.ProtocolVersion.MqttV5));
 });
 
 // Server Keep Alive 0 (keep alive disabled) must be encoded, not dropped as absent.
@@ -739,7 +739,7 @@ Deno.test('encodeConnackPacketMQTT5ServerKeepAliveZero', function () {
         reasonCode: 0,
         properties: { serverKeepAlive: 0 },
       },
-      Mqtt.ProtocolVersion.MQTT_V5, // ProtocolVersion
+      Mqtt.ProtocolVersion.MqttV5, // ProtocolVersion
     ),
     new Uint8Array([
       // fixedHeader
@@ -764,9 +764,9 @@ Deno.test('encodeConnackPacketMQTT5MaximumQoSZero', function () {
         type: 'connack',
         sessionPresent: false,
         reasonCode: 0,
-        properties: { maximumQoS: Mqtt.QoS.AT_MOST_ONCE },
+        properties: { maximumQoS: Mqtt.QoS.AtMostOnce },
       },
-      Mqtt.ProtocolVersion.MQTT_V5, // ProtocolVersion
+      Mqtt.ProtocolVersion.MqttV5, // ProtocolVersion
     ),
     new Uint8Array([
       // fixedHeader

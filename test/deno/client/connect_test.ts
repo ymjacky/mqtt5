@@ -26,7 +26,7 @@ Deno.test({ name: '@connect', only: false }, async (context) => {
           assertEquals(packet.clean, true);
           assertEquals(packet.username, undefined);
           assertEquals(packet.password, undefined);
-          assertEquals(packet.protocolVersion, Mqtt.ProtocolVersion.MQTT_V5);
+          assertEquals(packet.protocolVersion, Mqtt.ProtocolVersion.MqttV5);
           assertEquals(packet.keepAlive, 10);
           assertEquals(packet.properties, undefined);
 
@@ -75,7 +75,7 @@ Deno.test({ name: '@connect', only: false }, async (context) => {
           assertEquals(packet.clean, false);
           assertEquals(packet.username, 'myname');
           assertEquals(packet.password, 'mypass');
-          assertEquals(packet.protocolVersion, Mqtt.ProtocolVersion.MQTT_V3_1_1);
+          assertEquals(packet.protocolVersion, Mqtt.ProtocolVersion.MqttV3_1_1);
           assertEquals(packet.keepAlive, 20);
           assertEquals(packet.properties, undefined);
 
@@ -113,10 +113,10 @@ Deno.test({ name: '@connect', only: false }, async (context) => {
 
         broker.on('connect', async (event) => {
           const packet = event.detail;
-          assertEquals(packet.protocolVersion, Mqtt.ProtocolVersion.MQTT_V3_1_1);
+          assertEquals(packet.protocolVersion, Mqtt.ProtocolVersion.MqttV3_1_1);
 
           await broker.sendConnack(packet.clientId, false, packet.protocolVersion, Mqtt.V3_1_1_ConnectReturnCode.NotAuthorized);
-          broker.closeConnectionFromBroker(client.getClientId());
+          broker.closeConnectionFromBroker(client.clientId);
         });
 
         const connack = await client.connect();
@@ -162,7 +162,7 @@ Deno.test({ name: '@connect', only: false }, async (context) => {
           assertEquals(packet.clean, false);
           assertEquals(packet.username, 'myname');
           assertEquals(packet.password, 'mypass');
-          assertEquals(packet.protocolVersion, Mqtt.ProtocolVersion.MQTT_V5);
+          assertEquals(packet.protocolVersion, Mqtt.ProtocolVersion.MqttV5);
           assertEquals(packet.keepAlive, 20);
           assertEquals(packet.properties, undefined);
 
@@ -203,7 +203,7 @@ Deno.test({ name: '@connect', only: false }, async (context) => {
           assertEquals(packet.clean, true);
           assertEquals(packet.username, undefined);
           assertEquals(packet.password, undefined);
-          assertEquals(packet.protocolVersion, Mqtt.ProtocolVersion.MQTT_V5);
+          assertEquals(packet.protocolVersion, Mqtt.ProtocolVersion.MqttV5);
           assertEquals(packet.keepAlive, 10);
 
           assertEquals(packet.properties?.sessionExpiryInterval, 300);
@@ -281,7 +281,7 @@ Deno.test({ name: '@connect', only: false }, async (context) => {
           assertEquals(packet.clean, true);
           assertEquals(packet.username, undefined);
           assertEquals(packet.password, undefined);
-          assertEquals(packet.protocolVersion, Mqtt.ProtocolVersion.MQTT_V5);
+          assertEquals(packet.protocolVersion, Mqtt.ProtocolVersion.MqttV5);
           assertEquals(packet.keepAlive, 10);
 
           const connackProperties: MqttProperties.ConnackProperties = {
@@ -309,7 +309,7 @@ Deno.test({ name: '@connect', only: false }, async (context) => {
           };
 
           await broker.sendConnack(packet.clientId, false, packet.protocolVersion, Mqtt.ReasonCode.NotAuthorized, connackProperties);
-          broker.closeConnectionFromBroker(client.getClientId());
+          broker.closeConnectionFromBroker(client.clientId);
         });
 
         const connack = await client.connect();
@@ -436,7 +436,7 @@ Deno.test({ name: '@connect options that are Two Byte Integers', only: false }, 
       for (const value of [65_536, 70_000, -1, 1.5, NaN]) {
         assertThrows(() => new MqttClient({ clientId: 'cid', keepAlive: value }), ClientErrors.InvalidArgumentError, 'keepAlive', `${value}`);
         assertThrows(
-          () => new MqttClient({ clientId: 'cid', protocolVersion: Mqtt.ProtocolVersion.MQTT_V3_1_1, keepAlive: value }),
+          () => new MqttClient({ clientId: 'cid', protocolVersion: Mqtt.ProtocolVersion.MqttV3_1_1, keepAlive: value }),
           ClientErrors.InvalidArgumentError,
           'keepAlive',
           `${value}`,
@@ -457,7 +457,7 @@ Deno.test({ name: '@connect options that are Two Byte Integers', only: false }, 
       // MQTT 3.1.1 has no topic aliases: the options are not used, so they are not checked.
       new MqttClient({
         clientId: 'cid',
-        protocolVersion: Mqtt.ProtocolVersion.MQTT_V3_1_1,
+        protocolVersion: Mqtt.ProtocolVersion.MqttV3_1_1,
         topicAliasMaximumAboutSend: -1,
         topicAliasMaximumAboutReceive: 70_000,
       });

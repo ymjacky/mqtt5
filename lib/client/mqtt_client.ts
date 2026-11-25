@@ -3,7 +3,7 @@ import type { ClientOptions } from './client_types.ts';
 import { SendPacketError, UnexpectedUrlProtocol } from './error.ts';
 
 // The port to connect to when the URL has none.
-const defaultPorts: Record<string, number> = { 'mqtt:': 1883, 'mqtts:': 8883 };
+const defaultPorts = { 'mqtt:': 1883, 'mqtts:': 8883 } as const;
 
 /**
  * Waits for a connection that is being opened, unless `signal` aborts first: then rejects with the abort reason at once,
@@ -44,7 +44,7 @@ function openUnlessAborted<T extends Deno.Conn>(opening: Promise<T>, signal: Abo
  * const client = new MqttClient({
  *   url: new URL('mqtt://127.0.0.1:1883'),
  *   clientId: 'clientA',
- *   protocolVersion: Mqtt.ProtocolVersion.MQTT_V5,
+ *   protocolVersion: Mqtt.ProtocolVersion.MqttV5,
  * });
  * await client.connect();
  * ```
@@ -56,8 +56,8 @@ export class MqttClient extends BaseMqttClient {
    */
   protected conn?: Deno.Conn;
   // Writes to and reads from `conn`. Set when it is opened.
-  private writer?: WritableStreamDefaultWriter<Uint8Array>;
-  private reader?: ReadableStreamDefaultReader<Uint8Array>;
+  #writer?: WritableStreamDefaultWriter<Uint8Array>;
+  #reader?: ReadableStreamDefaultReader<Uint8Array>;
 
   /**
    * Creates a client. It does not connect until {@link MqttClient.connect} is called.
@@ -77,14 +77,18 @@ export class MqttClient extends BaseMqttClient {
    */
   protected override async open(signal: AbortSignal): Promise<void> {
     const openSocket = async () => {
+      const protocol = this.url.protocol;
+      if (protocol !== 'mqtt:' && protocol !== 'mqtts:') {
+        throw new UnexpectedUrlProtocol(`${protocol.slice(0, -1)}`);
+      }
       // A URL without a port has the default port of its protocol.
-      const port = this.url.port !== '' ? Number(this.url.port) : defaultPorts[this.url.protocol];
-      if (this.url.protocol === 'mqtt:') {
+      const port = this.url.port !== '' ? Number(this.url.port) : defaultPorts[protocol];
+      if (protocol === 'mqtt:') {
         return Deno.connect({
           hostname: this.url.hostname,
           port,
         });
-      } else if (this.url.protocol === 'mqtts:') {
+      } else {
         const conn = await Deno.connectTls({
           hostname: this.url.hostname,
           port,
@@ -100,18 +104,16 @@ export class MqttClient extends BaseMqttClient {
           throw err;
         }
         return conn;
-      } else {
-        throw new UnexpectedUrlProtocol(`${this.url.protocol.slice(0, -1)}`);
       }
     };
 
     // Nothing of this client is changed until the connection is open: an aborted opening must not affect the next one.
     this.conn = await openUnlessAborted(openSocket(), signal);
-    this.writer = this.conn.writable.getWriter();
+    this.#writer = this.conn.writable.getWriter();
     // The receive loop reads this connection only, and reports its close only while it is the connection of the client:
     // a loop that outlives its connection must not touch the next one.
     const reader = this.conn.readable.getReader();
-    this.reader = reader;
+    this.#reader = reader;
     // Not shared with a previous connection, which may have left a partial packet.
     const frameBuffer = this.createFrameBuffer();
 
@@ -151,7 +153,7 @@ export class MqttClient extends BaseMqttClient {
         // would keep receiving, and the broker would see the client as connected until the keep alive expires.
         // cancel() rejects when the connection has failed already, e.g. it was reset: there is nothing to close then.
         await reader.cancel().catch(() => {});
-        if (this.reader === reader) {
+        if (this.#reader === reader) {
           this.detectClosed();
         }
       }
@@ -164,7 +166,7 @@ export class MqttClient extends BaseMqttClient {
    * @ignore
    */
   protected override async write(bytes: Uint8Array): Promise<void> {
-    const writer = this.writer;
+    const writer = this.#writer;
     if (!writer) {
       return Promise.reject(new SendPacketError());
     }
@@ -178,6 +180,6 @@ export class MqttClient extends BaseMqttClient {
    * @ignore
    */
   protected override async close(): Promise<void> {
-    await this.reader?.cancel();
+    await this.#reader?.cancel();
   }
 }

@@ -42,7 +42,7 @@ import { Mqtt, MqttClient } from '@ymjacky/mqtt5';
 const client = new MqttClient({
   url: new URL('mqtt://127.0.0.1:1883'),
   clientId: 'clientA',
-  protocolVersion: Mqtt.ProtocolVersion.MQTT_V5,
+  protocolVersion: Mqtt.ProtocolVersion.MqttV5,
 });
 
 client.on('publish', (event) => {
@@ -51,8 +51,8 @@ client.on('publish', (event) => {
 });
 
 await client.connect();
-await client.subscribe('topicA', Mqtt.QoS.AT_LEAST_ONCE);
-await client.publish('topicA', 'hello', { qos: Mqtt.QoS.AT_LEAST_ONCE });
+await client.subscribe('topicA', Mqtt.QoS.AtLeastOnce);
+await client.publish('topicA', 'hello', { qos: Mqtt.QoS.AtLeastOnce });
 
 await client.disconnect();
 ```
@@ -69,7 +69,7 @@ from 0 to 65535.
 | `url`                           | `mqtt://127.0.0.1:1883`        | Broker URL. `MqttClient`: `mqtt:` or `mqtts:`. `WebSocketMqttClient`: `ws:` or `wss:` (required).                                     |
 | `clientId`                      | `''`                           | Client identifier. With an empty ID, an MQTT 5.0 broker assigns one.                                                                  |
 | `username` / `password`         | -                              | Credentials sent in CONNECT.                                                                                                          |
-| `protocolVersion`               | `Mqtt.ProtocolVersion.MQTT_V5` | `MQTT_V5` or `MQTT_V3_1_1`.                                                                                                           |
+| `protocolVersion`               | `Mqtt.ProtocolVersion.MqttV5`  | `MqttV5` or `MqttV3_1_1`.                                                                                                             |
 | `clean`                         | `true`                         | Clean Start (5.0) / Clean Session (3.1.1).                                                                                            |
 | `keepAlive`                     | `10`                           | Keep alive interval in **seconds**, from `0` to `65535`. `0` disables it. A Server Keep Alive in CONNACK (5.0) overrides it.          |
 | `connectTimeoutMS`              | `10000`                        | Time to wait for CONNACK, in milliseconds.                                                                                            |
@@ -92,7 +92,7 @@ const client = new MqttClient({
   clientId: 'clientA',
   username: 'user',
   password: 'pass',
-  protocolVersion: Mqtt.ProtocolVersion.MQTT_V3_1_1,
+  protocolVersion: Mqtt.ProtocolVersion.MqttV3_1_1,
 });
 await client.connect();
 ```
@@ -142,7 +142,7 @@ import { Mqtt, WebSocketMqttClient } from '@ymjacky/mqtt5';
 const client = new WebSocketMqttClient({
   url: new URL('wss://127.0.0.1:8081'),
   clientId: 'clientA',
-  protocolVersion: Mqtt.ProtocolVersion.MQTT_V5,
+  protocolVersion: Mqtt.ProtocolVersion.MqttV5,
 });
 await client.connect();
 ```
@@ -163,7 +163,7 @@ const connack = await client.connect({
   will: {
     topic: 'clients/clientA/status',
     payload: new TextEncoder().encode('offline'),
-    qos: Mqtt.QoS.AT_LEAST_ONCE,
+    qos: Mqtt.QoS.AtLeastOnce,
     retain: true,
   },
 });
@@ -183,10 +183,10 @@ import { Mqtt, MqttClient } from '@ymjacky/mqtt5';
 const client = new MqttClient({ clientId: 'clientA' });
 await client.connect();
 
-await client.publish('topicA', 'payload', { qos: Mqtt.QoS.AT_MOST_ONCE });
-await client.publish('topicA', new Uint8Array([1, 2, 3]), { qos: Mqtt.QoS.AT_LEAST_ONCE, retain: true });
+await client.publish('topicA', 'payload', { qos: Mqtt.QoS.AtMostOnce });
+await client.publish('topicA', new Uint8Array([1, 2, 3]), { qos: Mqtt.QoS.AtLeastOnce, retain: true });
 
-const result = await client.publish('topicA', 'payload', { qos: Mqtt.QoS.EXACTLY_ONCE }, {
+const result = await client.publish('topicA', 'payload', { qos: Mqtt.QoS.ExactlyOnce }, {
   contentType: 'application/json',
   messageExpiryInterval: 60,
   userProperties: [{ key: 'userProp1', val: 'userData1' }],
@@ -219,16 +219,16 @@ client.on('publish', (event) => {
 
 await client.connect();
 
-await client.subscribe('topicA', Mqtt.QoS.AT_LEAST_ONCE);
-await client.subscribe(['topicB', 'sensors/+/temperature', 'logs/#'], Mqtt.QoS.AT_LEAST_ONCE);
+await client.subscribe('topicA', Mqtt.QoS.AtLeastOnce);
+await client.subscribe(['topicB', 'sensors/+/temperature', 'logs/#'], Mqtt.QoS.AtLeastOnce);
 
 // Shared subscription
-await client.subscribe('$share/group1/topicC', Mqtt.QoS.AT_LEAST_ONCE);
+await client.subscribe('$share/group1/topicC', Mqtt.QoS.AtLeastOnce);
 
 // MQTT 5.0 subscription options
 const result = await client.subscribe({
   topicFilter: 'topicD',
-  qos: Mqtt.QoS.AT_LEAST_ONCE,
+  qos: Mqtt.QoS.AtLeastOnce,
   noLocal: true,
   retainAsPublished: true,
   retainHandling: Mqtt.RetainHandling.DoNotSend,
@@ -296,7 +296,7 @@ import { Mqtt, MqttClient } from '@ymjacky/mqtt5';
 async function publishOnce(): Promise<void> {
   await using client = new MqttClient({ clientId: 'clientA' });
   await client.connect();
-  await client.publish('topicA', 'hello', { qos: Mqtt.QoS.AT_LEAST_ONCE });
+  await client.publish('topicA', 'hello', { qos: Mqtt.QoS.AtLeastOnce });
 } // client.disconnect() is called here
 ```
 
@@ -315,7 +315,7 @@ async function publishWithStore(): Promise<void> {
   });
 
   await client.connect({ properties: { sessionExpiryInterval: 3600 } });
-  await client.publish('topicA', 'payload', { qos: Mqtt.QoS.AT_LEAST_ONCE });
+  await client.publish('topicA', 'payload', { qos: Mqtt.QoS.AtLeastOnce });
 } // client.disconnect(), then kv.close()
 ```
 
@@ -393,7 +393,7 @@ const client = new MqttClient({ clientId: 'clientA' });
 await client.connect();
 
 try {
-  const result = await client.publish('sensors/room1/temperature', '23.5', { qos: Mqtt.QoS.AT_LEAST_ONCE });
+  const result = await client.publish('sensors/room1/temperature', '23.5', { qos: Mqtt.QoS.AtLeastOnce });
   // QoS 1 and 2: the reason code of PUBACK / PUBREC (MQTT 5.0). 0x10 (NoMatchingSubscribers) is a success.
   if (result.result >= 0x80) {
     console.error(`the broker refused the message: ${result.result} ${result.reason ?? ''}`);
@@ -419,7 +419,7 @@ await client.connect();
 
 const topicFilters = ['sensors/+/temperature', 'logs/#'];
 try {
-  const { reasons } = await client.subscribe(topicFilters, Mqtt.QoS.AT_LEAST_ONCE);
+  const { reasons } = await client.subscribe(topicFilters, Mqtt.QoS.AtLeastOnce);
   // One per topic filter: the granted QoS (0, 1 or 2; it can be lower than requested), or 0x80 or more on failure.
   reasons.forEach((reason, i) => {
     if (reason >= 0x80) {
@@ -471,7 +471,7 @@ import { Mqtt, WebSocketMqttClient } from '@ymjacky/mqtt5/browser';
 const client = new WebSocketMqttClient({
   url: new URL('wss://broker.example.com:8081'),
   clientId: 'browserClient',
-  protocolVersion: Mqtt.ProtocolVersion.MQTT_V5,
+  protocolVersion: Mqtt.ProtocolVersion.MqttV5,
 });
 
 client.on('publish', (event) => {
@@ -480,7 +480,7 @@ client.on('publish', (event) => {
 });
 
 await client.connect();
-await client.subscribe('topicA', Mqtt.QoS.AT_LEAST_ONCE);
+await client.subscribe('topicA', Mqtt.QoS.AtLeastOnce);
 ```
 
 ### From a CDN (no build step)
@@ -495,7 +495,7 @@ import { Mqtt, WebSocketMqttClient } from 'https://esm.sh/jsr/@ymjacky/mqtt5/bro
 const client = new WebSocketMqttClient({
   url: new URL('wss://broker.example.com:8081'),
   clientId: 'browserClient',
-  protocolVersion: Mqtt.ProtocolVersion.MQTT_V5,
+  protocolVersion: Mqtt.ProtocolVersion.MqttV5,
 });
 await client.connect();
 </script>
@@ -520,7 +520,7 @@ import { Mqtt, WebSocketMqttClient } from './mqtt5.mjs';
 const client = new WebSocketMqttClient({
   url: new URL('wss://localhost:8081'),
   clientId: 'browserClient',
-  protocolVersion: Mqtt.ProtocolVersion.MQTT_V5,
+  protocolVersion: Mqtt.ProtocolVersion.MqttV5,
 });
 
 client.on('publish', (event) => {
@@ -529,7 +529,7 @@ client.on('publish', (event) => {
 });
 
 await client.connect();
-await client.subscribe('topicA', Mqtt.QoS.AT_LEAST_ONCE);
+await client.subscribe('topicA', Mqtt.QoS.AtLeastOnce);
 </script>
 ```
 
@@ -547,10 +547,10 @@ async function publishOnce(): Promise<void> {
   await using client = new WebSocketMqttClient({
     url: new URL('wss://broker.example.com:8081'),
     clientId: 'browserClient',
-    protocolVersion: Mqtt.ProtocolVersion.MQTT_V5,
+    protocolVersion: Mqtt.ProtocolVersion.MqttV5,
   });
   await client.connect();
-  await client.publish('topicA', 'hello', { qos: Mqtt.QoS.AT_LEAST_ONCE });
+  await client.publish('topicA', 'hello', { qos: Mqtt.QoS.AtLeastOnce });
 } // client.disconnect() is called here
 ```
 
@@ -566,15 +566,38 @@ async function publishOnce(): Promise<void> {
   const client = new WebSocketMqttClient({
     url: new URL('wss://broker.example.com:8081'),
     clientId: 'browserClient',
-    protocolVersion: Mqtt.ProtocolVersion.MQTT_V5,
+    protocolVersion: Mqtt.ProtocolVersion.MqttV5,
   });
   try {
     await client.connect();
-    await client.publish('topicA', 'hello', { qos: Mqtt.QoS.AT_LEAST_ONCE });
+    await client.publish('topicA', 'hello', { qos: Mqtt.QoS.AtLeastOnce });
   } finally {
     await client.disconnect();
   }
 }
+```
+
+### Vue
+
+Keep the client out of the deep reactivity of Vue 3: hold it in a `shallowRef()`, or mark it with `markRaw()`. `ref()` and `reactive()` wrap an object, and
+the objects in it, in a `Proxy`. The methods of the client then run on the proxy, which cannot read the private (`#`) fields of the client and of the objects it
+keeps: they throw a `TypeError` such as "Cannot read private member from an object whose class did not declare it".
+
+```ts ignore
+import { markRaw, reactive, shallowRef } from 'vue';
+import { Mqtt, WebSocketMqttClient } from '@ymjacky/mqtt5/browser';
+
+// shallowRef(): `client.value` is the client itself, not a proxy.
+const client = shallowRef(new WebSocketMqttClient({ url: new URL('wss://broker.example.com:8081') }));
+await client.value.connect();
+await client.value.subscribe('topicA', Mqtt.QoS.AtLeastOnce);
+
+// markRaw(): the client is not wrapped, also in a reactive object.
+const state = reactive({
+  client: markRaw(new WebSocketMqttClient({ url: new URL('wss://broker.example.com:8081') })),
+  messages: [] as string[], // the received messages can be reactive
+});
+state.client.on('publish', (event) => state.messages.push(new TextDecoder().decode(event.detail.payload)));
 ```
 
 ## Features
@@ -663,7 +686,7 @@ const client = new MqttClient({
 
 // the messages of a previous process are resent after connect() resolves, before the messages of later publish() calls
 await client.connect({ properties: { sessionExpiryInterval: 3600 } });
-await client.publish('topicA', 'payload', { qos: Mqtt.QoS.AT_LEAST_ONCE });
+await client.publish('topicA', 'payload', { qos: Mqtt.QoS.AtLeastOnce });
 
 await client.disconnect();
 kv.close(); // after the client has disconnected

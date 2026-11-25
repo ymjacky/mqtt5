@@ -60,14 +60,14 @@ export interface OutgoingStore {
 
   /** Stores a packet by its packet ID. A packet with the packet ID of a stored one replaces it and keeps its position. */
   store(
-    packet: MqttPackets.PublishPacket | MqttPackets.PubrelPacket,
+    packet: MqttPackets.PublishPacketWithId | MqttPackets.PubrelPacket,
   ): Promise<void>;
 
   /** Removes the packet with the packet ID. */
   discard(packetId: number): Promise<void>;
 
   /** Iterates over the stored packets to resend. */
-  resendIterator(): AsyncIterableIterator<MqttPackets.PublishPacket | MqttPackets.PubrelPacket>;
+  resendIterator(): AsyncIterableIterator<MqttPackets.PublishPacketWithId | MqttPackets.PubrelPacket>;
 
   /** Returns whether a packet with the packet ID is stored. */
   has(packetId: number): Promise<boolean>;
@@ -82,13 +82,13 @@ export interface OutgoingStore {
 /** The default {@link OutgoingStore} used internally by the client. */
 export class MemoryStore implements OutgoingStore {
   /** The stored packets by packet ID. */
-  packets: Map<number, MqttPackets.PublishPacket | MqttPackets.PubrelPacket> = new Map<
+  packets: Map<number, MqttPackets.PublishPacketWithId | MqttPackets.PubrelPacket> = new Map<
     number, /* packetId */
-    MqttPackets.PublishPacket | MqttPackets.PubrelPacket
+    MqttPackets.PublishPacketWithId | MqttPackets.PubrelPacket
   >();
 
   /** Stores a packet by its packet ID. Rejects if the packet has no packet ID. */
-  store(packet: MqttPackets.PublishPacket | MqttPackets.PubrelPacket): Promise<void> {
+  store(packet: MqttPackets.PublishPacketWithId | MqttPackets.PubrelPacket): Promise<void> {
     if (!packet.packetId) {
       return Promise.reject(new Error('missing packet.packetId'));
     }
@@ -122,7 +122,7 @@ export class MemoryStore implements OutgoingStore {
   }
 
   /** Iterates over the stored packets to resend. */
-  async *resendIterator(): AsyncIterableIterator<MqttPackets.PublishPacket | MqttPackets.PubrelPacket> {
+  async *resendIterator(): AsyncIterableIterator<MqttPackets.PublishPacketWithId | MqttPackets.PubrelPacket> {
     for (const value of this.packets.values()) {
       yield value;
     }

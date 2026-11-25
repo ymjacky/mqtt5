@@ -117,8 +117,8 @@ Deno.test('decodeProperties throws for a property that must be 0 or 1 and has an
 });
 
 Deno.test('decodeProperties reads a Maximum QoS of 0 or 1 as a QoS (MQTT 5.0 3.2.2.3.4)', () => {
-  assertEquals(parse([0x24, 0x00]), { maximumQoS: Mqtt.QoS.AT_MOST_ONCE });
-  assertEquals(parse([0x24, 0x01]), { maximumQoS: Mqtt.QoS.AT_LEAST_ONCE });
+  assertEquals(parse([0x24, 0x00]), { maximumQoS: Mqtt.QoS.AtMostOnce });
+  assertEquals(parse([0x24, 0x01]), { maximumQoS: Mqtt.QoS.AtLeastOnce });
 });
 
 Deno.test('decodeProperties throws for a Receive Maximum, Maximum Packet Size or Subscription Identifier of 0', () => {

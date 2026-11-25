@@ -35,7 +35,7 @@ export function toBytes(packet: ConnectPacket): Uint8Array {
     [protocolVersion, connectFlags, keepAlive >> 8, keepAlive & 0xFF],
   ];
 
-  if (protocolVersion > Mqtt.ProtocolVersion.MQTT_V3_1_1) {
+  if (protocolVersion > Mqtt.ProtocolVersion.MqttV3_1_1) {
     variableHeaderChunks.push(MqttProperties.propertiesToBytes(packet.properties));
   }
 
@@ -46,7 +46,7 @@ export function toBytes(packet: ConnectPacket): Uint8Array {
   // Will
   if (packet.will) {
     // Will Properties
-    if (protocolVersion > Mqtt.ProtocolVersion.MQTT_V3_1_1) {
+    if (protocolVersion > Mqtt.ProtocolVersion.MqttV3_1_1) {
       payloadChunks.push(MqttProperties.propertiesToBytes(packet.will.properties));
     }
     // Will Topic
@@ -71,7 +71,7 @@ export function toBytes(packet: ConnectPacket): Uint8Array {
   const payload = concatBytes(payloadChunks);
 
   const fixedHeader = [
-    (Mqtt.PacketType.CONNECT << 4) + Mqtt.fixedHeaderFlag.CONNECT,
+    (Mqtt.PacketType.Connect << 4) + Mqtt.FixedHeaderFlag.Connect,
     ...remainingLengthToBytes(variableHeader.length + payload.length),
   ];
 
@@ -96,13 +96,13 @@ export function parse(
   const cleanSession = !!(connectFlags & 2);
 
   if (
-    protocolVersion !== Mqtt.ProtocolVersion.MQTT_V3_1_1 &&
-    protocolVersion !== Mqtt.ProtocolVersion.MQTT_V5
+    protocolVersion !== Mqtt.ProtocolVersion.MqttV3_1_1 &&
+    protocolVersion !== Mqtt.ProtocolVersion.MqttV5
   ) {
     throw new InvalidProtocolVersionError(`${protocolVersion}`);
   }
   const pV = protocolVersion as Mqtt.ProtocolVersion;
-  const mqtt5 = pV > Mqtt.ProtocolVersion.MQTT_V3_1_1;
+  const mqtt5 = pV > Mqtt.ProtocolVersion.MqttV3_1_1;
 
   const keepAlive = reader.readTwoByteInteger();
   const properties = mqtt5 ? readProperties(reader) : undefined;

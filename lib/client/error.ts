@@ -189,7 +189,7 @@ export class NotSupportedByBrokerError extends Error {
 export class QoSNotSupportedError extends NotSupportedByBrokerError {
   /** The name of the error class. */
   override readonly name = 'QoSNotSupportedError' as const;
-  /** The highest QoS the broker supports: `Mqtt.QoS.AT_MOST_ONCE` or `Mqtt.QoS.AT_LEAST_ONCE`. */
+  /** The highest QoS the broker supports: `Mqtt.QoS.AtMostOnce` or `Mqtt.QoS.AtLeastOnce`. */
   readonly maximumQoS: Mqtt.QoS;
   /** Creates the error for the QoS that was requested and the Maximum QoS of the broker. */
   constructor(qos: number, maximumQoS: Mqtt.QoS) {

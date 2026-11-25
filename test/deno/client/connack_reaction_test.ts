@@ -33,7 +33,7 @@ Deno.test({ name: '@connack reaction', only: false }, async (context) => {
         const connack = await client.connect();
         assertEquals(connack.reasonCode, Mqtt.ReasonCode.Success);
         assertEquals(connack.properties?.assignedClientIdentifier, 'generated_cid');
-        assertEquals(client.getClientId(), 'generated_cid');
+        assertEquals(client.clientId, 'generated_cid');
       } catch (err) {
         fail(`error occured: ${err}`);
       } finally {

@@ -55,36 +55,36 @@ Deno.test({ name: '@receive topic alias', only: false }, async (context) => {
           topicAlias: 1,
         };
         broker.sendPublish(
-          client.getClientId(),
+          client.clientId,
           0,
           'topicA',
-          Mqtt.ProtocolVersion.MQTT_V5,
+          Mqtt.ProtocolVersion.MqttV5,
           new TextEncoder().encode('1st'),
-          Mqtt.QoS.AT_MOST_ONCE,
+          Mqtt.QoS.AtMostOnce,
           false,
           false,
           properties,
         );
 
         broker.sendPublish(
-          client.getClientId(),
+          client.clientId,
           0,
           '',
-          Mqtt.ProtocolVersion.MQTT_V5,
+          Mqtt.ProtocolVersion.MqttV5,
           new TextEncoder().encode('2nd'),
-          Mqtt.QoS.AT_MOST_ONCE,
+          Mqtt.QoS.AtMostOnce,
           false,
           false,
           properties,
         );
 
         broker.sendPublish(
-          client.getClientId(),
+          client.clientId,
           0,
           '',
-          Mqtt.ProtocolVersion.MQTT_V5,
+          Mqtt.ProtocolVersion.MqttV5,
           new TextEncoder().encode('3rd'),
-          Mqtt.QoS.AT_MOST_ONCE,
+          Mqtt.QoS.AtMostOnce,
           false,
           false,
           properties,
@@ -148,48 +148,48 @@ Deno.test({ name: '@receive topic alias', only: false }, async (context) => {
         });
 
         broker.sendPublish(
-          client.getClientId(),
+          client.clientId,
           0,
           'topicA',
-          Mqtt.ProtocolVersion.MQTT_V5,
+          Mqtt.ProtocolVersion.MqttV5,
           new TextEncoder().encode('1st'),
-          Mqtt.QoS.AT_MOST_ONCE,
+          Mqtt.QoS.AtMostOnce,
           false,
           false,
           { topicAlias: 1 },
         );
 
         broker.sendPublish(
-          client.getClientId(),
+          client.clientId,
           0,
           'topicB',
-          Mqtt.ProtocolVersion.MQTT_V5,
+          Mqtt.ProtocolVersion.MqttV5,
           new TextEncoder().encode('2nd'),
-          Mqtt.QoS.AT_MOST_ONCE,
+          Mqtt.QoS.AtMostOnce,
           false,
           false,
           { topicAlias: 1 },
         );
 
         broker.sendPublish(
-          client.getClientId(),
+          client.clientId,
           0,
           'topicA',
-          Mqtt.ProtocolVersion.MQTT_V5,
+          Mqtt.ProtocolVersion.MqttV5,
           new TextEncoder().encode('3rd'),
-          Mqtt.QoS.AT_MOST_ONCE,
+          Mqtt.QoS.AtMostOnce,
           false,
           false,
           { topicAlias: 2 },
         );
 
         broker.sendPublish(
-          client.getClientId(),
+          client.clientId,
           0,
           '',
-          Mqtt.ProtocolVersion.MQTT_V5,
+          Mqtt.ProtocolVersion.MqttV5,
           new TextEncoder().encode('4th'),
-          Mqtt.QoS.AT_MOST_ONCE,
+          Mqtt.QoS.AtMostOnce,
           false,
           false,
           { topicAlias: 2 },
@@ -241,24 +241,24 @@ Deno.test({ name: '@receive topic alias', only: false }, async (context) => {
         });
 
         broker.sendPublish(
-          client.getClientId(),
+          client.clientId,
           0,
           '',
-          Mqtt.ProtocolVersion.MQTT_V5,
+          Mqtt.ProtocolVersion.MqttV5,
           new TextEncoder().encode('1st'),
-          Mqtt.QoS.AT_MOST_ONCE,
+          Mqtt.QoS.AtMostOnce,
           false,
           false,
           { topicAlias: 1 },
         );
 
         broker.sendPublish(
-          client.getClientId(),
+          client.clientId,
           0,
           'topicA',
-          Mqtt.ProtocolVersion.MQTT_V5,
+          Mqtt.ProtocolVersion.MqttV5,
           new TextEncoder().encode('2nd'),
-          Mqtt.QoS.AT_MOST_ONCE,
+          Mqtt.QoS.AtMostOnce,
         );
 
         await promise;

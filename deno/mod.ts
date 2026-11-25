@@ -32,7 +32,7 @@
  * const client = new MqttClient({
  *   url: new URL('mqtt://127.0.0.1:1883'),
  *   clientId: 'clientA',
- *   protocolVersion: Mqtt.ProtocolVersion.MQTT_V5,
+ *   protocolVersion: Mqtt.ProtocolVersion.MqttV5,
  * });
  *
  * client.on('publish', (event) => {
@@ -41,8 +41,8 @@
  * });
  *
  * await client.connect();
- * await client.subscribe('topicA', Mqtt.QoS.AT_LEAST_ONCE);
- * await client.publish('topicA', 'hello', { qos: Mqtt.QoS.AT_LEAST_ONCE });
+ * await client.subscribe('topicA', Mqtt.QoS.AtLeastOnce);
+ * await client.publish('topicA', 'hello', { qos: Mqtt.QoS.AtLeastOnce });
  * await client.disconnect();
  * ```
  *
@@ -54,13 +54,13 @@
  * await client.connect();
  *
  * // QoS 0: resolves right after sending. The payload is a string or a Uint8Array.
- * await client.publish('topicA', 'payload', { qos: Mqtt.QoS.AT_MOST_ONCE });
+ * await client.publish('topicA', 'payload', { qos: Mqtt.QoS.AtMostOnce });
  *
  * // QoS 1: resolves when the broker acknowledges (PUBACK). `retain` asks the broker to keep the message.
- * await client.publish('topicA', new Uint8Array([1, 2, 3]), { qos: Mqtt.QoS.AT_LEAST_ONCE, retain: true });
+ * await client.publish('topicA', new Uint8Array([1, 2, 3]), { qos: Mqtt.QoS.AtLeastOnce, retain: true });
  *
  * // QoS 2, with MQTT 5.0 properties as the fourth argument
- * const result = await client.publish('topicA', '{"temperature":23.5}', { qos: Mqtt.QoS.EXACTLY_ONCE }, {
+ * const result = await client.publish('topicA', '{"temperature":23.5}', { qos: Mqtt.QoS.ExactlyOnce }, {
  *   contentType: 'application/json',
  *   messageExpiryInterval: 60,
  *   userProperties: [{ key: 'room', val: '1' }],
@@ -85,15 +85,15 @@
  * await client.connect();
  *
  * // Several topic filters at once; `+` matches one level, `#` matches the rest.
- * await client.subscribe(['topicB', 'sensors/+/temperature', 'logs/#'], Mqtt.QoS.AT_LEAST_ONCE);
+ * await client.subscribe(['topicB', 'sensors/+/temperature', 'logs/#'], Mqtt.QoS.AtLeastOnce);
  *
  * // Shared subscription: the messages are distributed among the clients of the group.
- * await client.subscribe('$share/group1/topicC', Mqtt.QoS.AT_LEAST_ONCE);
+ * await client.subscribe('$share/group1/topicC', Mqtt.QoS.AtLeastOnce);
  *
  * // MQTT 5.0 subscription options. `reasons` has one entry per topic filter (0x80 or more is a failure).
  * const { reasons } = await client.subscribe({
  *   topicFilter: 'topicD',
- *   qos: Mqtt.QoS.AT_LEAST_ONCE,
+ *   qos: Mqtt.QoS.AtLeastOnce,
  *   noLocal: true,
  *   retainAsPublished: true,
  *   retainHandling: Mqtt.RetainHandling.DoNotSend,
@@ -112,7 +112,7 @@
  *   clientId: 'clientA',
  *   username: 'user',
  *   password: 'pass',
- *   protocolVersion: Mqtt.ProtocolVersion.MQTT_V3_1_1,
+ *   protocolVersion: Mqtt.ProtocolVersion.MqttV3_1_1,
  * });
  * await client.connect();
  * ```
@@ -149,7 +149,7 @@
  * const client = new WebSocketMqttClient({
  *   url: new URL('wss://127.0.0.1:8081'),
  *   clientId: 'clientA',
- *   protocolVersion: Mqtt.ProtocolVersion.MQTT_V5,
+ *   protocolVersion: Mqtt.ProtocolVersion.MqttV5,
  * });
  * await client.connect();
  * ```
@@ -169,7 +169,7 @@
  *   will: {
  *     topic: 'clients/clientA/status',
  *     payload: new TextEncoder().encode('offline'),
- *     qos: Mqtt.QoS.AT_LEAST_ONCE,
+ *     qos: Mqtt.QoS.AtLeastOnce,
  *     retain: true,
  *   },
  * });
@@ -189,7 +189,7 @@
  *     console.error(`the broker refused the connection: ${connack.reasonCode}`);
  *   }
  *
- *   const result = await client.publish('sensors/room1/temperature', '23.5', { qos: Mqtt.QoS.AT_LEAST_ONCE });
+ *   const result = await client.publish('sensors/room1/temperature', '23.5', { qos: Mqtt.QoS.AtLeastOnce });
  *   // A reason code of 0x80 (128) or more is a failure.
  *   if (result.result >= 0x80) {
  *     console.error(`the broker refused the message: ${result.result}`);
@@ -219,11 +219,11 @@
  * client.on('closed', async () => {
  *   await new Promise((resolve) => setTimeout(resolve, 5000));
  *   await client.connect({ properties: { sessionExpiryInterval: 3600 } });
- *   await client.subscribe('topicA', Mqtt.QoS.AT_LEAST_ONCE);
+ *   await client.subscribe('topicA', Mqtt.QoS.AtLeastOnce);
  * });
  *
  * await client.connect({ properties: { sessionExpiryInterval: 3600 } });
- * await client.subscribe('topicA', Mqtt.QoS.AT_LEAST_ONCE);
+ * await client.subscribe('topicA', Mqtt.QoS.AtLeastOnce);
  * ```
  *
  * @example Keep messages in flight across restarts (Deno KV)
@@ -241,7 +241,7 @@
  *
  * // The messages a previous process left are resent after connect() resolves, before the message of this publish().
  * await client.connect({ properties: { sessionExpiryInterval: 3600 } });
- * await client.publish('topicA', 'payload', { qos: Mqtt.QoS.AT_LEAST_ONCE });
+ * await client.publish('topicA', 'payload', { qos: Mqtt.QoS.AtLeastOnce });
  *
  * // At the end of the module, client.disconnect() is called, then kv.close(): what is declared later is disposed of
  * // first, so the database is closed after the client has disconnected.

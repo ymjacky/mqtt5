@@ -94,7 +94,7 @@ const connackWithUnknownProperty = [0x20, 0x04, 0x00, 0x00, 0x01, 0x7F];
 
 /** A CONNACK (MQTT 5.0) that accepts the connection. */
 const validConnack = [
-  ...MqttPackets.packetToBytes({ type: 'connack', sessionPresent: false, reasonCode: Mqtt.ReasonCode.Success }, Mqtt.ProtocolVersion.MQTT_V5),
+  ...MqttPackets.packetToBytes({ type: 'connack', sessionPresent: false, reasonCode: Mqtt.ReasonCode.Success }, Mqtt.ProtocolVersion.MqttV5),
 ];
 
 /** Packets that the client cannot accept while it waits for CONNACK (MQTT 5.0), and the reason it ends the connection with. */
@@ -147,8 +147,8 @@ Deno.test({ name: '@receive before CONNACK: a packet that the client cannot acce
       broker.listen();
       const recorded = record(client, broker);
       const publish = MqttPackets.packetToBytes(
-        { type: 'publish', topic: 'a', payload: new Uint8Array(40), dup: false, retain: false, qos: Mqtt.QoS.AT_MOST_ONCE },
-        Mqtt.ProtocolVersion.MQTT_V5,
+        { type: 'publish', topic: 'a', payload: new Uint8Array(40), dup: false, retain: false, qos: Mqtt.QoS.AtMostOnce },
+        Mqtt.ProtocolVersion.MqttV5,
       );
       answerFirstConnect(broker, publish);
 
@@ -200,7 +200,7 @@ Deno.test({ name: '@receive before CONNACK: a packet that the client cannot acce
 
   await context.step('MQTT 3.1.1: connect() rejects with the same error, with the reason the connection was closed for', async () => {
     const broker = new TestBroker();
-    const client = new MqttClient({ clientId: 'cid', logger, connectTimeoutMS, protocolVersion: Mqtt.ProtocolVersion.MQTT_V3_1_1 });
+    const client = new MqttClient({ clientId: 'cid', logger, connectTimeoutMS, protocolVersion: Mqtt.ProtocolVersion.MqttV3_1_1 });
     try {
       broker.listen();
       const recorded = record(client, broker);
@@ -237,18 +237,18 @@ Deno.test({ name: '@receive before CONNACK: a packet that the client cannot acce
 });
 
 /** Encodes a packet, for MQTT 5.0 unless `protocolVersion` is given. */
-function bytesOf(packet: MqttPackets.AnyPacket, protocolVersion: Mqtt.ProtocolVersion = Mqtt.ProtocolVersion.MQTT_V5): number[] {
+function bytesOf(packet: MqttPackets.AnyPacket, protocolVersion: Mqtt.ProtocolVersion = Mqtt.ProtocolVersion.MqttV5): number[] {
   return [...MqttPackets.packetToBytes(packet, protocolVersion)];
 }
 
 const payload = new Uint8Array([1]);
-const publishQoS1: MqttPackets.PublishPacket = { type: 'publish', topic: 'a', payload, dup: false, retain: false, qos: Mqtt.QoS.AT_LEAST_ONCE, packetId: 7 };
+const publishQoS1: MqttPackets.PublishPacket = { type: 'publish', topic: 'a', payload, dup: false, retain: false, qos: Mqtt.QoS.AtLeastOnce, packetId: 7 };
 
 /** Packets that the broker must not send before CONNACK: with MQTT 5.0, it sends AUTH only [MQTT-3.2.0-1]. */
 const packetsBeforeConnack: [string, MqttPackets.AnyPacket][] = [
-  ['a PUBLISH with QoS 0', { type: 'publish', topic: 'a', payload, dup: false, retain: false, qos: Mqtt.QoS.AT_MOST_ONCE }],
+  ['a PUBLISH with QoS 0', { type: 'publish', topic: 'a', payload, dup: false, retain: false, qos: Mqtt.QoS.AtMostOnce }],
   ['a PUBLISH with QoS 1', publishQoS1],
-  ['a PUBLISH with QoS 2', { type: 'publish', topic: 'a', payload, dup: false, retain: false, qos: Mqtt.QoS.EXACTLY_ONCE, packetId: 7 }],
+  ['a PUBLISH with QoS 2', { type: 'publish', topic: 'a', payload, dup: false, retain: false, qos: Mqtt.QoS.ExactlyOnce, packetId: 7 }],
   ['a PUBACK', { type: 'puback', packetId: 1 }],
   ['a PUBREC', { type: 'pubrec', packetId: 1 }],
   ['a PUBREL', { type: 'pubrel', packetId: 1 }],
@@ -388,13 +388,13 @@ Deno.test({ name: '@receive before CONNACK: a packet that the broker must not se
 
   // MQTT 3.1.1 has no AUTH: CONNACK is the first packet that the broker sends [MQTT-3.2.0-1].
   const packetsBeforeConnackV3_1_1: [string, number[]][] = [
-    ['a PUBLISH with QoS 1', bytesOf(publishQoS1, Mqtt.ProtocolVersion.MQTT_V3_1_1)],
+    ['a PUBLISH with QoS 1', bytesOf(publishQoS1, Mqtt.ProtocolVersion.MqttV3_1_1)],
     ['an AUTH', [0xF0, 0x00]],
   ];
   for (const [name, bytes] of packetsBeforeConnackV3_1_1) {
     await context.step(`MQTT 3.1.1: on ${name}, the client does not handle it, closes the connection, and connect() rejects`, async () => {
       const broker = new TestBroker();
-      const client = new MqttClient({ clientId: 'cid', logger, connectTimeoutMS, protocolVersion: Mqtt.ProtocolVersion.MQTT_V3_1_1 });
+      const client = new MqttClient({ clientId: 'cid', logger, connectTimeoutMS, protocolVersion: Mqtt.ProtocolVersion.MqttV3_1_1 });
       try {
         broker.listen();
         const recorded = record(client, broker);

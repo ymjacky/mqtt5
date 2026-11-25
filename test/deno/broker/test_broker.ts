@@ -1,5 +1,12 @@
 import { ClientErrors, Mqtt, MqttPackets, type MqttProperties } from '../../../deno/mod.ts';
 import * as MqttStream from '../../../lib/mqtt_stream_utils/mod.ts';
+import { assert } from '@std/assert';
+
+/** The packet ID of a received PUBLISH, e.g. to acknowledge it. Fails the test for QoS 0, which has no packet ID. */
+export function packetIdOf(packet: MqttPackets.PublishPacket): number {
+  assert(packet.qos !== Mqtt.QoS.AtMostOnce, 'a QoS 0 PUBLISH has no packet ID');
+  return packet.packetId;
+}
 
 interface CustomEventMap {
   'accept': CustomEvent<Deno.Conn<Deno.Addr>>;
@@ -216,7 +223,7 @@ export class TestBroker extends EventTarget {
     const client = this.clients.get(clientId);
     if (client) { // found
       let packet: MqttPackets.ConnackPacket;
-      if (protocolVersion > Mqtt.ProtocolVersion.MQTT_V3_1_1) {
+      if (protocolVersion > Mqtt.ProtocolVersion.MqttV3_1_1) {
         packet = {
           type: 'connack',
           sessionPresent,
@@ -253,13 +260,14 @@ export class TestBroker extends EventTarget {
   ): Promise<void> {
     const client = this.clients.get(clientId);
     if (client) { // found
+      // Only QoS 1 and QoS 2 have a packet ID.
+      const qosAndPacketId = qos === Mqtt.QoS.AtMostOnce ? { qos } : { qos, packetId };
       let packet: MqttPackets.PublishPacket;
-      if (protocolVersion > Mqtt.ProtocolVersion.MQTT_V3_1_1) {
+      if (protocolVersion > Mqtt.ProtocolVersion.MqttV3_1_1) {
         packet = {
           type: 'publish',
-          packetId,
+          ...qosAndPacketId,
           topic,
-          qos,
           dup,
           retain,
           payload,
@@ -268,9 +276,8 @@ export class TestBroker extends EventTarget {
       } else {
         packet = {
           type: 'publish',
-          packetId,
+          ...qosAndPacketId,
           topic,
-          qos,
           dup,
           retain,
           payload,
@@ -296,7 +303,7 @@ export class TestBroker extends EventTarget {
     const client = this.clients.get(clientId);
     if (client) { // found
       let packet: MqttPackets.PubackPacket;
-      if (protocolVersion > Mqtt.ProtocolVersion.MQTT_V3_1_1) {
+      if (protocolVersion > Mqtt.ProtocolVersion.MqttV3_1_1) {
         packet = {
           type: 'puback',
           packetId,
@@ -329,7 +336,7 @@ export class TestBroker extends EventTarget {
     const client = this.clients.get(clientId);
     if (client) { // found
       let packet: MqttPackets.PubrecPacket;
-      if (protocolVersion > Mqtt.ProtocolVersion.MQTT_V3_1_1) {
+      if (protocolVersion > Mqtt.ProtocolVersion.MqttV3_1_1) {
         packet = {
           type: 'pubrec',
           packetId,
@@ -362,7 +369,7 @@ export class TestBroker extends EventTarget {
     const client = this.clients.get(clientId);
     if (client) { // found
       let packet: MqttPackets.PubrelPacket;
-      if (protocolVersion > Mqtt.ProtocolVersion.MQTT_V3_1_1) {
+      if (protocolVersion > Mqtt.ProtocolVersion.MqttV3_1_1) {
         packet = {
           type: 'pubrel',
           packetId,
@@ -395,7 +402,7 @@ export class TestBroker extends EventTarget {
     const client = this.clients.get(clientId);
     if (client) { // found
       let packet: MqttPackets.PubcompPacket;
-      if (protocolVersion > Mqtt.ProtocolVersion.MQTT_V3_1_1) {
+      if (protocolVersion > Mqtt.ProtocolVersion.MqttV3_1_1) {
         packet = {
           type: 'pubcomp',
           packetId,
@@ -428,7 +435,7 @@ export class TestBroker extends EventTarget {
     const client = this.clients.get(clientId);
     if (client) { // found
       let packet: MqttPackets.SubackPacket;
-      if (protocolVersion > Mqtt.ProtocolVersion.MQTT_V3_1_1) {
+      if (protocolVersion > Mqtt.ProtocolVersion.MqttV3_1_1) {
         packet = {
           type: 'suback',
           packetId,
@@ -462,7 +469,7 @@ export class TestBroker extends EventTarget {
     const client = this.clients.get(clientId);
     if (client) { // found
       let packet: MqttPackets.UnsubackPacket;
-      if (protocolVersion > Mqtt.ProtocolVersion.MQTT_V3_1_1) {
+      if (protocolVersion > Mqtt.ProtocolVersion.MqttV3_1_1) {
         packet = {
           type: 'unsuback',
           packetId,
@@ -518,7 +525,7 @@ export class TestBroker extends EventTarget {
       };
 
       log(`sending packet`, packet);
-      const bytes = MqttPackets.packetToBytes(packet, Mqtt.ProtocolVersion.MQTT_V5);
+      const bytes = MqttPackets.packetToBytes(packet, Mqtt.ProtocolVersion.MqttV5);
       log(`sending bytes`, bytes);
       await client.writer.ready;
       await client.writer.write(bytes);
@@ -538,7 +545,7 @@ export class TestBroker extends EventTarget {
       };
 
       log(`sending packet`, packet);
-      const bytes = MqttPackets.packetToBytes(packet, Mqtt.ProtocolVersion.MQTT_V5);
+      const bytes = MqttPackets.packetToBytes(packet, Mqtt.ProtocolVersion.MqttV5);
       log(`sending bytes`, bytes);
       await client.writer.ready;
       await client.writer.write(bytes);

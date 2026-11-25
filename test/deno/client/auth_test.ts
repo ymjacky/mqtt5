@@ -42,7 +42,7 @@ Deno.test({ name: '@auth', only: false }, async (context) => {
           const connackPropertie: MqttProperties.ConnackProperties = {
             authenticationMethod: packet.properties?.authenticationMethod,
           };
-          broker.sendConnack(client.getClientId(), false, Mqtt.ProtocolVersion.MQTT_V5, Mqtt.ReasonCode.Success, connackPropertie);
+          broker.sendConnack(client.clientId, false, Mqtt.ProtocolVersion.MqttV5, Mqtt.ReasonCode.Success, connackPropertie);
           resolve();
         });
 
@@ -54,7 +54,7 @@ Deno.test({ name: '@auth', only: false }, async (context) => {
           const response = new Uint8Array([...new TextEncoder().encode(`myData:${salt}`)]);
 
           const authPropertie: MqttProperties.AuthProperties = {
-            authenticationMethod: packet.properties!.authenticationMethod,
+            authenticationMethod: packet.properties?.authenticationMethod,
             authenticationData: response,
           };
           client.auth(Mqtt.ReasonCode.ContinueAuthentication, authPropertie);
@@ -110,7 +110,7 @@ Deno.test({ name: '@receive malformed auth', only: false }, async (context) => {
           clean: false,
           connectTimeoutMS: 10000,
           keepAlive: 10,
-          protocolVersion: Mqtt.ProtocolVersion.MQTT_V5,
+          protocolVersion: Mqtt.ProtocolVersion.MqttV5,
         });
 
         broker.on('connect', (event) => {
@@ -159,7 +159,7 @@ Deno.test({ name: '@receive malformed auth', only: false }, async (context) => {
           // Missing 5 bytes that Properties Length claims to have
         ]);
 
-        await broker.sendRawBytes(client.getClientId(), malformedPacket);
+        await broker.sendRawBytes(client.clientId, malformedPacket);
 
         await promise;
       } catch (err) {

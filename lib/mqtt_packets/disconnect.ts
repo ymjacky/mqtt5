@@ -13,7 +13,7 @@ export function toBytes(
   // the call stack once the byte array grows large (e.g. many properties).
   const variableHeaderChunks: (Uint8Array | number[])[] = [];
 
-  if (protocolVersion > Mqtt.ProtocolVersion.MQTT_V3_1_1) {
+  if (protocolVersion > Mqtt.ProtocolVersion.MqttV3_1_1) {
     const reasonCode = packet.reasonCode || 0x00; // 0x00 success
     if (packet.properties) {
       variableHeaderChunks.push([reasonCode & 0xFF]);
@@ -28,7 +28,7 @@ export function toBytes(
   const variableHeader = concatBytes(variableHeaderChunks);
 
   const fixedHeader = [
-    (Mqtt.PacketType.DISCONNECT << 4) + Mqtt.fixedHeaderFlag.DISCONNECT,
+    (Mqtt.PacketType.Disconnect << 4) + Mqtt.FixedHeaderFlag.Disconnect,
     ...remainingLengthToBytes(variableHeader.length),
   ];
 
@@ -41,7 +41,7 @@ export function parse(
   protocolVersion: Mqtt.ProtocolVersion,
 ): DisconnectPacket {
   const reader = new ByteReader(buffer, remainingLength);
-  if (protocolVersion === Mqtt.ProtocolVersion.MQTT_V3_1_1) {
+  if (protocolVersion === Mqtt.ProtocolVersion.MqttV3_1_1) {
     // MQTT 3.1.1 DISCONNECT has no variable header.
     reader.expectEnd('DISCONNECT');
     return {

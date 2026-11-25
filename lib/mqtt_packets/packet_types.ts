@@ -30,15 +30,46 @@ export type ConnackPacket = {
   properties?: MqttProperties.ConnackProperties;
 };
 
-/** PUBLISH packet: an application message. */
-export type PublishPacket = {
+/**
+ * PUBLISH packet: an application message. Narrow it by its `qos`: only QoS 1 and QoS 2 have a `packetId`.
+ * @example
+ * ```ts
+ * import type { MqttPackets } from '@ymjacky/mqtt5';
+ *
+ * function describe(packet: MqttPackets.PublishPacket): string {
+ *   if (packet.qos === 0) {
+ *     return `${packet.topic} (QoS 0)`;
+ *   }
+ *   return `${packet.topic} (QoS ${packet.qos}, packet ID ${packet.packetId})`;
+ * }
+ * ```
+ */
+export type PublishPacket = PublishPacketWithoutId | PublishPacketWithId;
+
+/** PUBLISH packet with QoS 0. It has no packet ID: the broker does not acknowledge it. */
+export type PublishPacketWithoutId = {
   type: 'publish';
   topic: string;
   payload: Uint8Array;
   dup: boolean;
   retain: boolean;
-  qos: Mqtt.QoS;
-  packetId?: number;
+  /** `Mqtt.QoS.AtMostOnce`. */
+  qos: 0;
+  /** QoS 0 has no packet ID. */
+  packetId?: undefined;
+  properties?: MqttProperties.PublishProperties;
+};
+
+/** PUBLISH packet with QoS 1 or QoS 2. It has a packet ID, which its acknowledgments carry. */
+export type PublishPacketWithId = {
+  type: 'publish';
+  topic: string;
+  payload: Uint8Array;
+  dup: boolean;
+  retain: boolean;
+  /** `Mqtt.QoS.AtLeastOnce` or `Mqtt.QoS.ExactlyOnce`. */
+  qos: 1 | 2;
+  packetId: number;
   properties?: MqttProperties.PublishProperties;
 };
 

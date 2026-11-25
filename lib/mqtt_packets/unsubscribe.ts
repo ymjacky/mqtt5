@@ -9,7 +9,7 @@ export function toBytes(
   protocolVersion: Mqtt.ProtocolVersion,
 ): Uint8Array {
   const variableHeaderChunks: (Uint8Array | number[])[] = [numToTwoByteInteger(packet.packetId)];
-  if (protocolVersion > Mqtt.ProtocolVersion.MQTT_V3_1_1) {
+  if (protocolVersion > Mqtt.ProtocolVersion.MqttV3_1_1) {
     if (packet.properties) {
       variableHeaderChunks.push(MqttProperties.propertiesToBytes(packet.properties));
     } else {
@@ -27,7 +27,7 @@ export function toBytes(
   const payload = concatBytes(payloadChunks);
 
   const fixedHeader = [
-    (Mqtt.PacketType.UNSUBSCRIBE << 4) + Mqtt.fixedHeaderFlag.UNSUBSCRIBE,
+    (Mqtt.PacketType.Unsubscribe << 4) + Mqtt.FixedHeaderFlag.Unsubscribe,
     ...remainingLengthToBytes(variableHeader.length + payload.length),
   ];
 
@@ -41,14 +41,14 @@ export function parse(
 ): UnsubscribePacket {
   const reader = new ByteReader(buffer, remainingLength);
   const packetId = reader.readTwoByteInteger();
-  const properties = protocolVersion > Mqtt.ProtocolVersion.MQTT_V3_1_1 ? readProperties(reader) : undefined;
+  const properties = protocolVersion > Mqtt.ProtocolVersion.MqttV3_1_1 ? readProperties(reader) : undefined;
 
   const topicFilters: string[] = [];
   while (reader.remaining > 0) {
     topicFilters.push(reader.readUtf8EncodedString());
   }
 
-  if (protocolVersion > Mqtt.ProtocolVersion.MQTT_V3_1_1) {
+  if (protocolVersion > Mqtt.ProtocolVersion.MqttV3_1_1) {
     if (properties) {
       return {
         type: 'unsubscribe',
