@@ -1,5 +1,5 @@
 import { BaseMqttClient } from './base_mqtt_client.ts';
-import type { ClientOptions } from './client_types.ts';
+import type * as ClientTypes from './client_types.ts';
 import * as MqttStream from '../mqtt_stream_utils/mod.ts';
 import { Deferred } from './promise.ts';
 import { ConnectionClosed, InvalidArgumentError, SendPacketError } from './error.ts';
@@ -46,7 +46,7 @@ export class WebSocketMqttClient extends BaseMqttClient {
    * `clientId` or `username` is longer than 65,535 bytes in UTF-8 or contains U+0000 or a lone surrogate, if `password` is
    * longer than 65,535 bytes or a string with a lone surrogate, or if the `outgoingStore` cannot be used with the `clientId`.
    */
-  constructor(options?: ClientOptions) {
+  constructor(options?: ClientTypes.ClientOptions) {
     if (!options?.url) {
       throw new InvalidArgumentError('url is required');
     }

@@ -1,4 +1,4 @@
-import { MemoryStore } from '../../../lib/mqtt_store/mod.ts';
+import { IncomingMemoryStore, MemoryStore } from '../../../lib/mqtt_store/mod.ts';
 import * as Mqtt from '../../../lib/mqtt/mod.ts';
 
 import { assertEquals, assertFalse } from '@std/assert';
@@ -269,6 +269,48 @@ Deno.test({ name: '@MemoryStore', only: false }, async (context) => {
 
       await store.discard(1);
       assertEquals(await store.count(), 0);
+    },
+  );
+
+  await context.step(
+    'the stored packets cannot be reached from outside',
+    async () => {
+      const store: MemoryStore = new MemoryStore();
+      await store.store({ type: 'pubrel', packetId: 1, reasonCode: Mqtt.ReasonCode.Success, properties: {} });
+
+      assertEquals(Object.keys(store), []);
+      // @ts-expect-error: the stored packets are private.
+      assertEquals(store.packets, undefined);
+      assertEquals(await store.count(), 1);
+    },
+  );
+});
+
+Deno.test({ name: '@IncomingMemoryStore', only: false }, async (context) => {
+  await context.step(
+    'store, has and discard',
+    async () => {
+      const store: IncomingMemoryStore = new IncomingMemoryStore();
+
+      await store.store(1);
+      assertEquals(await store.has(1), true);
+      assertFalse(await store.has(2));
+
+      await store.discard(1);
+      assertFalse(await store.has(1));
+    },
+  );
+
+  await context.step(
+    'the stored packet IDs cannot be reached from outside',
+    async () => {
+      const store: IncomingMemoryStore = new IncomingMemoryStore();
+      await store.store(1);
+
+      assertEquals(Object.keys(store), []);
+      // @ts-expect-error: the stored packet IDs are private.
+      assertEquals(store.packets, undefined);
+      assertEquals(await store.has(1), true);
     },
   );
 });

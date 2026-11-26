@@ -1,5 +1,5 @@
 import { BaseMqttClient } from './base_mqtt_client.ts';
-import type { ClientOptions } from './client_types.ts';
+import type * as ClientTypes from './client_types.ts';
 import { SendPacketError, UnexpectedUrlProtocol } from './error.ts';
 
 // The port to connect to when the URL has none.
@@ -68,7 +68,7 @@ export class MqttClient extends BaseMqttClient {
    * `clientId` or `username` is longer than 65,535 bytes in UTF-8 or contains U+0000 or a lone surrogate, if `password` is
    * longer than 65,535 bytes or a string with a lone surrogate, or if the `outgoingStore` cannot be used with the `clientId`.
    */
-  constructor(options?: ClientOptions) {
+  constructor(options?: ClientTypes.ClientOptions) {
     super(options);
   }
 

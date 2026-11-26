@@ -1028,7 +1028,7 @@ Deno.test({ name: '@resend from a store with packets of a previous process', onl
       class RestoredStore extends Store.MemoryStore {
         override async *resendIterator(): AsyncIterableIterator<MqttPackets.PublishPacketWithId | MqttPackets.PubrelPacket> {
           resendStarted.resolve();
-          for (const packet of [...this.packets.values()]) {
+          for (const packet of await Array.fromAsync(super.resendIterator())) {
             await new Promise((resolve) => setTimeout(resolve, 20));
             yield packet;
           }
