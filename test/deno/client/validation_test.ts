@@ -112,7 +112,7 @@ Deno.test('a lone surrogate is rejected: UTF-8 cannot encode it, and TextEncoder
     'properties.userProperties[0].val "v\\udfff" must not contain a lone surrogate',
   );
   assertThrows(() => validateProperties({ responseTopic: 'r\uD800' }, 'properties'), InvalidTopicNameError, 'properties.responseTopic');
-  assertThrows(() => validatePublish('a\uD800', 0, false, undefined, V3), InvalidTopicNameError, 'lone surrogate');
+  assertThrows(() => validatePublish('a\uD800', 'p', 0, false, undefined, V3), InvalidTopicNameError, 'lone surrogate');
   assertThrows(() => validateConnect({ will: { topic: 'w\uD800' } }, V3), InvalidTopicNameError, 'will.topic');
   assertThrows(() => validateDisconnect({ reasonString: 'bye\uD800' }, undefined, V5), InvalidPropertyError, 'properties.reasonString');
 });
@@ -183,24 +183,24 @@ Deno.test('validateProperties checks the Response Topic as a Topic Name', () => 
 });
 
 Deno.test('validatePublish checks the topic, the QoS, the DUP flag and the properties', () => {
-  validatePublish('a', 0, false, { responseTopic: 'r', messageExpiryInterval: 0 }, V5);
-  validatePublish('a', 1, true, undefined, V5);
-  validatePublish('a', 2, true, undefined, V5);
-  assertThrows(() => validatePublish('a/#', 0, false, undefined, V5), InvalidTopicNameError, 'topic "a/#"');
+  validatePublish('a', 'p', 0, false, { responseTopic: 'r', messageExpiryInterval: 0 }, V5);
+  validatePublish('a', 'p', 1, true, undefined, V5);
+  validatePublish('a', 'p', 2, true, undefined, V5);
+  assertThrows(() => validatePublish('a/#', 'p', 0, false, undefined, V5), InvalidTopicNameError, 'topic "a/#"');
   for (const qos of [3, -1, 1.5]) {
-    assertThrows(() => validatePublish('a', qos, false, undefined, V5), InvalidArgumentError, 'qos must be 0, 1 or 2');
+    assertThrows(() => validatePublish('a', 'p', qos, false, undefined, V5), InvalidArgumentError, 'qos must be 0, 1 or 2');
   }
   // [MQTT-3.3.1-2]
-  assertThrows(() => validatePublish('a', 0, true, undefined, V5), InvalidArgumentError, 'dup must be false for QoS 0');
-  assertThrows(() => validatePublish('a', 0, true, undefined, V3), InvalidArgumentError, 'dup must be false for QoS 0');
-  assertThrows(() => validatePublish('a', 0, false, { responseTopic: 'r/+' }, V5), InvalidTopicNameError, 'properties.responseTopic "r/+"');
-  assertThrows(() => validatePublish('a', 0, false, { messageExpiryInterval: -1 }, V5), InvalidPropertyError, 'properties.messageExpiryInterval');
+  assertThrows(() => validatePublish('a', 'p', 0, true, undefined, V5), InvalidArgumentError, 'dup must be false for QoS 0');
+  assertThrows(() => validatePublish('a', 'p', 0, true, undefined, V3), InvalidArgumentError, 'dup must be false for QoS 0');
+  assertThrows(() => validatePublish('a', 'p', 0, false, { responseTopic: 'r/+' }, V5), InvalidTopicNameError, 'properties.responseTopic "r/+"');
+  assertThrows(() => validatePublish('a', 'p', 0, false, { messageExpiryInterval: -1 }, V5), InvalidPropertyError, 'properties.messageExpiryInterval');
 });
 
 Deno.test('validatePublish does not check the properties in MQTT 3.1.1: they are not sent', () => {
-  validatePublish('a', 0, false, { responseTopic: 'r/+', messageExpiryInterval: -1 }, V3);
-  assertThrows(() => validatePublish('a/#', 0, false, undefined, V3), InvalidTopicNameError);
-  assertThrows(() => validatePublish('a', 3, false, undefined, V3), InvalidArgumentError);
+  validatePublish('a', 'p', 0, false, { responseTopic: 'r/+', messageExpiryInterval: -1 }, V3);
+  assertThrows(() => validatePublish('a/#', 'p', 0, false, undefined, V3), InvalidTopicNameError);
+  assertThrows(() => validatePublish('a', 'p', 3, false, undefined, V3), InvalidArgumentError);
 });
 
 Deno.test('validateSubscribe accepts valid subscriptions', () => {

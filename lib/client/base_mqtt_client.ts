@@ -560,13 +560,14 @@ export abstract class BaseMqttClient {
    * would close the connection.
    *
    * @param topic topic name
-   * @param payload payload. A string is encoded as UTF-8.
+   * @param payload payload. A Uint8Array is sent as it is; a string is encoded as UTF-8.
    * @param options {@link PublishOptions}: QoS, retain and DUP flags. QoS defaults to `Mqtt.QoS.AtMostOnce`.
    * @param properties MQTT 5.0 PUBLISH properties ({@link MqttProperties.UserPublishProperties}).
    * @returns the result of the publish flow ({@link PublishResult}). Its `result` is the reason code; 0x80 (128) or more is a failure.
    * @throws {StateIsNotOnlineError} if the client is not connected.
    * @throws {InvalidTopicNameError} if `topic` or the Response Topic is not a valid Topic Name. Nothing is sent.
-   * @throws {InvalidArgumentError} if the QoS is not 0, 1 or 2, or `dup` is true with QoS 0. Nothing is sent.
+   * @throws {InvalidArgumentError} if a string payload contains a lone surrogate, which UTF-8 cannot encode, the QoS is not
+   * 0, 1 or 2, or `dup` is true with QoS 0. Nothing is sent.
    * @throws {QoSNotSupportedError} if the QoS is higher than the Maximum QoS of the broker (CONNACK). Nothing is sent.
    * @throws {RetainNotSupportedError} if `retain` is true and the broker does not support retained messages. Nothing is sent.
    * @throws {InvalidPropertyError} if a property is invalid. Nothing is sent.
@@ -632,7 +633,7 @@ export abstract class BaseMqttClient {
     const qos = options?.qos ?? Mqtt.QoS.AtMostOnce;
     const retain = options?.retain ?? false;
     // Check the topic given by the caller: with a topic alias, the client itself sends an empty Topic Name.
-    validatePublish(topic, qos, dup, properties, this.protocolVersion);
+    validatePublish(topic, payload, qos, dup, properties, this.protocolVersion);
 
     // Copies, taken before the first await: the caller may change or reuse its objects as soon as publish() returns,
     // while the PUBLISH waits for its turn and, for QoS 1 and 2, is kept in the session to be resent after reconnecting.

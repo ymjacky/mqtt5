@@ -258,7 +258,7 @@ export function validateProperties(properties: object | undefined, name: string)
 }
 
 /**
- * Checks the topic, QoS, DUP flag and properties of publish(). `qos` and `dup` are the values that are sent.
+ * Checks the topic, payload, QoS, DUP flag and properties of publish(). `qos` and `dup` are the values that are sent.
  * The topic is the one given by the caller, before topic alias resolution.
  * @throws {InvalidTopicNameError}
  * @throws {InvalidArgumentError}
@@ -266,12 +266,21 @@ export function validateProperties(properties: object | undefined, name: string)
  */
 export function validatePublish(
   topic: string,
+  payload: string | Uint8Array,
   qos: number,
   dup: boolean,
   properties: MqttProperties.UserPublishProperties | undefined,
   protocolVersion: Mqtt.ProtocolVersion,
 ): void {
   validateTopicName(topic, 'topic');
+  if (typeof payload === 'string') {
+    // A Uint8Array is sent as it is: a payload may be any bytes. A string is encoded as UTF-8, which cannot encode a lone
+    // surrogate: TextEncoder would send U+FFFD in its place, so the subscribers would not get the string that was given.
+    const index = payload.search(loneSurrogate);
+    if (index !== -1) {
+      throw new InvalidArgumentError(`payload must not contain a lone surrogate, which UTF-8 cannot encode (found at index ${index})`);
+    }
+  }
   validateZeroToTwo(qos, 'qos');
   if (dup && qos === Mqtt.QoS.AtMostOnce) {
     // [MQTT-3.3.1-2]
