@@ -1,5 +1,5 @@
 import * as Mqtt from '../mqtt/mod.ts';
-import { ByteReader, concatBytes, numToQoS, numToTwoByteInteger, remainingLengthToBytes, stringToBytes, stringToUtfEncodedString } from '../mqtt_utils/mod.ts';
+import { ByteReader, concatBytes, numToQoS, numToTwoByteInteger, remainingLengthToBytes, stringToUtfEncodedString } from '../mqtt_utils/mod.ts';
 import * as MqttProperties from '../mqtt_properties/mod.ts';
 import { readProperties } from '../mqtt_properties/read_properties.ts';
 import type { PublishPacket } from './packet_types.ts';
@@ -27,11 +27,7 @@ export function toBytes(
 
   const variableHeader = concatBytes(variableHeaderChunks);
 
-  let payload = packet.payload;
-
-  if (typeof payload === 'string') {
-    payload = stringToBytes(payload);
-  }
+  const payload = packet.payload;
 
   const fixedHeader = [
     (Mqtt.PacketType.Publish << 4) + flags,

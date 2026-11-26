@@ -595,7 +595,7 @@ Deno.test('decodeConnectPacketWithUsernameAndPassword', function () {
       protocolName: 'MQTT',
       protocolVersion: 4,
       username: 'user',
-      password: 'pass',
+      password: new TextEncoder().encode('pass'),
       will: undefined,
       clean: true,
       keepAlive: 0,
@@ -723,7 +723,7 @@ Deno.test('decodeConnectPacketMQTTv5WithUsernameAndPassword', function () {
       protocolName: 'MQTT',
       protocolVersion: Mqtt.ProtocolVersion.MqttV5,
       username: 'user',
-      password: 'pass',
+      password: new TextEncoder().encode('pass'),
       will: undefined,
       clean: true,
       keepAlive: 0,
@@ -954,7 +954,7 @@ Deno.test('decodeConnectPacketWithEmptyUsernameAndPassword', function () {
       protocolName: 'MQTT',
       protocolVersion: 4,
       username: '',
-      password: '',
+      password: new Uint8Array(0),
       will: undefined,
       clean: true,
       keepAlive: 0,
@@ -989,7 +989,7 @@ function connectWithUsernameAndPassword(username: number[], password: number[]):
 }
 
 // The Password is Binary Data, not a UTF-8 Encoded String (MQTT 5.0 3.1.3.6, MQTT 3.1.1 3.1.3.5): it may hold any bytes,
-// so a CONNECT with a Password that is not UTF-8 or contains 0x00 is decoded. A leading 0xEF 0xBB 0xBF is kept.
+// so a CONNECT with a Password that is not UTF-8 or contains 0x00 is decoded, to the bytes that were sent.
 Deno.test('decodeConnectPacketWithAPasswordThatIsNotUtf8', function () {
   const bytes = connectWithUsernameAndPassword([0x75], [0xEF, 0xBB, 0xBF, 0xFF, 0x00]);
   assertEquals<ConnectPacket>(parse(bytes, bytes.length), {
@@ -998,7 +998,7 @@ Deno.test('decodeConnectPacketWithAPasswordThatIsNotUtf8', function () {
     protocolName: 'MQTT',
     protocolVersion: 4,
     username: 'u',
-    password: '\u{FEFF}\u{FFFD}\u0000',
+    password: new Uint8Array([0xEF, 0xBB, 0xBF, 0xFF, 0x00]),
     will: undefined,
     clean: true,
     keepAlive: 0,

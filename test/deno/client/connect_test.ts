@@ -74,7 +74,7 @@ Deno.test({ name: '@connect', only: false }, async (context) => {
           assertEquals(packet.clientId, 'cid');
           assertEquals(packet.clean, false);
           assertEquals(packet.username, 'myname');
-          assertEquals(packet.password, 'mypass');
+          assertEquals(packet.password, new TextEncoder().encode('mypass'));
           assertEquals(packet.protocolVersion, Mqtt.ProtocolVersion.MqttV3_1_1);
           assertEquals(packet.keepAlive, 20);
           assertEquals(packet.properties, undefined);
@@ -161,7 +161,7 @@ Deno.test({ name: '@connect', only: false }, async (context) => {
           assertEquals(packet.clientId, 'cid');
           assertEquals(packet.clean, false);
           assertEquals(packet.username, 'myname');
-          assertEquals(packet.password, 'mypass');
+          assertEquals(packet.password, new TextEncoder().encode('mypass'));
           assertEquals(packet.protocolVersion, Mqtt.ProtocolVersion.MqttV5);
           assertEquals(packet.keepAlive, 20);
           assertEquals(packet.properties, undefined);

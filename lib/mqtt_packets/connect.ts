@@ -1,4 +1,4 @@
-import { ByteReader, concatBytes, numToQoS, numToTwoByteInteger, remainingLengthToBytes, stringToUtfEncodedString } from '../mqtt_utils/mod.ts';
+import { ByteReader, concatBytes, numToQoS, numToTwoByteInteger, remainingLengthToBytes, stringToUtfEncodedString, toBinaryData } from '../mqtt_utils/mod.ts';
 import * as Mqtt from '../mqtt/mod.ts';
 import * as MqttProperties from '../mqtt_properties/mod.ts';
 import { readProperties } from '../mqtt_properties/read_properties.ts';
@@ -65,7 +65,8 @@ export function toBytes(packet: ConnectPacket): Uint8Array {
   }
 
   if (typeof packet.password !== 'undefined') {
-    payloadChunks.push(stringToUtfEncodedString(packet.password));
+    // The Password is Binary Data, not a UTF-8 Encoded String: it may contain U+0000.
+    payloadChunks.push(toBinaryData(packet.password));
   }
 
   const payload = concatBytes(payloadChunks);
@@ -121,8 +122,9 @@ export function parse(
   }
 
   const username = usernameFlag ? reader.readUtf8EncodedString() : undefined;
-  // The Password is Binary Data, not a UTF-8 Encoded String (MQTT 5.0 3.1.3.6, MQTT 3.1.1 3.1.3.5).
-  const password = passwordFlag ? reader.readBinaryDataAsString() : undefined;
+  // The Password is Binary Data, not a UTF-8 Encoded String (MQTT 5.0 3.1.3.6, MQTT 3.1.1 3.1.3.5): it is read as the bytes
+  // that were sent, which may not be UTF-8.
+  const password = passwordFlag ? reader.readBinaryData() : undefined;
   reader.expectEnd('CONNECT');
 
   if (mqtt5) {

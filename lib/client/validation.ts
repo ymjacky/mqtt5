@@ -3,7 +3,9 @@
  * done before anything is sent.
  * Only the values that are used are checked: MQTT 3.1.1 packets have no properties and no Retain Handling,
  * and MQTT 3.1.1 has no topic aliases, so they are not checked there.
- * The packet encoders do not check them: they encode what they are given.
+ * The packet encoders check only the rules of the data types, for every packet (e.g. a UTF-8 Encoded String must not
+ * contain U+0000 or a lone surrogate) and fail with MqttPacketSerializeError, which does not tell which value is wrong.
+ * These checks come first and name it.
  * @module
  */
 
@@ -38,17 +40,11 @@ function utf8Length(str: string): number {
 }
 
 /**
- * Matches a lone surrogate: a code unit from U+D800 to U+DFFF that is not part of a surrogate pair. With the `u` flag, a pair
- * is one code point, so it does not match. (`String.prototype.isWellFormed()` does the same, but needs newer browsers.)
- */
-const loneSurrogate = /[\uD800-\uDFFF]/u;
-
-/**
  * Whether the string has a lone surrogate. UTF-8 cannot encode it [MQTT-1.5.4-1]: TextEncoder would send U+FFFD in its place,
  * so the string that is sent would not be the one that was given.
  */
 function hasLoneSurrogate(str: string): boolean {
-  return loneSurrogate.test(str);
+  return MqttUtils.indexOfLoneSurrogate(str) !== -1;
 }
 
 /** Whether the packets of the protocol version have properties and the other MQTT 5.0 fields. */
@@ -276,7 +272,7 @@ export function validatePublish(
   if (typeof payload === 'string') {
     // A Uint8Array is sent as it is: a payload may be any bytes. A string is encoded as UTF-8, which cannot encode a lone
     // surrogate: TextEncoder would send U+FFFD in its place, so the subscribers would not get the string that was given.
-    const index = payload.search(loneSurrogate);
+    const index = MqttUtils.indexOfLoneSurrogate(payload);
     if (index !== -1) {
       throw new InvalidArgumentError(`payload must not contain a lone surrogate, which UTF-8 cannot encode (found at index ${index})`);
     }

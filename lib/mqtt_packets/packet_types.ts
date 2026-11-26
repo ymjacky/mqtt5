@@ -8,7 +8,11 @@ export type ConnectPacket = {
   protocolVersion: Mqtt.ProtocolVersion;
   protocolName?: string;
   username?: string;
-  password?: string;
+  /**
+   * The Password, which is Binary Data. A string is sent as its UTF-8 bytes. A decoded CONNECT always has a Uint8Array: the
+   * bytes may not be UTF-8.
+   */
+  password?: string | Uint8Array;
   clean?: boolean;
   keepAlive?: number;
   properties?: MqttProperties.ConnectProperties;
