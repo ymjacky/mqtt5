@@ -16,12 +16,27 @@ export class RemainingLengthError extends MqttClientError {
   }
 }
 
-/** A received UTF-8 Encoded String is ill-formed UTF-8 or contains U+0000: the packet is a Malformed Packet. */
+/**
+ * A UTF-8 Encoded String breaks the rules of MQTT. A received one is ill-formed UTF-8 or contains U+0000: the packet is a
+ * Malformed Packet. One to send contains U+0000 or is longer than 65,535 bytes in UTF-8: the packet cannot be encoded.
+ */
 export class InvalidUtf8EncodedStringError extends MqttClientError {
   /** The name of the error class. */
   override readonly name = 'InvalidUtf8EncodedStringError' as const;
   constructor(message: string, options?: ErrorOptions) {
     super(`invalid UTF-8 Encoded String: ${message}`, options);
+  }
+}
+
+/**
+ * A string to send has a lone surrogate, which UTF-8 cannot encode: TextEncoder would put U+FFFD in its place, so the packet
+ * would not carry the string that was given. The packet cannot be encoded.
+ */
+export class UnencodableStringError extends MqttClientError {
+  /** The name of the error class. */
+  override readonly name = 'UnencodableStringError' as const;
+  constructor(message: string, options?: ErrorOptions) {
+    super(`cannot encode the string as UTF-8: ${message}`, options);
   }
 }
 

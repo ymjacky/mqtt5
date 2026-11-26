@@ -42,6 +42,7 @@ const internalErrors: Record<string, ErrorFactory> = {
   NumIsOutOfRange: (options) => new MqttUtilsError.NumIsOutOfRange(options),
   RemainingLengthError: (options) => new MqttUtilsError.RemainingLengthError('m', options),
   InvalidUtf8EncodedStringError: (options) => new MqttUtilsError.InvalidUtf8EncodedStringError('m', options),
+  UnencodableStringError: (options) => new MqttUtilsError.UnencodableStringError('m', options),
   MalformedDataError: (options) => new MqttUtilsError.MalformedDataError('m', options),
   ProtocolViolationError: (options) => new MqttUtilsError.ProtocolViolationError('m', options),
   InvalidQoSError: (options) => new InvalidQoSError(3, options),

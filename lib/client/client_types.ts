@@ -21,6 +21,8 @@ export type ClientOptions = {
   url?: URL;
   /**
    * Client identifier. With an empty ID, an MQTT 5.0 broker assigns one.
+   * It is a UTF-8 Encoded String: at most 65,535 bytes in UTF-8, without U+0000 or a lone surrogate. Another value makes the
+   * constructor throw `InvalidArgumentError`.
    * @default {''}
    */
   clientId?: string;
@@ -36,10 +38,17 @@ export type ClientOptions = {
    * @default {10}
    */
   keepAlive?: number;
-  /** User name sent in CONNECT. */
+  /**
+   * User name sent in CONNECT. It is a UTF-8 Encoded String: at most 65,535 bytes in UTF-8, without U+0000 or a lone
+   * surrogate. Another value makes the constructor throw `InvalidArgumentError`.
+   */
   username?: string;
-  /** Password sent in CONNECT. */
-  password?: string;
+  /**
+   * Password sent in CONNECT. It is Binary Data of at most 65,535 bytes: a Uint8Array is sent as it is, and a string as its
+   * UTF-8 bytes (U+0000 is allowed, a lone surrogate is not). Another value makes the constructor throw `InvalidArgumentError`.
+   * The client keeps a copy of a Uint8Array, which it sends on every connection.
+   */
+  password?: string | Uint8Array;
   /**
    * Time to wait for CONNACK, in milliseconds. A value that is not positive uses the default.
    * @default {10000}

@@ -69,7 +69,9 @@ export type AnyPacket =
  * @param packet the packet to encode.
  * @param protocolVersion the protocol version to encode the packet for.
  * @returns the encoded bytes.
- * @throws {MqttPacketsError.MqttPacketSerializeError} if the packet cannot be encoded.
+ * @throws {MqttPacketsError.MqttPacketSerializeError} if the packet cannot be encoded, e.g. a UTF-8 Encoded String (a topic,
+ * the Client Identifier, a string property, ...) contains U+0000 or a lone surrogate or is longer than 65,535 bytes in UTF-8,
+ * a string Password has a lone surrogate, or a value does not fit its field. Its `cause` tells why.
  */
 export function packetToBytes(
   packet: AnyPacket,

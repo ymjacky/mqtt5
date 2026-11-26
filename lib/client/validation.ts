@@ -3,7 +3,9 @@
  * done before anything is sent.
  * Only the values that are used are checked: MQTT 3.1.1 packets have no properties and no Retain Handling,
  * and MQTT 3.1.1 has no topic aliases, so they are not checked there.
- * The packet encoders do not check them: they encode what they are given.
+ * The packet encoders check only the rules of the data types, for every packet (e.g. a UTF-8 Encoded String must not
+ * contain U+0000 or a lone surrogate) and fail with MqttPacketSerializeError, which does not tell which value is wrong.
+ * These checks come first and name it.
  * @module
  */
 
@@ -38,17 +40,24 @@ function utf8Length(str: string): number {
 }
 
 /**
- * Matches a lone surrogate: a code unit from U+D800 to U+DFFF that is not part of a surrogate pair. With the `u` flag, a pair
- * is one code point, so it does not match. (`String.prototype.isWellFormed()` does the same, but needs newer browsers.)
- */
-const loneSurrogate = /[\uD800-\uDFFF]/u;
-
-/**
  * Whether the string has a lone surrogate. UTF-8 cannot encode it [MQTT-1.5.4-1]: TextEncoder would send U+FFFD in its place,
  * so the string that is sent would not be the one that was given.
  */
 function hasLoneSurrogate(str: string): boolean {
-  return loneSurrogate.test(str);
+  return MqttUtils.indexOfLoneSurrogate(str) !== -1;
+}
+
+/**
+ * Checks that a string has no lone surrogate (see {@link hasLoneSurrogate}). The message tells where it is, but not the
+ * string, which may be long or a credential.
+ * @param name what the value is, used in the error message, e.g. `payload`.
+ * @throws {InvalidArgumentError}
+ */
+function validateNoLoneSurrogate(str: string, name: string): void {
+  const index = MqttUtils.indexOfLoneSurrogate(str);
+  if (index !== -1) {
+    throw new InvalidArgumentError(`${name} must not contain a lone surrogate, which UTF-8 cannot encode (found at index ${index})`);
+  }
 }
 
 /** Whether the packets of the protocol version have properties and the other MQTT 5.0 fields. */
@@ -258,7 +267,7 @@ export function validateProperties(properties: object | undefined, name: string)
 }
 
 /**
- * Checks the topic, QoS, DUP flag and properties of publish(). `qos` and `dup` are the values that are sent.
+ * Checks the topic, payload, QoS, DUP flag and properties of publish(). `qos` and `dup` are the values that are sent.
  * The topic is the one given by the caller, before topic alias resolution.
  * @throws {InvalidTopicNameError}
  * @throws {InvalidArgumentError}
@@ -266,12 +275,18 @@ export function validateProperties(properties: object | undefined, name: string)
  */
 export function validatePublish(
   topic: string,
+  payload: string | Uint8Array,
   qos: number,
   dup: boolean,
   properties: MqttProperties.UserPublishProperties | undefined,
   protocolVersion: Mqtt.ProtocolVersion,
 ): void {
   validateTopicName(topic, 'topic');
+  if (typeof payload === 'string') {
+    // A Uint8Array is sent as it is: a payload may be any bytes. A string is encoded as UTF-8, which cannot encode a lone
+    // surrogate: TextEncoder would send U+FFFD in its place, so the subscribers would not get the string that was given.
+    validateNoLoneSurrogate(payload, 'payload');
+  }
   validateZeroToTwo(qos, 'qos');
   if (dup && qos === Mqtt.QoS.AtMostOnce) {
     // [MQTT-3.3.1-2]
@@ -417,10 +432,58 @@ export function validateUnsubscribe(
 }
 
 /**
- * Checks the options of the client constructor that are Two Byte Integers in MQTT: `keepAlive` (the Keep Alive of CONNECT),
- * and, in MQTT 5.0, `topicAliasMaximumAboutReceive` (the Topic Alias Maximum of CONNECT) and `topicAliasMaximumAboutSend`
- * (the largest Topic Alias to send). They must be integers from 0 to 65,535, the values a Two Byte Integer can hold:
- * another value would not reach the broker as it is (e.g. a Keep Alive of 70,000 would be sent as 4,464).
+ * Checks an option of the client constructor that is a UTF-8 Encoded String in CONNECT: at most 65,535 bytes in UTF-8, no
+ * U+0000 and no lone surrogate ([MQTT-1.5.4-1], [MQTT-1.5.4-2]). The message does not tell the value, which may be a
+ * credential.
+ * @param name the name of the option, used in the error message, e.g. `clientId`.
+ * @throws {InvalidArgumentError}
+ */
+function validateUtf8EncodedStringOption(value: unknown, name: string): void {
+  if (typeof value !== 'string') {
+    throw new InvalidArgumentError(`${name} must be a string`);
+  }
+  const length = utf8Length(value);
+  if (length > maxDataLength) {
+    throw new InvalidArgumentError(`${name} must be at most ${maxDataLength} bytes long in UTF-8 (got ${length})`);
+  }
+  if (value.includes('\u0000')) {
+    throw new InvalidArgumentError(`${name} must not contain U+0000`);
+  }
+  validateNoLoneSurrogate(value, name);
+}
+
+/**
+ * Checks the `password` option, which is Binary Data in CONNECT: at most 65,535 bytes. A string is sent as its UTF-8 bytes,
+ * so U+0000 is allowed, but a lone surrogate is not. The message does not tell the value.
+ * @throws {InvalidArgumentError}
+ */
+function validatePasswordOption(value: unknown): void {
+  if (typeof value === 'string') {
+    const length = utf8Length(value);
+    if (length > maxDataLength) {
+      throw new InvalidArgumentError(`password must be at most ${maxDataLength} bytes long in UTF-8 (got ${length})`);
+    }
+    validateNoLoneSurrogate(value, 'password');
+    return;
+  }
+  if (!(value instanceof Uint8Array)) {
+    throw new InvalidArgumentError('password must be a string or a Uint8Array');
+  }
+  if (value.length > maxDataLength) {
+    throw new InvalidArgumentError(`password must be at most ${maxDataLength} bytes long (got ${value.length})`);
+  }
+}
+
+/**
+ * Checks the options of the client constructor that MQTT limits:
+ * - The Two Byte Integers: `keepAlive` (the Keep Alive of CONNECT), and, in MQTT 5.0, `topicAliasMaximumAboutReceive` (the
+ *   Topic Alias Maximum of CONNECT) and `topicAliasMaximumAboutSend` (the largest Topic Alias to send). They must be integers
+ *   from 0 to 65,535, the values a Two Byte Integer can hold: another value would not reach the broker as it is (e.g. a
+ *   Keep Alive of 70,000 would be sent as 4,464).
+ * - The UTF-8 Encoded Strings of CONNECT: `clientId` and `username` (see {@link validateUtf8EncodedStringOption}).
+ * - The Binary Data of CONNECT: `password` (see {@link validatePasswordOption}).
+ *
+ * The encoder of CONNECT would reject the same strings, but only in connect(), and without telling which value is wrong.
  * @throws {InvalidArgumentError}
  */
 export function validateClientOptions(options: ClientOptions | undefined, protocolVersion: Mqtt.ProtocolVersion): void {
@@ -430,6 +493,15 @@ export function validateClientOptions(options: ClientOptions | undefined, protoc
     if (typeof value !== 'undefined' && !isIntegerIn(value, 0, maxTwoByteInteger)) {
       throw new InvalidArgumentError(`${name} must be an integer from 0 to ${maxTwoByteInteger} (got ${value})`);
     }
+  }
+  if (typeof options?.clientId !== 'undefined') {
+    validateUtf8EncodedStringOption(options.clientId, 'clientId');
+  }
+  if (typeof options?.username !== 'undefined') {
+    validateUtf8EncodedStringOption(options.username, 'username');
+  }
+  if (typeof options?.password !== 'undefined') {
+    validatePasswordOption(options.password);
   }
 }
 

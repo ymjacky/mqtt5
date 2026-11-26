@@ -3,7 +3,7 @@ import { byteAt, requireBytes } from './bounds.ts';
 import { twoByteIntegerToNum } from './two_byte_integer.ts';
 import { fourByteIntegerToNum } from './four_byte_integer.ts';
 import { variableByteIntegerToNum } from './variable_byte_integer.ts';
-import { binaryDataToString, utfEncodedStringToString } from './utf8_encoded_string.ts';
+import { utfEncodedStringToString } from './utf8_encoded_string.ts';
 
 /**
  * Reads the fields of a received packet in order, with the data types of MQTT (MQTT 5.0 1.5), and remembers where it is.
@@ -83,13 +83,6 @@ export class ByteReader {
    */
   readUtf8EncodedString(): string {
     const { length, value } = utfEncodedStringToString(this.#bytes, this.#pos);
-    this.#pos += length;
-    return value;
-  }
-
-  /** Reads Binary Data as a string, for the Password, which this library handles as a string. The bytes are not checked. */
-  readBinaryDataAsString(): string {
-    const { length, value } = binaryDataToString(this.#bytes, this.#pos);
     this.#pos += length;
     return value;
   }

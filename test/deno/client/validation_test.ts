@@ -1,4 +1,4 @@
-import { assertThrows } from '@std/assert';
+import { assert, assertThrows } from '@std/assert';
 import { Mqtt } from '../../../deno/mod.ts';
 import { InvalidArgumentError, InvalidPropertyError, InvalidTopicFilterError, InvalidTopicNameError } from '../../../lib/client/error.ts';
 import {
@@ -112,7 +112,7 @@ Deno.test('a lone surrogate is rejected: UTF-8 cannot encode it, and TextEncoder
     'properties.userProperties[0].val "v\\udfff" must not contain a lone surrogate',
   );
   assertThrows(() => validateProperties({ responseTopic: 'r\uD800' }, 'properties'), InvalidTopicNameError, 'properties.responseTopic');
-  assertThrows(() => validatePublish('a\uD800', 0, false, undefined, V3), InvalidTopicNameError, 'lone surrogate');
+  assertThrows(() => validatePublish('a\uD800', 'p', 0, false, undefined, V3), InvalidTopicNameError, 'lone surrogate');
   assertThrows(() => validateConnect({ will: { topic: 'w\uD800' } }, V3), InvalidTopicNameError, 'will.topic');
   assertThrows(() => validateDisconnect({ reasonString: 'bye\uD800' }, undefined, V5), InvalidPropertyError, 'properties.reasonString');
 });
@@ -183,24 +183,48 @@ Deno.test('validateProperties checks the Response Topic as a Topic Name', () => 
 });
 
 Deno.test('validatePublish checks the topic, the QoS, the DUP flag and the properties', () => {
-  validatePublish('a', 0, false, { responseTopic: 'r', messageExpiryInterval: 0 }, V5);
-  validatePublish('a', 1, true, undefined, V5);
-  validatePublish('a', 2, true, undefined, V5);
-  assertThrows(() => validatePublish('a/#', 0, false, undefined, V5), InvalidTopicNameError, 'topic "a/#"');
+  validatePublish('a', 'p', 0, false, { responseTopic: 'r', messageExpiryInterval: 0 }, V5);
+  validatePublish('a', 'p', 1, true, undefined, V5);
+  validatePublish('a', 'p', 2, true, undefined, V5);
+  assertThrows(() => validatePublish('a/#', 'p', 0, false, undefined, V5), InvalidTopicNameError, 'topic "a/#"');
   for (const qos of [3, -1, 1.5]) {
-    assertThrows(() => validatePublish('a', qos, false, undefined, V5), InvalidArgumentError, 'qos must be 0, 1 or 2');
+    assertThrows(() => validatePublish('a', 'p', qos, false, undefined, V5), InvalidArgumentError, 'qos must be 0, 1 or 2');
   }
   // [MQTT-3.3.1-2]
-  assertThrows(() => validatePublish('a', 0, true, undefined, V5), InvalidArgumentError, 'dup must be false for QoS 0');
-  assertThrows(() => validatePublish('a', 0, true, undefined, V3), InvalidArgumentError, 'dup must be false for QoS 0');
-  assertThrows(() => validatePublish('a', 0, false, { responseTopic: 'r/+' }, V5), InvalidTopicNameError, 'properties.responseTopic "r/+"');
-  assertThrows(() => validatePublish('a', 0, false, { messageExpiryInterval: -1 }, V5), InvalidPropertyError, 'properties.messageExpiryInterval');
+  assertThrows(() => validatePublish('a', 'p', 0, true, undefined, V5), InvalidArgumentError, 'dup must be false for QoS 0');
+  assertThrows(() => validatePublish('a', 'p', 0, true, undefined, V3), InvalidArgumentError, 'dup must be false for QoS 0');
+  assertThrows(() => validatePublish('a', 'p', 0, false, { responseTopic: 'r/+' }, V5), InvalidTopicNameError, 'properties.responseTopic "r/+"');
+  assertThrows(() => validatePublish('a', 'p', 0, false, { messageExpiryInterval: -1 }, V5), InvalidPropertyError, 'properties.messageExpiryInterval');
+});
+
+Deno.test('validatePublish rejects a string payload with a lone surrogate, which UTF-8 cannot encode', () => {
+  const cases: [string, number][] = [['a\uD800', 1], ['\uDC00a', 0], ['a\uDE00\uD83Db', 1], ['\u{1F600}\uDBFF', 2]];
+  for (const [payload, index] of cases) {
+    for (const protocolVersion of [V5, V3]) {
+      assertThrows(
+        () => validatePublish('a', payload, 0, false, undefined, protocolVersion),
+        InvalidArgumentError,
+        `payload must not contain a lone surrogate, which UTF-8 cannot encode (found at index ${index})`,
+        JSON.stringify(payload),
+      );
+    }
+  }
+});
+
+Deno.test('validatePublish accepts any other string payload, and does not check a Uint8Array payload', () => {
+  // A payload is not a UTF-8 Encoded String: U+0000 is allowed, and U+FEFF is sent as it is.
+  for (const payload of ['', 'a\u0000b', '\u{FEFF}abc', '\u{1F600}', 'あ', '\u{FFFD}']) {
+    validatePublish('a', payload, 0, false, undefined, V5);
+    validatePublish('a', payload, 0, false, undefined, V3);
+  }
+  // A Uint8Array may be any bytes, also the encoding of a surrogate, which is not UTF-8.
+  validatePublish('a', new Uint8Array([0xED, 0xA0, 0x80, 0xFF, 0x00]), 0, false, undefined, V5);
 });
 
 Deno.test('validatePublish does not check the properties in MQTT 3.1.1: they are not sent', () => {
-  validatePublish('a', 0, false, { responseTopic: 'r/+', messageExpiryInterval: -1 }, V3);
-  assertThrows(() => validatePublish('a/#', 0, false, undefined, V3), InvalidTopicNameError);
-  assertThrows(() => validatePublish('a', 3, false, undefined, V3), InvalidArgumentError);
+  validatePublish('a', 'p', 0, false, { responseTopic: 'r/+', messageExpiryInterval: -1 }, V3);
+  assertThrows(() => validatePublish('a/#', 'p', 0, false, undefined, V3), InvalidTopicNameError);
+  assertThrows(() => validatePublish('a', 'p', 3, false, undefined, V3), InvalidArgumentError);
 });
 
 Deno.test('validateSubscribe accepts valid subscriptions', () => {
@@ -353,4 +377,77 @@ Deno.test('validateClientOptions rejects topic alias maximums that are not integ
 
 Deno.test('validateClientOptions does not check the topic alias maximums in MQTT 3.1.1: they are not used', () => {
   validateClientOptions({ topicAliasMaximumAboutSend: -1, topicAliasMaximumAboutReceive: 70_000 }, V3);
+});
+
+Deno.test('validateClientOptions accepts a clientId and a username that are valid UTF-8 Encoded Strings', () => {
+  // 'あ' x 21,845 is 65,535 bytes in UTF-8, the most.
+  for (const value of ['', 'cid', '\u{FEFF}', '\u{1F600}', 'あ'.repeat(21_845)]) {
+    for (const protocolVersion of [V5, V3]) {
+      validateClientOptions({ clientId: value, username: value }, protocolVersion);
+    }
+  }
+});
+
+Deno.test('validateClientOptions rejects a clientId or a username that CONNECT cannot carry', () => {
+  const cases: [unknown, string][] = [
+    ['a\u0000', 'must not contain U+0000'],
+    ['\u0000', 'must not contain U+0000'],
+    ['a\uD800', 'must not contain a lone surrogate, which UTF-8 cannot encode (found at index 1)'],
+    ['\uDC00', 'must not contain a lone surrogate, which UTF-8 cannot encode (found at index 0)'],
+    ['a'.repeat(65_536), 'must be at most 65535 bytes long in UTF-8 (got 65536)'],
+    ['あ'.repeat(21_846), 'must be at most 65535 bytes long in UTF-8 (got 65538)'],
+    [1, 'must be a string'],
+  ];
+  for (const [value, message] of cases) {
+    for (const name of ['clientId', 'username'] as const) {
+      for (const protocolVersion of [V5, V3]) {
+        assertThrows(
+          () => validateClientOptions({ [name]: value as string }, protocolVersion),
+          InvalidArgumentError,
+          `${name} ${message}`,
+          `${name}: ${JSON.stringify(value)?.slice(0, 20)}`,
+        );
+      }
+    }
+  }
+});
+
+Deno.test('validateClientOptions accepts a password that is valid Binary Data: a string may contain U+0000', () => {
+  const values: (string | Uint8Array)[] = [
+    '',
+    'pass',
+    'p\u0000w',
+    '\u{FEFF}\u{1F600}',
+    'a'.repeat(65_535),
+    new Uint8Array(0),
+    new Uint8Array([0xFF, 0x00, 0xED, 0xA0, 0x80]),
+    new Uint8Array(65_535),
+  ];
+  for (const password of values) {
+    validateClientOptions({ password }, V5);
+    validateClientOptions({ password }, V3);
+  }
+});
+
+Deno.test('validateClientOptions rejects a password that CONNECT cannot carry', () => {
+  const cases: [unknown, string][] = [
+    ['p\uD800', 'password must not contain a lone surrogate, which UTF-8 cannot encode (found at index 1)'],
+    ['\uDC00', 'password must not contain a lone surrogate, which UTF-8 cannot encode (found at index 0)'],
+    ['a'.repeat(65_536), 'password must be at most 65535 bytes long in UTF-8 (got 65536)'],
+    [new Uint8Array(65_536), 'password must be at most 65535 bytes long (got 65536)'],
+    [1234, 'password must be a string or a Uint8Array'],
+    [[0x70], 'password must be a string or a Uint8Array'],
+  ];
+  for (const [value, message] of cases) {
+    for (const protocolVersion of [V5, V3]) {
+      assertThrows(() => validateClientOptions({ password: value as string }, protocolVersion), InvalidArgumentError, message, message);
+    }
+  }
+});
+
+Deno.test('validateClientOptions does not put the clientId, the username or the password in the message', () => {
+  for (const options of [{ clientId: 'secret\u0000' }, { username: 'secret\uD800' }, { password: 'secret\uD800' }]) {
+    const error = assertThrows(() => validateClientOptions(options, V5), InvalidArgumentError);
+    assert(!error.message.includes('secret'), error.message);
+  }
 });

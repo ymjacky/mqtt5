@@ -1323,6 +1323,96 @@ Deno.test({ name: '@publish invalid topic', only: false }, async (context) => {
   );
 }); // @publish invalid topic
 
+Deno.test({ name: '@publish string payload', only: false }, async (context) => {
+  await context.step(
+    'rejects a string payload with a lone surrogate instead of sending U+FFFD, and sends nothing',
+    async () => {
+      const broker = new TestBroker();
+      try {
+        broker.listen();
+        broker.on('connect', (event) => {
+          const packet = event.detail;
+          broker.sendConnack(packet.clientId, false, packet.protocolVersion);
+        });
+
+        const client = new MqttClient({ clientId: 'cid', logger: logger });
+        await client.connect();
+
+        const { promise, resolve } = Promise.withResolvers<void>();
+        const receivedTopics: string[] = [];
+        broker.on('publish', (event) => {
+          receivedTopics.push(event.detail.topic);
+          resolve();
+        });
+
+        for (const qos of [Mqtt.QoS.AtMostOnce, Mqtt.QoS.AtLeastOnce, Mqtt.QoS.ExactlyOnce]) {
+          await assertRejects(
+            () => client.publish('rejected', 'ab\uD800c', { qos }),
+            ClientErrors.InvalidArgumentError,
+            'payload must not contain a lone surrogate, which UTF-8 cannot encode (found at index 2)',
+          );
+          await assertRejects(() => client.publish('rejected', '\uDC00', { qos }), ClientErrors.InvalidArgumentError, 'found at index 0');
+        }
+
+        // Nothing was sent: the next valid publish is the first PUBLISH the broker receives.
+        await client.publish('topicA', 'x');
+        await promise;
+        assertEquals(receivedTopics, ['topicA']);
+        // The rejected QoS 1 / QoS 2 publishes did not acquire a packet ID or enter the session.
+        assertEquals(await client.publishInflightCount(), 0);
+      } catch (err) {
+        fail(`error occured: ${err}`);
+      } finally {
+        await broker.destroy();
+      }
+    },
+  );
+
+  await context.step(
+    'sends a string payload as its UTF-8 bytes, U+0000 and U+FEFF included, and a Uint8Array payload as it is',
+    async () => {
+      const broker = new TestBroker();
+      try {
+        broker.listen();
+        broker.on('connect', (event) => {
+          const packet = event.detail;
+          broker.sendConnack(packet.clientId, false, packet.protocolVersion);
+        });
+
+        const client = new MqttClient({ clientId: 'cid', logger: logger });
+        await client.connect();
+
+        const payloads: (string | Uint8Array)[] = [
+          'a\u0000b',
+          '\u{FEFF}abc',
+          'x\u{1F600}y',
+          '\u{FFFD}',
+          // Bytes that are not UTF-8, e.g. the encoding of a surrogate.
+          new Uint8Array([0xED, 0xA0, 0x80, 0xFF, 0x00]),
+        ];
+        const received: Uint8Array[] = [];
+        const { promise, resolve } = Promise.withResolvers<void>();
+        broker.on('publish', (event) => {
+          received.push(event.detail.payload);
+          if (received.length === payloads.length) {
+            resolve();
+          }
+        });
+
+        for (const payload of payloads) {
+          await client.publish('topicA', payload);
+        }
+        await promise;
+        assertEquals(received, payloads.map((payload) => typeof payload === 'string' ? new TextEncoder().encode(payload) : payload));
+      } catch (err) {
+        fail(`error occured: ${err}`);
+      } finally {
+        await broker.destroy();
+      }
+    },
+  );
+}); // @publish string payload
+
 Deno.test({ name: '@publish too large', only: false }, async (context) => {
   await context.step(
     'QoS 1: a packet larger than MQTT allows is not kept in the session, and its packet ID is released',

@@ -29,7 +29,7 @@ Deno.test('ByteReader reads the fields in order and moves past each of them', ()
     0x00,
     0x02,
     0xFF,
-    0x00, // Binary Data as a string
+    0x00, // Binary Data that is not UTF-8
     0x00,
     0x01,
     0x09, // Binary Data
@@ -42,8 +42,8 @@ Deno.test('ByteReader reads the fields in order and moves past each of them', ()
   assertEquals(r.readFourByteInteger(), 300);
   assertEquals(r.readVariableByteInteger(), 128);
   assertEquals(r.readUtf8EncodedString(), 'a/b');
-  // Binary Data is not checked as UTF-8.
-  assertEquals(r.readBinaryDataAsString(), '\u{FFFD}\u0000');
+  // Binary Data is not checked as UTF-8: the bytes are read as they are.
+  assertEquals(r.readBinaryData(), new Uint8Array([0xFF, 0x00]));
   assertEquals(r.readBinaryData(), new Uint8Array([0x09]));
   assertEquals(r.remaining, 2);
   assertEquals(r.readRest(), new Uint8Array([0x0A, 0x0B]));
@@ -61,7 +61,6 @@ Deno.test('ByteReader throws instead of reading past its end', () => {
     ['bytes', [0x01, 0x02], (r) => r.readBytes(3)],
     ['Binary Data longer than the rest', [0x00, 0x03, 0x01, 0x02], (r) => r.readBinaryData()],
     ['a UTF-8 Encoded String longer than the rest', [0x00, 0x0A, 0x61, 0x62, 0x63], (r) => r.readUtf8EncodedString()],
-    ['Binary Data as a string longer than the rest', [0x00, 0x02, 0x61], (r) => r.readBinaryDataAsString()],
     ['a sub reader longer than the rest', [0x01, 0x02], (r) => r.readSub(3)],
   ];
   for (const [name, bytes, read] of cases) {
