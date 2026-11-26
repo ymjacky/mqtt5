@@ -15,23 +15,22 @@ export interface IncomingStore {
 
 /** The default {@link IncomingStore} used internally by the client. */
 export class IncomingMemoryStore implements IncomingStore {
-  /** The stored packet IDs. */
-  packets: Set<number> = new Set<number>();
+  readonly #packets: Set<number> = new Set<number>();
 
   /** Stores a packet ID. */
   store(packetId: number): Promise<void> {
-    this.packets.add(packetId);
+    this.#packets.add(packetId);
     return Promise.resolve();
   }
 
   /** Returns whether the packet ID is stored. */
   has(packetId: number): Promise<boolean> {
-    return Promise.resolve(this.packets.has(packetId));
+    return Promise.resolve(this.#packets.has(packetId));
   }
 
   /** Removes a packet ID. */
   discard(packetId: number): Promise<void> {
-    this.packets.delete(packetId);
+    this.#packets.delete(packetId);
     return Promise.resolve();
   }
 }
@@ -81,8 +80,7 @@ export interface OutgoingStore {
 
 /** The default {@link OutgoingStore} used internally by the client. */
 export class MemoryStore implements OutgoingStore {
-  /** The stored packets by packet ID. */
-  packets: Map<number, MqttPackets.PublishPacketWithId | MqttPackets.PubrelPacket> = new Map<
+  readonly #packets: Map<number, MqttPackets.PublishPacketWithId | MqttPackets.PubrelPacket> = new Map<
     number, /* packetId */
     MqttPackets.PublishPacketWithId | MqttPackets.PubrelPacket
   >();
@@ -93,37 +91,37 @@ export class MemoryStore implements OutgoingStore {
       return Promise.reject(new Error('missing packet.packetId'));
     }
 
-    this.packets.set(packet.packetId, packet);
+    this.#packets.set(packet.packetId, packet);
     return Promise.resolve();
   }
 
   /** Returns whether a packet with the packet ID is stored. */
   has(packetId: number): Promise<boolean> {
-    const exist = this.packets.has(packetId);
+    const exist = this.#packets.has(packetId);
     return Promise.resolve(exist);
   }
 
   /** Removes the packet with the packet ID. */
   discard(packetId: number): Promise<void> {
-    this.packets.delete(packetId);
+    this.#packets.delete(packetId);
 
     return Promise.resolve();
   }
 
   /** Returns the number of stored packets. */
   count(): Promise<number> {
-    return Promise.resolve(this.packets.size);
+    return Promise.resolve(this.#packets.size);
   }
 
   /** Removes all packets. */
   clear(): Promise<void> {
-    this.packets.clear();
+    this.#packets.clear();
     return Promise.resolve();
   }
 
   /** Iterates over the stored packets to resend. */
   async *resendIterator(): AsyncIterableIterator<MqttPackets.PublishPacketWithId | MqttPackets.PubrelPacket> {
-    for (const value of this.packets.values()) {
+    for (const value of this.#packets.values()) {
       yield value;
     }
   }
