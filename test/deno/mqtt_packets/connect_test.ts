@@ -1012,3 +1012,32 @@ Deno.test('decodeConnectPacketWithAnInvalidUsername', function () {
     assertThrows(() => parse(bytes, bytes.length), MqttUtilsError.InvalidUtf8EncodedStringError, undefined, JSON.stringify(username));
   }
 });
+
+// The Password is Binary Data: a string is encoded as its UTF-8 bytes, U+0000 included, and a Uint8Array as it is. Decoding
+// gives the same bytes back, as a Uint8Array.
+Deno.test('encodeConnectPacketWithAPasswordAsBinaryData', function () {
+  const cases: [string | Uint8Array, number[]][] = [
+    ['p\u0000w', [0x70, 0x00, 0x77]],
+    ['\u{FEFF}あ', [0xEF, 0xBB, 0xBF, 0xE3, 0x81, 0x82]],
+    ['', []],
+    [new Uint8Array([0xFF, 0x00, 0xED, 0xA0, 0x80]), [0xFF, 0x00, 0xED, 0xA0, 0x80]],
+    [new Uint8Array(0), []],
+  ];
+  for (const [password, bytes] of cases) {
+    const name = typeof password === 'string' ? JSON.stringify(password) : `Uint8Array ${password.length}`;
+    const encoded = toBytes({ type: 'connect', clientId: 'id', protocolVersion: Mqtt.ProtocolVersion.MqttV3_1_1, username: 'u', password });
+    // After the fixed header (2 bytes).
+    assertEquals(encoded.subarray(2), connectWithUsernameAndPassword([0x75], bytes), name);
+    assertEquals(parse(encoded.subarray(2), encoded.length - 2).password, new Uint8Array(bytes), name);
+  }
+});
+
+// A string Password is sent as its UTF-8 bytes, which cannot hold a lone surrogate: it is not sent as U+FFFD.
+Deno.test('encodeConnectPacketWithAPasswordThatCannotBeEncoded', function () {
+  const connect = (password: string | Uint8Array): ConnectPacket => ({ type: 'connect', clientId: 'id', protocolVersion: 5, username: 'u', password });
+  assertThrows(() => toBytes(connect('p\uD800')), MqttUtilsError.UnencodableStringError, 'lone surrogate at index 1');
+  assertThrows(() => toBytes(connect('\uDC00')), MqttUtilsError.UnencodableStringError, 'lone surrogate at index 0');
+  // Binary Data is at most 65,535 bytes: its length is a Two Byte Integer.
+  assertThrows(() => toBytes(connect(new Uint8Array(65_536))), MqttUtilsError.NumIsOutOfRange);
+  assertThrows(() => toBytes(connect('a'.repeat(65_536))), MqttUtilsError.NumIsOutOfRange);
+});

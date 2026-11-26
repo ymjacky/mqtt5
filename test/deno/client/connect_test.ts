@@ -1,4 +1,4 @@
-import { ClientErrors, Mqtt, MqttClient, MqttPackets, type MqttProperties } from '../../../deno/mod.ts';
+import { ClientErrors, type ClientTypes, Mqtt, MqttClient, MqttPackets, type MqttProperties, WebSocketMqttClient } from '../../../deno/mod.ts';
 import { TestBroker } from '../broker/test_broker.ts';
 import { assert, assertEquals, assertExists, assertRejects, assertThrows } from '@std/assert';
 
@@ -492,6 +492,100 @@ Deno.test({ name: '@connect options that are Two Byte Integers', only: false }, 
     },
   );
 }); // @connect options that are Two Byte Integers
+
+Deno.test({ name: '@connect clientId, username and password', only: false }, async (context) => {
+  await context.step(
+    'the constructors throw for a clientId, a username or a password that CONNECT cannot carry',
+    () => {
+      const cases: [ClientTypes.ClientOptions, string][] = [
+        // UTF-8 Encoded Strings [MQTT-1.5.4-1] [MQTT-1.5.4-2]
+        [{ clientId: 'a\u0000' }, 'clientId must not contain U+0000'],
+        [{ clientId: 'x\uD800' }, 'clientId must not contain a lone surrogate, which UTF-8 cannot encode (found at index 1)'],
+        [{ clientId: 'a'.repeat(65_536) }, 'clientId must be at most 65535 bytes long in UTF-8'],
+        [{ username: 'u\u0000' }, 'username must not contain U+0000'],
+        [{ username: '\uDC00' }, 'username must not contain a lone surrogate, which UTF-8 cannot encode (found at index 0)'],
+        [{ username: 'あ'.repeat(21_846) }, 'username must be at most 65535 bytes long in UTF-8'],
+        // Binary Data
+        [{ password: 'p\uD800' }, 'password must not contain a lone surrogate, which UTF-8 cannot encode (found at index 1)'],
+        [{ password: 'a'.repeat(65_536) }, 'password must be at most 65535 bytes long in UTF-8'],
+        [{ password: new Uint8Array(65_536) }, 'password must be at most 65535 bytes long'],
+      ];
+      for (const [options, message] of cases) {
+        for (const protocolVersion of [Mqtt.ProtocolVersion.MqttV5, Mqtt.ProtocolVersion.MqttV3_1_1]) {
+          assertThrows(() => new MqttClient({ ...options, protocolVersion }), ClientErrors.InvalidArgumentError, message, message);
+          assertThrows(
+            () => new WebSocketMqttClient({ ...options, protocolVersion, url: new URL('ws://127.0.0.1:8080') }),
+            ClientErrors.InvalidArgumentError,
+            message,
+            message,
+          );
+        }
+      }
+    },
+  );
+
+  await context.step(
+    'a string password is sent as its UTF-8 bytes, U+0000 included, and a valid clientId and username as they are',
+    async () => {
+      const broker = new TestBroker();
+
+      try {
+        broker.listen();
+        const received: MqttPackets.ConnectPacket[] = [];
+        broker.on('connect', (event) => {
+          const packet = event.detail;
+          received.push(packet);
+          broker.sendConnack(packet.clientId, false, packet.protocolVersion);
+        });
+
+        for (const protocolVersion of [Mqtt.ProtocolVersion.MqttV5, Mqtt.ProtocolVersion.MqttV3_1_1]) {
+          const client = new MqttClient({ clientId: '\u{FEFF}cid', username: 'u\u{1F600}', password: 'p\u0000w\u{1F600}', protocolVersion, logger });
+          await client.connect();
+          await client.disconnect();
+        }
+        assertEquals(received.length, 2);
+        for (const packet of received) {
+          assertEquals(packet.clientId, '\u{FEFF}cid');
+          assertEquals(packet.username, 'u\u{1F600}');
+          assertEquals(packet.password, new TextEncoder().encode('p\u0000w\u{1F600}'));
+        }
+      } finally {
+        await broker.destroy();
+      }
+    },
+  );
+
+  await context.step(
+    'a Uint8Array password is sent as it is on every connection, also after the caller changed it',
+    async () => {
+      const broker = new TestBroker();
+
+      try {
+        broker.listen();
+        const passwords: (string | Uint8Array | undefined)[] = [];
+        broker.on('connect', (event) => {
+          const packet = event.detail;
+          passwords.push(packet.password);
+          broker.sendConnack(packet.clientId, false, packet.protocolVersion);
+        });
+
+        // Not UTF-8, and with 0x00: Binary Data may be any bytes.
+        const password = new Uint8Array([0xFF, 0x00, 0x70]);
+        const client = new MqttClient({ clientId: 'cid', username: 'u', password, logger });
+        // The client keeps a copy: changing the caller's array does not change what is sent.
+        password.fill(0x41);
+        await client.connect();
+        await client.disconnect();
+        password.fill(0x42);
+        await client.connect();
+        await client.disconnect();
+        assertEquals(passwords, [new Uint8Array([0xFF, 0x00, 0x70]), new Uint8Array([0xFF, 0x00, 0x70])]);
+      } finally {
+        await broker.destroy();
+      }
+    },
+  );
+}); // @connect clientId, username and password
 
 Deno.test({ name: '@connect failure leaves the client offline', only: false }, async (context) => {
   await context.step(
