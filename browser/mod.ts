@@ -118,4 +118,3 @@ export * as MqttPackets from '../lib/mqtt_packets/mod.ts';
 export * as MqttProperties from '../lib/mqtt_properties/mod.ts';
 export { ClientErrors, ClientTypes, Store, WebSocketMqttClient } from '../lib/client/mod.ts';
 export type { BaseMqttClient } from '../lib/client/mod.ts';
-export type { ConnectOptions, PublishOptions, PublishResult, SubscribeResults, SubscriptionOption, UnsubscribeResults } from '../lib/client/client_types.ts';

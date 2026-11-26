@@ -1,4 +1,4 @@
-import { ClientErrors, Mqtt, MqttClient, MqttPackets, type PublishResult, Store } from '../../../deno/mod.ts';
+import { ClientErrors, type ClientTypes, Mqtt, MqttClient, MqttPackets, Store } from '../../../deno/mod.ts';
 import * as MqttStream from '../../../lib/mqtt_stream_utils/mod.ts';
 import { packetIdOf, TestBroker } from '../broker/test_broker.ts';
 import { connackBytes, type RawConnection, RawServer, waitUntil } from '../broker/raw_server.ts';
@@ -818,7 +818,7 @@ Deno.test({ name: '@connection state: publish() and the next connection', only: 
     store: GatedStore,
     client: MqttClient,
     sessionPresent: boolean,
-  ): Promise<{ publishing: Promise<PublishResult>; first: RawConnection; second: RawConnection }> {
+  ): Promise<{ publishing: Promise<ClientTypes.PublishResult>; first: RawConnection; second: RawConnection }> {
     let reconnecting: Promise<MqttPackets.ConnackPacket> | undefined;
     let closedCount = 0;
     client.on('closed', () => {
