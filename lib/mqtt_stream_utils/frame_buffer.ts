@@ -1,3 +1,4 @@
+import { MqttClientError } from '../error/mod.ts';
 import { decodeRemainingLength } from './remaining_length.ts';
 
 // The fixed header: one byte of packet type and flags, and a Remaining Length of at most 4 bytes.
@@ -8,7 +9,7 @@ const maxFixedHeaderBytes = 5;
  * Thrown by {@link MqttFrameBuffer.takePacket} as soon as the fixed header tells the size of the packet, before the rest
  * of it is received.
  */
-export class PacketTooLargeToReceiveError extends Error {
+export class PacketTooLargeToReceiveError extends MqttClientError {
   /** The name of the error class. */
   override readonly name = 'PacketTooLargeToReceiveError' as const;
   /** The size of the packet in bytes, from its fixed header. */
@@ -16,8 +17,8 @@ export class PacketTooLargeToReceiveError extends Error {
   /** The Maximum Packet Size of CONNECT. */
   readonly maximumPacketSize: number;
 
-  constructor(packetSize: number, maximumPacketSize: number) {
-    super(`the received packet is ${packetSize} bytes, larger than the Maximum Packet Size ${maximumPacketSize}`);
+  constructor(packetSize: number, maximumPacketSize: number, options?: ErrorOptions) {
+    super(`the received packet is ${packetSize} bytes, larger than the Maximum Packet Size ${maximumPacketSize}`, options);
     this.packetSize = packetSize;
     this.maximumPacketSize = maximumPacketSize;
   }

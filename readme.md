@@ -349,6 +349,7 @@ A rejected promise that is not awaited does not terminate the process, so await 
 | `PacketTooLargeError`     | `connect()`, `publish()`, `subscribe()`, `unsubscribe()`, `auth()` | The packet is larger than the Maximum Packet Size of the broker (MQTT 5.0) or than MQTT allows.                                                              |
 | `NotSupportedByBrokerError` | `publish()`, `subscribe()` | The broker said in CONNACK (MQTT 5.0) that it does not support what the call asks for; nothing is sent. Catch it to handle all of the following. `QoSNotSupportedError`: a QoS above the Maximum QoS (`err.maximumQoS` is the highest the broker accepts). `RetainNotSupportedError`: `retain: true`. `WildcardSubscriptionsNotSupportedError`, `SharedSubscriptionsNotSupportedError` and `SubscriptionIdentifiersNotSupportedError`: a topic filter with `+` / `#`, a `$share/...` topic filter, or a `subscriptionIdentifier`. |
 | `SessionLostError`        | `publish()` (QoS 1 and 2)                                          | The broker did not keep the session when reconnecting. The message may or may not have reached the broker.                                                   |
+| `PacketIdsExhaustedError` | `publish()` (QoS 1 and 2), `subscribe()`, `unsubscribe()`          | All the packet IDs (1 to 65535) are in use by requests that have not completed; nothing is sent. Call again after some of them have completed.               |
 | `ConnectionClosed`        | `connect()`, `subscribe()`, `unsubscribe()`                        | The connection is closed before CONNACK / SUBACK / UNSUBACK. For SUBACK / UNSUBACK, the broker may or may not have processed the request.                    |
 | `SendPacketError`         | `auth()`                                                           | The client is not connected.                                                                                                                                 |
 
@@ -356,6 +357,10 @@ Properties are checked only for MQTT 5.0, because MQTT 3.1.1 packets do not carr
 connection, e.g. `Deno.errors.ConnectionRefused` when the broker is not running, or `Deno.errors.InvalidData` when the certificate of the broker is not
 trusted; `WebSocketMqttClient.connect()` rejects with `ConnectionClosed` then. When `connect()` rejects, or resolves with a CONNACK that refuses the
 connection, the client has closed the connection and is offline again, so it can be called again right away.
+
+All the errors above extend `ClientErrors.MqttClientError`, and so do the other error classes of this library, e.g.
+`MqttPackets.MqttPacketsError.MqttPacketParseError`: catch it to handle all of them at once. The errors of opening the connection, e.g.
+`Deno.errors.ConnectionRefused`, and of a session store, e.g. Deno KV, are not of it. `err.cause` is the error that caused one, when there is one.
 
 ### Connecting
 
@@ -403,6 +408,8 @@ try {
     console.error('not connected');
   } else if (err instanceof ClientErrors.InvalidTopicNameError || err instanceof ClientErrors.InvalidArgumentError) {
     console.error(err.message); // e.g. a topic with a wildcard: 'sensors/+/temperature'
+  } else if (err instanceof ClientErrors.MqttClientError) {
+    console.error(`${err.name}: ${err.message}`); // another error of this library, e.g. PacketTooLargeError
   } else {
     throw err;
   }

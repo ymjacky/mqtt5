@@ -29,6 +29,7 @@
  *   are listed under {@link BaseMqttClient}. Pass the options of {@link ClientTypes.ClientOptions} to the constructor; `url` is required.
  * - Constants such as `Mqtt.QoS`, `Mqtt.ProtocolVersion` and `Mqtt.ReasonCode` are in the `Mqtt` namespace.
  * - Option and result types are in the `ClientTypes` namespace, and the errors of the client are in the `ClientErrors` namespace.
+ *   Every error class of this library extends `ClientErrors.MqttClientError`, so catching it handles all of them at once.
  *
  * A `wss://` connection is verified against the browser's certificate store; a CA certificate cannot be specified.
  *

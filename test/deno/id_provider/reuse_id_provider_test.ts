@@ -1,6 +1,7 @@
 import { assert, assertEquals, assertExists, assertFalse, assertThrows } from '@std/assert';
 
 import { ReuseIdProvider as IdProvider } from '../../../lib/id_provider/reuse_id_provider.ts';
+import { PacketIdsExhaustedError } from '../../../lib/id_provider/error.ts';
 
 /** A fixed pseudo-random sequence (mulberry32), so that a failure can be reproduced: integers from 0 to n - 1. */
 function randomIntegers(seed: number): (n: number) => number {
@@ -249,7 +250,7 @@ Deno.test('the ID 0 is reused when the range starts at 0', () => {
   assertEquals(idProvider.acquire(), 0);
   assertEquals(idProvider.acquire(), 2);
   assertEquals(idProvider.acquire(), 3);
-  assertThrows(() => idProvider.acquire(), Error, 'Unable to obtain ID because the limit has been reached');
+  assertThrows(() => idProvider.acquire(), PacketIdsExhaustedError, 'all the IDs from 0 to 3 are in use');
 });
 
 Deno.test('the IDs below a registered ID are still handed out', () => {
