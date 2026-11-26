@@ -64,7 +64,9 @@ export class MqttClient extends BaseMqttClient {
    * @param options client options. `url` must use `mqtt:` or `mqtts:` (default `mqtt://127.0.0.1:1883`).
    * Without a port in the URL, the client connects to 1883 (`mqtt:`) or 8883 (`mqtts:`).
    * @throws {InvalidArgumentError} if `keepAlive`, `topicAliasMaximumAboutSend` or `topicAliasMaximumAboutReceive`
-   * is not an integer from 0 to 65,535, or if the `outgoingStore` cannot be used with the `clientId`.
+   * is not an integer from 0 to 65,535, if
+   * `clientId` or `username` is longer than 65,535 bytes in UTF-8 or contains U+0000 or a lone surrogate, if `password` is
+   * longer than 65,535 bytes or a string with a lone surrogate, or if the `outgoingStore` cannot be used with the `clientId`.
    */
   constructor(options?: ClientOptions) {
     super(options);

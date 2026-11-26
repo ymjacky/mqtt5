@@ -408,17 +408,19 @@ Deno.test({ name: '@connect encoding failure', only: false }, async (context) =>
           broker.sendConnack(packet.clientId, false, packet.protocolVersion);
         });
 
-        // A User Name longer than 65,535 bytes cannot be encoded: its length is a Two Byte Integer.
-        const client = new MqttClient({ clientId: 'cid', logger: logger, username: 'a'.repeat(0x10000) });
+        // The values that the constructor and connect() check cannot make CONNECT fail to encode. A property that is not one
+        // of CONNECT is not checked there, but the encoder does not send a UTF-8 Encoded String with U+0000 [MQTT-1.5.4-2].
+        const properties: MqttProperties.Properties = { assignedClientIdentifier: 'a\u0000' };
+        const client = new MqttClient({ clientId: 'cid', logger: logger });
         await assertRejects(
-          () => client.connect(),
+          () => client.connect({ properties }),
           MqttPackets.MqttPacketsError.MqttPacketSerializeError,
         );
         assertEquals(accepted, 0);
 
         // The client stayed offline: connect() rejects again for the same reason, not with StateIsNotOfflineError.
         await assertRejects(
-          () => client.connect(),
+          () => client.connect({ properties }),
           MqttPackets.MqttPacketsError.MqttPacketSerializeError,
         );
         assertEquals(accepted, 0);

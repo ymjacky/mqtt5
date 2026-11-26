@@ -149,7 +149,8 @@ export abstract class BaseMqttClient {
    */
   protected url: URL;
   #userName?: string;
-  #password?: string;
+  // The Password is Binary Data: kept as the bytes that are sent.
+  #password?: Uint8Array;
   #clientId: string;
   // Keep Alive sent in CONNECT.
   #keepAlive: number;
@@ -233,7 +234,9 @@ export abstract class BaseMqttClient {
   /**
    * Creates a client. Use {@link MqttClient} or {@link WebSocketMqttClient}.
    * @throws {InvalidArgumentError} if `keepAlive`, `topicAliasMaximumAboutSend` or `topicAliasMaximumAboutReceive`
-   * is not an integer from 0 to 65,535, or if the `outgoingStore` cannot be used with the `clientId`.
+   * is not an integer from 0 to 65,535, if
+   * `clientId` or `username` is longer than 65,535 bytes in UTF-8 or contains U+0000 or a lone surrogate, if `password` is
+   * longer than 65,535 bytes or a string with a lone surrogate, or if the `outgoingStore` cannot be used with the `clientId`.
    */
   constructor(options?: ClientOptions) {
     this.protocolVersion = options?.protocolVersion ?? Mqtt.ProtocolVersion.MqttV5;
@@ -242,7 +245,9 @@ export abstract class BaseMqttClient {
     this.url = options?.url ?? new URL('mqtt://127.0.0.1:1883');
     this.log = options?.logger ?? (() => {});
     this.#userName = options?.username;
-    this.#password = options?.password;
+    // A Uint8Array is copied: the caller may change it after the constructor returns, and it is sent on every connection.
+    const password = options?.password;
+    this.#password = typeof password === 'string' ? MqttUtils.stringToBytes(password) : password && new Uint8Array(password);
     this.#clientId = options?.clientId ?? '';
     this.#keepAlive = options?.keepAlive ?? defaultKeepAlive;
     this.#currentKeepAlive = this.#keepAlive;
