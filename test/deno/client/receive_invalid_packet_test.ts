@@ -41,10 +41,22 @@ const publishWithPropertyPastThePropertyLength = new Uint8Array([0x30, 0x09, 0x0
 /** A PUBLISH with the Response Topic twice: a Protocol Error (MQTT 5.0 3.3.2.3.5). */
 const publishWithResponseTopicTwice = new Uint8Array([0x30, 0x0C, 0x00, 0x01, 0x61, 0x08, 0x08, 0x00, 0x01, 0x72, 0x08, 0x00, 0x01, 0x72]);
 
-/** What a client receives and what the broker gets back: the topics of `publish` events and the DISCONNECT Reason Codes. */
+/** A QoS 1 PUBLISH with the packet ID 1, an empty Topic Name and no Topic Alias. */
+function publishWithEmptyTopicName(protocolVersion: Mqtt.ProtocolVersion): Uint8Array {
+  return MqttPackets.packetToBytes(
+    { type: 'publish', topic: '', payload: new Uint8Array([0x78]), dup: false, retain: false, qos: Mqtt.QoS.AtLeastOnce, packetId: 1 },
+    protocolVersion,
+  );
+}
+
+/**
+ * What a client receives and what the broker gets back: the topics of `publish` events, the packet IDs of PUBACK and the
+ * DISCONNECT Reason Codes.
+ */
 function record(client: MqttClient | WebSocketMqttClient, broker: TestBroker | TestWsBroker) {
   const recorded = {
     topics: [] as string[],
+    pubacks: [] as number[],
     disconnects: [] as (number | undefined)[],
     disconnectEvents: [] as MqttPackets.DisconnectPacket[],
     closed: false,
@@ -57,6 +69,9 @@ function record(client: MqttClient | WebSocketMqttClient, broker: TestBroker | T
   });
   client.on('closed', () => {
     recorded.closed = true;
+  });
+  broker.on('puback', (event) => {
+    recorded.pubacks.push(event.detail.packetId);
   });
   broker.on('disconnect', (event) => {
     recorded.disconnects.push(event.detail.reasonCode);
@@ -153,6 +168,71 @@ Deno.test({ name: '@receive packets that are a Protocol Error', only: false }, a
       await waitFor(() => recorded.disconnects.length === 1 && recorded.closed, 'DISCONNECT and the close');
       assertEquals(recorded.disconnects, [Mqtt.ReasonCode.ProtocolError]);
       assertEquals(recorded.topics, []);
+    } finally {
+      await client.disconnect(true);
+      await broker.destroy();
+    }
+  });
+});
+
+Deno.test({ name: '@receive PUBLISH with an empty Topic Name and no Topic Alias', only: false }, async (context) => {
+  await context.step('MQTT 5.0: not delivered, no PUBACK, and the client sends DISCONNECT with Protocol Error (3.3.2.1)', async () => {
+    const broker = new TestBroker();
+    const client = new MqttClient({ clientId: 'cid', logger });
+    try {
+      broker.listen();
+      const recorded = record(client, broker);
+      await client.connect();
+
+      await broker.sendRawBytes('cid', validPublish('topic/ok'));
+      await waitFor(() => recorded.topics.length === 1, 'the valid PUBLISH');
+
+      await broker.sendRawBytes('cid', publishWithEmptyTopicName(Mqtt.ProtocolVersion.MqttV5));
+      await waitFor(() => recorded.disconnects.length === 1 && recorded.closed, 'DISCONNECT and the close');
+      assertEquals(recorded.disconnects, [Mqtt.ReasonCode.ProtocolError]);
+      assertEquals(recorded.topics, ['topic/ok']);
+      assertEquals(recorded.pubacks, []);
+    } finally {
+      await client.disconnect(true);
+      await broker.destroy();
+    }
+  });
+
+  await context.step('MQTT 3.1.1: not delivered, no PUBACK, and the client closes the connection without DISCONNECT [MQTT-4.7.3-1]', async () => {
+    const broker = new TestBroker();
+    const client = new MqttClient({ clientId: 'cid', logger, protocolVersion: Mqtt.ProtocolVersion.MqttV3_1_1 });
+    try {
+      broker.listen();
+      const recorded = record(client, broker);
+      await client.connect();
+
+      await broker.sendRawBytes('cid', validPublish('topic/ok', Mqtt.ProtocolVersion.MqttV3_1_1));
+      await waitFor(() => recorded.topics.length === 1, 'the valid PUBLISH');
+
+      await broker.sendRawBytes('cid', publishWithEmptyTopicName(Mqtt.ProtocolVersion.MqttV3_1_1));
+      await waitFor(() => recorded.closed, 'the close');
+      assertEquals(recorded.disconnects, []);
+      assertEquals(recorded.topics, ['topic/ok']);
+      assertEquals(recorded.pubacks, []);
+    } finally {
+      await client.disconnect(true);
+      await broker.destroy();
+    }
+  });
+
+  await context.step('WebSocket: the client sends DISCONNECT with Protocol Error', async () => {
+    const broker = new TestWsBroker();
+    const client = new WebSocketMqttClient({ clientId: 'cid', url: new URL('ws://127.0.0.1:3000/'), logger });
+    try {
+      broker.listen();
+      const recorded = record(client, broker);
+      await client.connect();
+
+      broker.sendRawBytes('cid', publishWithEmptyTopicName(Mqtt.ProtocolVersion.MqttV5));
+      await waitFor(() => recorded.disconnects.length === 1 && recorded.closed, 'DISCONNECT and the close');
+      assertEquals(recorded.disconnects, [Mqtt.ReasonCode.ProtocolError]);
+      assertEquals(recorded.topics, []);
+      assertEquals(recorded.pubacks, []);
     } finally {
       await client.disconnect(true);
       await broker.destroy();

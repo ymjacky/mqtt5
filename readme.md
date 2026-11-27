@@ -242,6 +242,10 @@ A broker can say in CONNACK (MQTT 5.0) that it does not support wildcard subscri
 rejects a topic filter with `+` / `#`, a `$share/...` topic filter or a `subscriptionIdentifier` with `WildcardSubscriptionsNotSupportedError`,
 `SharedSubscriptionsNotSupportedError` or `SubscriptionIdentifiersNotSupportedError`, and nothing is sent. The broker would close the connection otherwise.
 
+The `topic` of a `publish` event is never empty: a topic alias (MQTT 5.0) is resolved, see [Topic aliases](#topic-aliases). The broker must not send an empty
+Topic Name without a topic alias. The client does not receive such a PUBLISH (no `publish` event, no PUBACK / PUBREC): it sends DISCONNECT with the Reason Code
+0x82 (Protocol Error) with MQTT 5.0, or closes the connection with MQTT 3.1.1.
+
 ## Events
 
 Register listeners with `client.on(type, listener)` and remove them with `client.off(type, listener)`. `event.detail` holds the packet.
