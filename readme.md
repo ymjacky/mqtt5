@@ -624,7 +624,11 @@ MQTT 5.0 only.
 - `topicAliasMaximumAboutSend`: when set, topic aliases are assigned to outgoing PUBLISH packets automatically, up to the smaller of this value and the broker's
   Topic Alias Maximum. If the broker's CONNACK has no Topic Alias Maximum (or it is 0), no topic aliases are sent.
 - `topicAliasMaximumAboutReceive`: when set, it is sent to the broker as the Topic Alias Maximum property of CONNECT, and topic aliases in incoming PUBLISH
-  packets are resolved automatically.
+  packets are resolved automatically. A `topicAliasMaximum` in the `properties` of `connect()` is sent in the same way, unless this option is set.
+
+The broker must not send a topic alias that is 0 or greater than the Topic Alias Maximum of CONNECT (when it was not sent, any topic alias), nor an empty
+Topic Name with a topic alias that it has not set on the connection. The client does not receive such a PUBLISH (no `publish` event, no PUBACK / PUBREC): it
+sends DISCONNECT with the Reason Code 0x94 (Topic Alias invalid) or 0x82 (Protocol Error), and the connection is closed.
 
 ### Server redirection
 

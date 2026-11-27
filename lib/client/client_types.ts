@@ -107,6 +107,8 @@ export type ClientOptions = {
   /**
    * MQTT 5.0 only. When set, it is sent to the broker as the Topic Alias Maximum property of CONNECT,
    * and topic aliases in incoming PUBLISH packets are resolved automatically.
+   * A PUBLISH with a topic alias that is 0 or greater than the Topic Alias Maximum sent in CONNECT (any topic alias when it
+   * was not sent) ends the connection with DISCONNECT 0x94 (Topic Alias invalid).
    * An integer from 0 to 65,535 (0 accepts no topic aliases); another value makes the constructor throw `InvalidArgumentError`.
    */
   topicAliasMaximumAboutReceive?: number;
