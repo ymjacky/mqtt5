@@ -71,8 +71,9 @@ export type AnyPacket =
  * @returns the encoded bytes.
  * @throws {MqttPacketsError.MqttPacketSerializeError} if the packet cannot be encoded, e.g. a UTF-8 Encoded String (a topic,
  * the Client Identifier, a string property, ...) contains U+0000 or a lone surrogate or is longer than 65,535 bytes in UTF-8,
- * a string Password has a lone surrogate, a value does not fit its field, or the packet is an AUTH with MQTT 3.1.1, which has no
- * AUTH. Its `cause` tells why.
+ * a string Password has a lone surrogate, an integer property has a value that it cannot have (e.g. a Receive Maximum of 0 or
+ * a Maximum QoS of 2: see `MqttProperties.propertiesToBytes()`), a value does not fit its field, or the packet is an AUTH with
+ * MQTT 3.1.1, which has no AUTH. Its `cause` tells why.
  */
 export function packetToBytes(
   packet: AnyPacket,

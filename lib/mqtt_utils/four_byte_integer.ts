@@ -1,8 +1,11 @@
 import * as UtilsError from './error.ts';
 import { byteAt, requireBytes } from './bounds.ts';
 
+/** The largest Four Byte Integer. */
+export const maxFourByteInteger = 0xFFFF_FFFF;
+
 export function numToFourByteInteger(num: number): Uint8Array {
-  if (num > 0xFFFFFFFF) {
+  if (num > maxFourByteInteger) {
     throw new UtilsError.NumIsOutOfRange();
   }
 

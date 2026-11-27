@@ -4,7 +4,8 @@ import { testPropertyCases } from './test_helper.ts';
 testPropertyCases([
   // id: 0x01 (payloadFormatIndicator)
   { name: 'payloadFormatIndicator 1', encode: { payloadFormatIndicator: 1 }, bytes: [0x01, 0x01] },
-  { name: 'payloadFormatIndicator 0', decode: { payloadFormatIndicator: 0 }, bytes: [0x01, 0x00] },
+  // 0 means the same as no Payload Format Indicator, but it is encoded as given.
+  { name: 'payloadFormatIndicator 0', encode: { payloadFormatIndicator: 0 }, bytes: [0x01, 0x00] },
 
   // id: 0x17 (requestProblemInformation)
   { name: 'requestProblemInformation true', encode: { requestProblemInformation: true }, bytes: [0x17, 0x01] },
