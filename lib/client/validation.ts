@@ -3,9 +3,10 @@
  * done before anything is sent.
  * Only the values that are used are checked: MQTT 3.1.1 packets have no properties and no Retain Handling,
  * and MQTT 3.1.1 has no topic aliases, so they are not checked there.
- * The packet encoders check only the rules of the data types, for every packet (e.g. a UTF-8 Encoded String must not
- * contain U+0000 or a lone surrogate) and fail with MqttPacketSerializeError, which does not tell which value is wrong.
- * These checks come first and name it.
+ * The packet encoders check only the rules of the data types and of the property values, for every packet (e.g. a UTF-8
+ * Encoded String must not contain U+0000 or a lone surrogate, a Receive Maximum must not be 0), and fail with
+ * MqttPacketSerializeError, which does not tell where the wrong value is: a string is not named, and a property is named only
+ * by its key (`messageExpiryInterval`, not `will.properties.messageExpiryInterval`). These checks come first and name it.
  * @module
  */
 

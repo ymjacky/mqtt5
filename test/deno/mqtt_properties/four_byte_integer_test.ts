@@ -15,9 +15,12 @@ testPropertyCases([
   // id: 0x18 (willDelayInterval)
   { name: 'willDelayInterval', encode: { willDelayInterval: 60 }, bytes: [0x18, 0x00, 0x00, 0x00, 0x3C] },
   { name: 'willDelayInterval 0xFFFFFFFF', encode: { willDelayInterval: 0xFFFFFFFF }, bytes: [0x18, 0xFF, 0xFF, 0xFF, 0xFF] },
-  { name: 'willDelayInterval 0', decode: { willDelayInterval: 0 }, bytes: [0x18, 0x00, 0x00, 0x00, 0x00] },
+  // 0 means the same as no Will Delay Interval, but it is encoded as given.
+  { name: 'willDelayInterval 0', encode: { willDelayInterval: 0 }, bytes: [0x18, 0x00, 0x00, 0x00, 0x00] },
 
   // id: 0x27 (maximumPacketSize)
   { name: 'maximumPacketSize', encode: { maximumPacketSize: 1024 }, bytes: [0x27, 0x00, 0x00, 0x04, 0x00] },
   { name: 'maximumPacketSize 268,435,455', encode: { maximumPacketSize: 268_435_455 }, bytes: [0x27, 0x0F, 0xFF, 0xFF, 0xFF] },
+  { name: 'maximumPacketSize 1', encode: { maximumPacketSize: 1 }, bytes: [0x27, 0x00, 0x00, 0x00, 0x01] },
+  { name: 'maximumPacketSize 0xFFFFFFFF', encode: { maximumPacketSize: 0xFFFFFFFF }, bytes: [0x27, 0xFF, 0xFF, 0xFF, 0xFF] },
 ]);

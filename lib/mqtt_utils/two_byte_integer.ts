@@ -1,8 +1,11 @@
 import * as UtilsError from './error.ts';
 import { byteAt, requireBytes } from './bounds.ts';
 
+/** The largest Two Byte Integer. */
+export const maxTwoByteInteger = 0xFFFF;
+
 export function numToTwoByteInteger(num: number): Uint8Array {
-  if (num > 0xFFFF) {
+  if (num > maxTwoByteInteger) {
     throw new UtilsError.NumIsOutOfRange();
   }
   return Uint8Array.from([num >> 8, num & 0xFF]);

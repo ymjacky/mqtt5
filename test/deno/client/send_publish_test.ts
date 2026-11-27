@@ -1413,6 +1413,35 @@ Deno.test({ name: '@publish string payload', only: false }, async (context) => {
   );
 }); // @publish string payload
 
+Deno.test({ name: '@publish property of 0', only: false }, async (context) => {
+  await context.step(
+    'sends a Payload Format Indicator of 0 as it is given, instead of leaving it out',
+    async () => {
+      const broker = new TestBroker();
+      try {
+        broker.listen();
+        broker.on('connect', (event) => {
+          const packet = event.detail;
+          broker.sendConnack(packet.clientId, false, packet.protocolVersion);
+        });
+        const { promise: publishReceived, resolve } = Promise.withResolvers<MqttPackets.PublishPacket>();
+        broker.on('publish', (event) => resolve(event.detail));
+
+        const client = new MqttClient({ clientId: 'cid', logger: logger });
+        await client.connect();
+        await client.publish('topicA', 'payloadA', {}, { payloadFormatIndicator: 0 });
+
+        const publish = await publishReceived;
+        // 0 means the same as no Payload Format Indicator, and a broker forwards it unaltered [MQTT-3.3.2-4].
+        assertEquals(publish.properties, { payloadFormatIndicator: 0 });
+        await client.disconnect();
+      } finally {
+        await broker.destroy();
+      }
+    },
+  );
+}); // @publish property of 0
+
 Deno.test({ name: '@publish too large', only: false }, async (context) => {
   await context.step(
     'QoS 1: a packet larger than MQTT allows is not kept in the session, and its packet ID is released',

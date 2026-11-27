@@ -493,6 +493,38 @@ Deno.test({ name: '@connect options that are Two Byte Integers', only: false }, 
   );
 }); // @connect options that are Two Byte Integers
 
+Deno.test({ name: '@connect properties of 0', only: false }, async (context) => {
+  await context.step(
+    'sends a Topic Alias Maximum and a Will Delay Interval of 0 as they are given, instead of leaving them out',
+    async () => {
+      const broker = new TestBroker();
+      try {
+        broker.listen();
+        const { promise: connectReceived, resolve } = Promise.withResolvers<MqttPackets.ConnectPacket>();
+        broker.on('connect', (event) => {
+          const packet = event.detail;
+          resolve(packet);
+          broker.sendConnack(packet.clientId, false, packet.protocolVersion);
+        });
+
+        const client = new MqttClient({ clientId: 'cid', logger: logger });
+        await client.connect({
+          properties: { topicAliasMaximum: 0 },
+          will: { topic: 'willTopic', payload: new Uint8Array([0x77]), properties: { willDelayInterval: 0 } },
+        });
+
+        // Both mean the same as leaving the property out: no topic aliases, and the Will is published at once.
+        const connect = await connectReceived;
+        assertEquals(connect.properties, { topicAliasMaximum: 0 });
+        assertEquals(connect.will?.properties, { willDelayInterval: 0 });
+        await client.disconnect();
+      } finally {
+        await broker.destroy();
+      }
+    },
+  );
+}); // @connect properties of 0
+
 Deno.test({ name: '@connect clientId, username and password', only: false }, async (context) => {
   await context.step(
     'the constructors throw for a clientId, a username or a password that CONNECT cannot carry',
