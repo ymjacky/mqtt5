@@ -71,7 +71,8 @@ export type AnyPacket =
  * @returns the encoded bytes.
  * @throws {MqttPacketsError.MqttPacketSerializeError} if the packet cannot be encoded, e.g. a UTF-8 Encoded String (a topic,
  * the Client Identifier, a string property, ...) contains U+0000 or a lone surrogate or is longer than 65,535 bytes in UTF-8,
- * a string Password has a lone surrogate, or a value does not fit its field. Its `cause` tells why.
+ * a string Password has a lone surrogate, a value does not fit its field, or the packet is an AUTH with MQTT 3.1.1, which has no
+ * AUTH. Its `cause` tells why.
  */
 export function packetToBytes(
   packet: AnyPacket,
@@ -142,7 +143,8 @@ export function packetToBytes(
  * @returns the decoded packet.
  * @throws {MqttPacketsError.MqttPacketParseError} if the bytes cannot be decoded: they are not exactly one packet, or the
  * packet is a Malformed Packet or a Protocol Error, e.g. a field goes past the end of the packet or a property is included
- * more than once (MQTT 5.0 4.13). `cause` is the error that was found.
+ * more than once (MQTT 5.0 4.13), or its packet type is Reserved: 0, or 15 (AUTH) with MQTT 3.1.1. `cause` is the error that
+ * was found.
  */
 export function decode(
   buffer: Uint8Array,

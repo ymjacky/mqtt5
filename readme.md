@@ -352,6 +352,7 @@ A rejected promise that is not awaited does not terminate the process, so await 
 | `PacketIdsExhaustedError` | `publish()` (QoS 1 and 2), `subscribe()`, `unsubscribe()`          | All the packet IDs (1 to 65535) are in use by requests that have not completed; nothing is sent. Call again after some of them have completed.               |
 | `ConnectionClosed`        | `connect()`, `subscribe()`, `unsubscribe()`                        | The connection is closed before CONNACK / SUBACK / UNSUBACK. For SUBACK / UNSUBACK, the broker may or may not have processed the request.                    |
 | `SendPacketError`         | `auth()`                                                           | The client is not connected.                                                                                                                                 |
+| `UnsupportedByProtocolVersionError` | `auth()`                                                 | The client uses MQTT 3.1.1, which has no AUTH; nothing is sent.                                                                                              |
 
 Properties are checked only for MQTT 5.0, because MQTT 3.1.1 packets do not carry them. `MqttClient.connect()` also rejects with the errors of opening the
 connection, e.g. `Deno.errors.ConnectionRefused` when the broker is not running, or `Deno.errors.InvalidData` when the certificate of the broker is not

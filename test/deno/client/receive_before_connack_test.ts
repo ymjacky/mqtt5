@@ -386,12 +386,13 @@ Deno.test({ name: '@receive before CONNACK: a packet that the broker must not se
     },
   );
 
-  // MQTT 3.1.1 has no AUTH: CONNACK is the first packet that the broker sends [MQTT-3.2.0-1].
-  const packetsBeforeConnackV3_1_1: [string, number[]][] = [
-    ['a PUBLISH with QoS 1', bytesOf(publishQoS1, Mqtt.ProtocolVersion.MqttV3_1_1)],
-    ['an AUTH', [0xF0, 0x00]],
+  // CONNACK is the first packet that the broker sends [MQTT-3.2.0-1]. MQTT 3.1.1 has no AUTH: its packet type 15 is
+  // Reserved, so the client cannot even decode it.
+  const packetsBeforeConnackV3_1_1: [string, number[], Mqtt.ReasonCode][] = [
+    ['a PUBLISH with QoS 1', bytesOf(publishQoS1, Mqtt.ProtocolVersion.MqttV3_1_1), Mqtt.ReasonCode.ProtocolError],
+    ['a packet of type 15 (AUTH in MQTT 5.0)', [0xF0, 0x00], Mqtt.ReasonCode.MalformedPacket],
   ];
-  for (const [name, bytes] of packetsBeforeConnackV3_1_1) {
+  for (const [name, bytes, reasonCode] of packetsBeforeConnackV3_1_1) {
     await context.step(`MQTT 3.1.1: on ${name}, the client does not handle it, closes the connection, and connect() rejects`, async () => {
       const broker = new TestBroker();
       const client = new MqttClient({ clientId: 'cid', logger, connectTimeoutMS, protocolVersion: Mqtt.ProtocolVersion.MqttV3_1_1 });
@@ -401,7 +402,7 @@ Deno.test({ name: '@receive before CONNACK: a packet that the broker must not se
         const handling = recordHandling(client, broker);
         answerFirstConnect(broker, new Uint8Array([...bytes, ...validConnackV3_1_1]));
 
-        assertInvalidPacketBeforeConnack(await connectError(client.connect()), Mqtt.ReasonCode.ProtocolError);
+        assertInvalidPacketBeforeConnack(await connectError(client.connect()), reasonCode);
         await waitFor(() => recorded.brokerSawClose, 'the close');
         assertEquals(recorded.disconnects, []);
         assertEquals(recorded.closedEvents, 1);

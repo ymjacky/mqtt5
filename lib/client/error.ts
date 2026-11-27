@@ -266,6 +266,20 @@ export class SharedSubscriptionsNotSupportedError extends NotSupportedByBrokerEr
   }
 }
 
+/**
+ * The call needs a protocol version other than the one of the client (the `protocolVersion` option): `auth()` with MQTT 3.1.1,
+ * which has no AUTH (MQTT 5.0 enhanced authentication). The call rejects with it and nothing is sent: the broker would close
+ * the connection.
+ */
+export class UnsupportedByProtocolVersionError extends MqttClientError {
+  /** The name of the error class. */
+  override readonly name = 'UnsupportedByProtocolVersionError' as const;
+  /** Creates the error with the given details. Pass the underlying error as `options.cause`. */
+  constructor(message: string, options?: ErrorOptions) {
+    super(`unsupported by protocol version: ${message}`, options);
+  }
+}
+
 /** The URL protocol is not supported by the client (`MqttClient` accepts `mqtt:` and `mqtts:`). */
 export class UnexpectedUrlProtocol extends MqttClientError {
   /** The name of the error class. */

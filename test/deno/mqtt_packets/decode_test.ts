@@ -119,6 +119,18 @@ Deno.test('decode reads a CONNACK of MQTT 3.1.1 for MQTT 5.0 without properties'
   assertEquals(decode(new Uint8Array([0x20, 0x02, 0x00, 0x01]), V5), { type: 'connack', sessionPresent: false, reasonCode: 1 });
 });
 
+Deno.test('decode throws for a packet type that is Reserved', () => {
+  const cases: [string, number[], Mqtt.ProtocolVersion][] = [
+    ['type 0', [0x00, 0x00], V5],
+    ['type 0 (MQTT 3.1.1)', [0x00, 0x00], V3],
+    // AUTH is new in MQTT 5.0.
+    ['type 15 (MQTT 3.1.1)', [0xF0, 0x00], V3],
+  ];
+  for (const [name, bytes, protocolVersion] of cases) {
+    assertInstanceOf(decodeError(bytes, protocolVersion, name), MqttPacketsError.UnsupportedPacketError, name);
+  }
+});
+
 Deno.test('decode throws a MqttPacketParseError caused by ProtocolViolationError for a Protocol Error', () => {
   const cases: [string, number[]][] = [
     // Response Topic twice
