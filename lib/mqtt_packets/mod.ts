@@ -145,9 +145,9 @@ export function packetToBytes(
  * @param protocolVersion the protocol version to decode the packet for.
  * @returns the decoded packet.
  * @throws {MqttPacketsError.MqttPacketParseError} if the bytes cannot be decoded: they are not exactly one packet, or the
- * packet is a Malformed Packet or a Protocol Error, e.g. a field goes past the end of the packet or a property is included
- * more than once (MQTT 5.0 4.13), or its packet type is Reserved: 0, or 15 (AUTH) with MQTT 3.1.1. `cause` is the error that
- * was found.
+ * packet is a Malformed Packet or a Protocol Error, e.g. a field goes past the end of the packet, a property is included
+ * more than once (MQTT 5.0 4.13) or a PUBLISH with QoS 1 or QoS 2 has a packet ID of 0, or its packet type is Reserved: 0, or
+ * 15 (AUTH) with MQTT 3.1.1. `cause` is the error that was found.
  */
 export function decode(
   buffer: Uint8Array,

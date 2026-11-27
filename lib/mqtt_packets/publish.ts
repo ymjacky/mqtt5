@@ -2,6 +2,7 @@ import * as Mqtt from '../mqtt/mod.ts';
 import { ByteReader, concatBytes, numToQoS, numToTwoByteInteger, remainingLengthToBytes, stringToUtfEncodedString } from '../mqtt_utils/mod.ts';
 import * as MqttProperties from '../mqtt_properties/mod.ts';
 import { readProperties } from '../mqtt_properties/read_properties.ts';
+import { ProtocolViolationError } from '../mqtt_utils/error.ts';
 import { packetIdValue, zeroToTwoValue } from './field_values.ts';
 import type { PublishPacket } from './packet_types.ts';
 
@@ -39,6 +40,20 @@ export function toBytes(
   return concatBytes([fixedHeader, variableHeader, payload]);
 }
 
+/**
+ * Reads the packet ID of a PUBLISH with QoS 1 or QoS 2. The sender must give it a packet ID other than 0 ([MQTT-2.2.1-3],
+ * [MQTT-2.2.1-4]; MQTT 3.1.1 [MQTT-2.3.1-1]): a PUBLISH with 0 can be read, but has data that the protocol does not allow,
+ * which is a Protocol Error (MQTT 5.0 4.13).
+ * @throws {ProtocolViolationError} if the packet ID is 0.
+ */
+function readPacketId(reader: ByteReader): number {
+  const packetId = reader.readTwoByteInteger();
+  if (packetId === 0) {
+    throw new ProtocolViolationError('the packet ID of a PUBLISH with QoS 1 or QoS 2 must not be 0');
+  }
+  return packetId;
+}
+
 export function parse(
   packetFlags: number,
   buffer: Uint8Array,
@@ -55,7 +70,7 @@ export function parse(
   const reader = new ByteReader(buffer, remainingLength);
   const topic = reader.readUtf8EncodedString();
   // Only QoS 1 and QoS 2 have a packet ID.
-  const qosAndPacketId = qos === Mqtt.QoS.AtMostOnce ? { qos } : { qos, packetId: reader.readTwoByteInteger() };
+  const qosAndPacketId = qos === Mqtt.QoS.AtMostOnce ? { qos } : { qos, packetId: readPacketId(reader) };
   const properties = protocolVersion > Mqtt.ProtocolVersion.MqttV3_1_1 ? readProperties(reader) : undefined;
 
   // payload: the rest of the packet

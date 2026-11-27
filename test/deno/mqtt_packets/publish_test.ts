@@ -753,3 +753,35 @@ Deno.test('decodePublishPacketWithAnInvalidTopic', function () {
     assertInstanceOf(error.cause, MqttUtilsError.InvalidUtf8EncodedStringError, JSON.stringify(topicBytes));
   }
 });
+
+/** A PUBLISH to 't' with the payload 'x' and the packet ID 0, which the encoder does not write. */
+function publishWithPacketIdZero(qos: 1 | 2, protocolVersion: Mqtt.ProtocolVersion): Uint8Array {
+  const properties = protocolVersion === Mqtt.ProtocolVersion.MqttV5 ? [0x00] : [];
+  const variableHeader = [0x00, 0x01, 0x74, 0x00, 0x00, ...properties];
+  return Uint8Array.from([0x30 | (qos << 1), variableHeader.length + 1, ...variableHeader, 0x78]);
+}
+
+Deno.test('decodePublishPacketWithPacketIdZero', function () {
+  // The sender must give a PUBLISH with QoS 1 or QoS 2 a packet ID other than 0 ([MQTT-2.2.1-3], [MQTT-2.2.1-4]; MQTT 3.1.1
+  // [MQTT-2.3.1-1]). Such a PUBLISH can be read, so it is a Protocol Error, not a Malformed Packet.
+  for (const protocolVersion of [Mqtt.ProtocolVersion.MqttV5, Mqtt.ProtocolVersion.MqttV3_1_1]) {
+    for (const qos of [1, 2] as const) {
+      const error = assertThrows(() => decode(publishWithPacketIdZero(qos, protocolVersion), protocolVersion), MqttPacketsError.MqttPacketParseError);
+      assertInstanceOf(error.cause, MqttUtilsError.ProtocolViolationError, `QoS ${qos} (${protocolVersion})`);
+      assertEquals(error.cause.message, 'protocol error: the packet ID of a PUBLISH with QoS 1 or QoS 2 must not be 0');
+    }
+  }
+});
+
+Deno.test('decodePublishPacketWithTheSmallestAndLargestPacketIds', function () {
+  for (const protocolVersion of [Mqtt.ProtocolVersion.MqttV5, Mqtt.ProtocolVersion.MqttV3_1_1]) {
+    for (const qos of [1, 2] as const) {
+      for (const packetId of [1, 65_535]) {
+        const bytes = publishWithPacketIdZero(qos, protocolVersion);
+        bytes.set([packetId >> 8, packetId & 0xFF], 5);
+        const packet = decode(bytes, protocolVersion);
+        assertEquals(packet.type === 'publish' && [packet.qos, packet.packetId], [qos, packetId], `QoS ${qos} ${packetId} (${protocolVersion})`);
+      }
+    }
+  }
+});
