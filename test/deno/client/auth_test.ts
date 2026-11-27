@@ -231,6 +231,53 @@ Deno.test({ name: '@auth too large', only: false }, async (context) => {
   );
 }); // @auth too large
 
+// AUTH can carry only 0x00 (Success), 0x18 (Continue authentication) and 0x19 (Re-authenticate) [MQTT-3.15.2-1], but the type
+// of the argument, Mqtt.ReasonCode, also has the codes of the other packets.
+Deno.test({ name: '@auth with a Reason Code that AUTH cannot carry', only: false }, async (context) => {
+  await context.step('auth() rejects with InvalidArgumentError and sends nothing; the connection stays open', async () => {
+    const broker = new TestBroker();
+    const client = new MqttClient({ clientId: 'cid', logger });
+    try {
+      const received: string[] = [];
+      broker.on('connect', (event) => {
+        const packet = event.detail;
+        broker.sendConnack(packet.clientId, false, packet.protocolVersion);
+      });
+      broker.on('auth', (event) => {
+        received.push(`auth ${event.detail.reasonCode}`);
+      });
+      broker.on('publish', (event) => {
+        received.push(`publish ${event.detail.topic}`);
+      });
+      broker.listen();
+      await client.connect();
+
+      await assertRejects(
+        () => client.auth(Mqtt.ReasonCode.NotAuthorized, { authenticationMethod: 'M' }),
+        ClientErrors.InvalidArgumentError,
+        'reasonCode must be 0x00 (Success), 0x18 (Continue authentication) or 0x19 (Re-authenticate) (got 135)',
+      );
+      // The broker gets the next packets on the same connection, and nothing before them.
+      await client.auth(Mqtt.ReasonCode.ReAuthenticate, { authenticationMethod: 'M' });
+      await client.publish('topic/after', 'x');
+      await waitFor(() => received.length > 1, 'the AUTH and the PUBLISH');
+      assertEquals(received, [`auth ${Mqtt.ReasonCode.ReAuthenticate}`, 'publish topic/after']);
+    } finally {
+      await client.disconnect(true);
+      await broker.destroy();
+    }
+  });
+
+  await context.step('auth() rejects with InvalidArgumentError also while not connected', async () => {
+    const client = new MqttClient({ clientId: 'cid', logger });
+
+    // ignored on purpose: the rejection must not terminate the process
+    client.auth(Mqtt.ReasonCode.QuotaExceeded);
+
+    await assertRejects(() => client.auth(Mqtt.ReasonCode.QuotaExceeded), ClientErrors.InvalidArgumentError, '(got 151)');
+  });
+}); // @auth with a Reason Code that AUTH cannot carry
+
 // MQTT 3.1.1 has no AUTH: its packet type 15 is Reserved (MQTT 3.1.1 2.2.1), and the receiver of it must close the
 // connection [MQTT-4.8.0-1].
 Deno.test({ name: '@auth with MQTT 3.1.1', only: false }, async (context) => {

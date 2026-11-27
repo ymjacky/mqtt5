@@ -1,10 +1,11 @@
 /**
- * Checks of the values given to the client constructor, publish(), subscribe(), unsubscribe() and connect(),
- * done before anything is sent.
+ * Checks of the values given to the client constructor, publish(), subscribe(), unsubscribe(), connect(), disconnect() and
+ * auth(), done before anything is sent.
  * Only the values that are used are checked: MQTT 3.1.1 packets have no properties and no Retain Handling,
  * and MQTT 3.1.1 has no topic aliases, so they are not checked there.
- * The packet encoders check only the rules of the data types and of the property values, for every packet (e.g. a UTF-8
- * Encoded String must not contain U+0000 or a lone surrogate, a Receive Maximum must not be 0), and fail with
+ * The packet encoders check only the rules of the data types and of the field and property values, for every packet (e.g. a
+ * UTF-8 Encoded String must not contain U+0000 or a lone surrogate, a QoS must be 0, 1 or 2, a Receive Maximum must not be 0),
+ * and fail with
  * MqttPacketSerializeError, which does not tell where the wrong value is: a string is not named, and a property is named only
  * by its key (`messageExpiryInterval`, not `will.properties.messageExpiryInterval`). These checks come first and name it.
  * @module
@@ -13,6 +14,7 @@
 import * as Mqtt from '../mqtt/mod.ts';
 import type * as MqttProperties from '../mqtt_properties/mod.ts';
 import * as MqttUtils from '../mqtt_utils/mod.ts';
+import { authReasonCodes } from '../mqtt_packets/field_values.ts';
 import type { ClientOptions, ConnectOptions, SubscriptionOption } from './client_types.ts';
 import {
   InvalidArgumentError,
@@ -556,6 +558,20 @@ export function validateDisconnect(
   if (sessionExpiryInterval !== undefined && sessionExpiryInterval !== 0 && !connectProperties?.sessionExpiryInterval) {
     throw new InvalidPropertyError(
       `properties.sessionExpiryInterval must be 0 or absent, as the Session Expiry Interval of CONNECT was 0 or absent (got ${sessionExpiryInterval})`,
+    );
+  }
+}
+
+/**
+ * Checks the Reason Code of auth(). AUTH can carry only 0x00 (Success), 0x18 (Continue authentication) and 0x19
+ * (Re-authenticate) [MQTT-3.15.2-1]. The type of the argument is `Mqtt.ReasonCode`, which also has the codes of the other
+ * packets.
+ * @throws {InvalidArgumentError}
+ */
+export function validateAuth(reasonCode: number | undefined): void {
+  if (reasonCode !== undefined && !authReasonCodes.has(reasonCode)) {
+    throw new InvalidArgumentError(
+      `reasonCode must be 0x00 (Success), 0x18 (Continue authentication) or 0x19 (Re-authenticate) (got ${reasonCode})`,
     );
   }
 }

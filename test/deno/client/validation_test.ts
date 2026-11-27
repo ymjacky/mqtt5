@@ -2,6 +2,7 @@ import { assert, assertThrows } from '@std/assert';
 import { Mqtt } from '../../../deno/mod.ts';
 import { InvalidArgumentError, InvalidPropertyError, InvalidTopicFilterError, InvalidTopicNameError } from '../../../lib/client/error.ts';
 import {
+  validateAuth,
   validateClientOptions,
   validateConnect,
   validateDisconnect,
@@ -449,5 +450,27 @@ Deno.test('validateClientOptions does not put the clientId, the username or the 
   for (const options of [{ clientId: 'secret\u0000' }, { username: 'secret\uD800' }, { password: 'secret\uD800' }]) {
     const error = assertThrows(() => validateClientOptions(options, V5), InvalidArgumentError);
     assert(!error.message.includes('secret'), error.message);
+  }
+});
+
+Deno.test('validateAuth accepts the Reason Codes of AUTH, and no Reason Code', () => {
+  for (const reasonCode of [undefined, Mqtt.ReasonCode.Success, Mqtt.ReasonCode.ContinueAuthentication, Mqtt.ReasonCode.ReAuthenticate]) {
+    validateAuth(reasonCode);
+  }
+});
+
+Deno.test('validateAuth rejects the other Reason Codes, also the ones that the type Mqtt.ReasonCode has for other packets [MQTT-3.15.2-1]', () => {
+  for (let reasonCode = 0; reasonCode <= 0xFF; reasonCode++) {
+    if (reasonCode !== 0x00 && reasonCode !== 0x18 && reasonCode !== 0x19) {
+      assertThrows(
+        () => validateAuth(reasonCode),
+        InvalidArgumentError,
+        'reasonCode must be 0x00 (Success), 0x18 (Continue authentication) or 0x19',
+        `${reasonCode}`,
+      );
+    }
+  }
+  for (const reasonCode of [0x118, -1, 24.5, NaN]) {
+    assertThrows(() => validateAuth(reasonCode), InvalidArgumentError, `(got ${reasonCode})`, `${reasonCode}`);
   }
 });

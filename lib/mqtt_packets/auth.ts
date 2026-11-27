@@ -3,6 +3,7 @@ import * as MqttProperties from '../mqtt_properties/mod.ts';
 import { readProperties } from '../mqtt_properties/read_properties.ts';
 import { ByteReader, concatBytes, remainingLengthToBytes } from '../mqtt_utils/mod.ts';
 import { UnsupportedPacketError } from './error.ts';
+import { authReasonCodes, reasonCodeValue } from './field_values.ts';
 import type { AuthPacket } from './packet_types.ts';
 
 /**
@@ -24,13 +25,13 @@ export function toBytes(
   expectAuthInProtocolVersion(protocolVersion);
   const variableHeaderChunks: (Uint8Array | number[])[] = [];
 
-  const reasonCode = packet.reasonCode || 0x00; // 0x00 success
+  const reasonCode = reasonCodeValue('AUTH', 'reasonCode', packet.reasonCode ?? 0x00, authReasonCodes); // 0x00 success
   if (packet.properties) {
-    variableHeaderChunks.push([reasonCode & 0xFF]);
+    variableHeaderChunks.push([reasonCode]);
     variableHeaderChunks.push(MqttProperties.propertiesToBytes(packet.properties));
   } else {
     if (reasonCode !== 0x00) {
-      variableHeaderChunks.push([reasonCode & 0xFF]);
+      variableHeaderChunks.push([reasonCode]);
     }
   }
 
