@@ -242,6 +242,10 @@ A broker can say in CONNACK (MQTT 5.0) that it does not support wildcard subscri
 rejects a topic filter with `+` / `#`, a `$share/...` topic filter or a `subscriptionIdentifier` with `WildcardSubscriptionsNotSupportedError`,
 `SharedSubscriptionsNotSupportedError` or `SubscriptionIdentifiersNotSupportedError`, and nothing is sent. The broker would close the connection otherwise.
 
+The `topic` of a `publish` event is never empty: a topic alias (MQTT 5.0) is resolved, see [Topic aliases](#topic-aliases). The broker must not send an empty
+Topic Name without a topic alias. The client does not receive such a PUBLISH (no `publish` event, no PUBACK / PUBREC): it sends DISCONNECT with the Reason Code
+0x82 (Protocol Error) with MQTT 5.0, or closes the connection with MQTT 3.1.1.
+
 ## Events
 
 Register listeners with `client.on(type, listener)` and remove them with `client.off(type, listener)`. `event.detail` holds the packet.
@@ -624,7 +628,11 @@ MQTT 5.0 only.
 - `topicAliasMaximumAboutSend`: when set, topic aliases are assigned to outgoing PUBLISH packets automatically, up to the smaller of this value and the broker's
   Topic Alias Maximum. If the broker's CONNACK has no Topic Alias Maximum (or it is 0), no topic aliases are sent.
 - `topicAliasMaximumAboutReceive`: when set, it is sent to the broker as the Topic Alias Maximum property of CONNECT, and topic aliases in incoming PUBLISH
-  packets are resolved automatically.
+  packets are resolved automatically. A `topicAliasMaximum` in the `properties` of `connect()` is sent in the same way, unless this option is set.
+
+The broker must not send a topic alias that is 0 or greater than the Topic Alias Maximum of CONNECT (when it was not sent, any topic alias), nor an empty
+Topic Name with a topic alias that it has not set on the connection. The client does not receive such a PUBLISH (no `publish` event, no PUBACK / PUBREC): it
+sends DISCONNECT with the Reason Code 0x94 (Topic Alias invalid) or 0x82 (Protocol Error), and the connection is closed.
 
 ### Server redirection
 

@@ -92,6 +92,8 @@ Deno.test({ name: '@receive publish_qos0 ws', only: false }, async (context) => 
           connectTimeoutMS: 10000,
           keepAlive: 10,
           protocolVersion: Mqtt.ProtocolVersion.MqttV5,
+          // The PUBLISH below has the Topic Alias 2, which must not be greater than the Topic Alias Maximum of CONNECT.
+          topicAliasMaximumAboutReceive: 2,
         });
 
         broker.on('connect', (event) => {
@@ -265,6 +267,8 @@ Deno.test({ name: '@receive publish_qos1 ws', only: false }, async (context) => 
           connectTimeoutMS: 10000,
           keepAlive: 10,
           protocolVersion: Mqtt.ProtocolVersion.MqttV5,
+          // The PUBLISH below has the Topic Alias 2, which must not be greater than the Topic Alias Maximum of CONNECT.
+          topicAliasMaximumAboutReceive: 2,
         });
 
         broker.on('connect', (event) => {
@@ -456,6 +460,8 @@ Deno.test({ name: '@receive publish_qos2 ws', only: false }, async (context) => 
           connectTimeoutMS: 10000,
           keepAlive: 10,
           protocolVersion: Mqtt.ProtocolVersion.MqttV5,
+          // The PUBLISH below has the Topic Alias 2, which must not be greater than the Topic Alias Maximum of CONNECT.
+          topicAliasMaximumAboutReceive: 2,
         });
 
         broker.on('connect', (event) => {

@@ -1729,22 +1729,17 @@ export abstract class BaseMqttClient {
     }
   }
 
-  /** Handles PUBLISH: resolves the topic alias, sends PUBACK / PUBREC per QoS and emits the `publish` event. */
+  /**
+   * Handles PUBLISH: resolves the topic alias, sends PUBACK / PUBREC per QoS and emits the `publish` event.
+   * A PUBLISH whose Topic Name cannot be known, e.g. with an invalid Topic Alias, ends the connection, and is not handled
+   * otherwise: no PUBACK / PUBREC and no `publish` event.
+   */
   private async handlePublish(packet: PublishPacket): Promise<void> {
-    { // resolve topic alias
-      if (packet.properties?.topicAlias) {
-        if (packet.topic === '') {
-          const storedTopic = this.#topicAliasMapAboutReceive.get(packet.properties.topicAlias);
-          if (storedTopic) {
-            packet.topic = storedTopic;
-          } else {
-            this.log('Unregistered topic alias received');
-            return;
-          }
-        } else {
-          this.#topicAliasMapAboutReceive.set(packet.properties.topicAlias, packet.topic);
-        }
-      }
+    const topicNameError = this.resolveTopicName(packet);
+    if (topicNameError !== undefined) {
+      this.log(`PUBLISH whose Topic Name cannot be known received, ending the connection (reason code ${topicNameError})`, packet);
+      await this.disconnectWithError(topicNameError);
+      return;
     }
 
     if (packet.qos === Mqtt.QoS.AtMostOnce) {
@@ -1785,6 +1780,39 @@ export abstract class BaseMqttClient {
         );
       }
     }
+  }
+
+  /**
+   * Sets the Topic Name of a received PUBLISH from its Topic Alias, as MQTT 5.0 3.3.4 says: an empty Topic Name is
+   * replaced with the Topic Name of the alias, and a Topic Name sent with an alias sets the alias (or changes it) for the
+   * connection.
+   * @returns the Reason Code to end the connection with if the Topic Name cannot be known, or undefined:
+   * - TopicAliasInvalid (0x94) if the Topic Alias is 0 [MQTT-3.3.2-8], or greater than the Topic Alias Maximum sent in
+   *   CONNECT [MQTT-3.1.2-26]. Without it, the Topic Alias Maximum is 0, and the broker must not send any alias
+   *   [MQTT-3.1.2-27].
+   * - ProtocolError (0x82) if the Topic Name is empty, and there is no Topic Alias (MQTT 5.0 3.3.2.1; with MQTT 3.1.1, a
+   *   Topic Name must be at least one character long [MQTT-4.7.3-1]) or the alias has not been set on this connection.
+   */
+  private resolveTopicName(packet: PublishPacket): Mqtt.ReasonCode | undefined {
+    const topicAlias = packet.properties?.topicAlias;
+    if (topicAlias === undefined) {
+      return packet.topic === '' ? Mqtt.ReasonCode.ProtocolError : undefined;
+    }
+    // The value sent in CONNECT for the current connection, also when it is given in the CONNECT properties of connect().
+    const topicAliasMaximum = this.#connectProperties?.topicAliasMaximum ?? 0;
+    if (topicAlias === 0 || topicAlias > topicAliasMaximum) {
+      return Mqtt.ReasonCode.TopicAliasInvalid;
+    }
+    if (packet.topic !== '') {
+      this.#topicAliasMapAboutReceive.set(topicAlias, packet.topic);
+      return undefined;
+    }
+    const topic = this.#topicAliasMapAboutReceive.get(topicAlias);
+    if (topic === undefined) {
+      return Mqtt.ReasonCode.ProtocolError;
+    }
+    packet.topic = topic;
+    return undefined;
   }
 
   /**
