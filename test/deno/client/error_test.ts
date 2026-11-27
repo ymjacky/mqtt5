@@ -29,6 +29,7 @@ const errors: Record<string, ErrorFactory> = {
   WildcardSubscriptionsNotSupportedError: (options) => new ClientErrors.WildcardSubscriptionsNotSupportedError('a/#', options),
   SubscriptionIdentifiersNotSupportedError: (options) => new ClientErrors.SubscriptionIdentifiersNotSupportedError(options),
   SharedSubscriptionsNotSupportedError: (options) => new ClientErrors.SharedSubscriptionsNotSupportedError('$share/g/a', options),
+  UnsupportedByProtocolVersionError: (options) => new ClientErrors.UnsupportedByProtocolVersionError('m', options),
   UnexpectedUrlProtocol: (options) => new ClientErrors.UnexpectedUrlProtocol('m', options),
   MqttPacketParseError: (options) => new MqttPackets.MqttPacketsError.MqttPacketParseError('m', options),
   MqttPacketSerializeError: (options) => new MqttPackets.MqttPacketsError.MqttPacketSerializeError('m', options),
@@ -107,6 +108,8 @@ Deno.test('the error classes stay apart as types', () => {
   const _closed: ClientErrors.ConnectionClosed = new ClientErrors.ConnectTimeout();
   // @ts-expect-error not about broker support
   const _notSupported: ClientErrors.NotSupportedByBrokerError = new ClientErrors.InvalidArgumentError('m');
+  // @ts-expect-error not about broker support
+  const _protocolVersion: ClientErrors.NotSupportedByBrokerError = new ClientErrors.UnsupportedByProtocolVersionError('m');
   const _subclass: ClientErrors.NotSupportedByBrokerError = new ClientErrors.RetainNotSupportedError();
   // Every error class of this library has the type of the base class.
   const _base: ClientErrors.MqttClientError = new ClientErrors.ConnectTimeout();

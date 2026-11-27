@@ -6,6 +6,20 @@ function logger(msg: string, ...args: unknown[]): void {
   console.log('[Test Client]', msg, ...args);
 }
 
+function delay(ms: number) {
+  return new Promise<void>((resolve) => setTimeout(resolve, ms));
+}
+
+async function waitFor(condition: () => boolean, label: string, ms = 3000) {
+  const start = Date.now();
+  while (!condition()) {
+    if (Date.now() - start > ms) {
+      throw new Error(`timed out waiting for ${label}`);
+    }
+    await delay(10);
+  }
+}
+
 Deno.test({ name: '@auth', only: false }, async (context) => {
   await context.step(
     'auth',
@@ -216,3 +230,84 @@ Deno.test({ name: '@auth too large', only: false }, async (context) => {
     },
   );
 }); // @auth too large
+
+// MQTT 3.1.1 has no AUTH: its packet type 15 is Reserved (MQTT 3.1.1 2.2.1), and the receiver of it must close the
+// connection [MQTT-4.8.0-1].
+Deno.test({ name: '@auth with MQTT 3.1.1', only: false }, async (context) => {
+  /** A broker that accepts the connection, and the packets it receives after CONNECT. */
+  function listen(broker: TestBroker) {
+    const received: string[] = [];
+    broker.on('connect', (event) => {
+      const packet = event.detail;
+      broker.sendConnack(packet.clientId, false, packet.protocolVersion);
+    });
+    broker.on('auth', () => {
+      received.push('auth');
+    });
+    broker.on('publish', (event) => {
+      received.push(`publish ${event.detail.topic}`);
+    });
+    broker.listen();
+    return received;
+  }
+
+  await context.step('auth() rejects with UnsupportedByProtocolVersionError and sends nothing; the connection stays open', async () => {
+    const broker = new TestBroker();
+    const client = new MqttClient({ clientId: 'cid', logger, protocolVersion: Mqtt.ProtocolVersion.MqttV3_1_1 });
+    try {
+      const received = listen(broker);
+      await client.connect();
+
+      await assertRejects(
+        () => client.auth(Mqtt.ReasonCode.ReAuthenticate, { authenticationMethod: 'M' }),
+        ClientErrors.UnsupportedByProtocolVersionError,
+        'auth() needs MQTT 5.0',
+      );
+      // The broker gets the next packet on the same connection, and nothing before it.
+      await client.publish('topic/after', 'x');
+      await waitFor(() => received.length > 0, 'the PUBLISH');
+      assertEquals(received, ['publish topic/after']);
+    } finally {
+      await client.disconnect(true);
+      await broker.destroy();
+    }
+  });
+
+  await context.step('auth() rejects with UnsupportedByProtocolVersionError also while not connected', async () => {
+    const client = new MqttClient({ clientId: 'cid', logger, protocolVersion: Mqtt.ProtocolVersion.MqttV3_1_1 });
+
+    // ignored on purpose: the rejection must not terminate the process
+    client.auth(Mqtt.ReasonCode.ContinueAuthentication);
+
+    await assertRejects(() => client.auth(Mqtt.ReasonCode.ContinueAuthentication), ClientErrors.UnsupportedByProtocolVersionError);
+  });
+
+  await context.step('a packet of type 15 is not an AUTH: no auth event, and the client closes the connection without DISCONNECT', async () => {
+    const broker = new TestBroker();
+    const client = new MqttClient({ clientId: 'cid', logger, protocolVersion: Mqtt.ProtocolVersion.MqttV3_1_1 });
+    try {
+      listen(broker);
+      let authEvents = 0;
+      let closed = false;
+      const disconnects: unknown[] = [];
+      client.on('auth', () => {
+        authEvents++;
+      });
+      client.on('closed', () => {
+        closed = true;
+      });
+      broker.on('disconnect', (event) => {
+        disconnects.push(event.detail);
+      });
+      await client.connect();
+
+      await broker.sendRawBytes('cid', new Uint8Array([0xF0, 0x00]));
+      await waitFor(() => closed, 'the close');
+      assertEquals(authEvents, 0);
+      assertEquals(disconnects, []);
+    } finally {
+      await client.disconnect(true);
+      await broker.destroy();
+    }
+  });
+}); // @auth with MQTT 3.1.1

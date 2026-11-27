@@ -1,6 +1,7 @@
 // filepath: /Users/jacky/develop/deno/mqtt5/test/deno/mqtt_packets/auth_test.ts
-import { assertEquals, assertThrows } from '@std/assert';
+import { assertEquals, assertInstanceOf, assertThrows } from '@std/assert';
 import { MqttUtilsError } from '../../../lib/mqtt_utils/mod.ts';
+import { MqttPacketsError, packetToBytes } from '../../../lib/mqtt_packets/mod.ts';
 import type { AuthPacket } from '../../../lib/mqtt_packets/packet_types.ts';
 import { parse, toBytes } from '../../../lib/mqtt_packets/auth.ts';
 import * as Mqtt from '../../../lib/mqtt/mod.ts';
@@ -437,4 +438,27 @@ Deno.test('decodeAuthPacketWithEmptyProperties', function () {
       reasonCode: Mqtt.ReasonCode.Success,
     },
   );
+});
+
+// MQTT 3.1.1 has no AUTH: its packet type 15 is Reserved (MQTT 3.1.1 2.2.1).
+Deno.test('AUTH cannot be encoded with MQTT 3.1.1', function () {
+  assertThrows(
+    () => toBytes({ type: 'auth' }, Mqtt.ProtocolVersion.MqttV3_1_1),
+    MqttPacketsError.UnsupportedPacketError,
+    'unsupported packet: AUTH (packet type 15 is Reserved in MQTT 3.1.1)',
+  );
+});
+
+Deno.test('AUTH cannot be decoded with MQTT 3.1.1', function () {
+  assertThrows(
+    () => parse(new Uint8Array([]), 0, Mqtt.ProtocolVersion.MqttV3_1_1),
+    MqttPacketsError.UnsupportedPacketError,
+    'unsupported packet: AUTH (packet type 15 is Reserved in MQTT 3.1.1)',
+  );
+});
+
+Deno.test('packetToBytes throws for AUTH with MQTT 3.1.1, and encodes it with MQTT 5.0', function () {
+  const error = assertThrows(() => packetToBytes({ type: 'auth' }, Mqtt.ProtocolVersion.MqttV3_1_1), MqttPacketsError.MqttPacketSerializeError);
+  assertInstanceOf(error.cause, MqttPacketsError.UnsupportedPacketError);
+  assertEquals(packetToBytes({ type: 'auth' }, Mqtt.ProtocolVersion.MqttV5), new Uint8Array([0xf0, 0x00]));
 });

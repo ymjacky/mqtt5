@@ -15,6 +15,7 @@ import {
   SendPacketError,
   StateIsNotOfflineError,
   StateIsNotOnlineError,
+  UnsupportedByProtocolVersionError,
 } from './error.ts';
 import { Deferred } from './promise.ts';
 import { Timer } from './timer.ts';
@@ -1266,6 +1267,7 @@ export abstract class BaseMqttClient {
    * @param reasonCode a {@link Mqtt.ReasonCode}, e.g. `Mqtt.ReasonCode.ContinueAuthentication` or `Mqtt.ReasonCode.ReAuthenticate`.
    * @param properties AUTH properties ({@link MqttProperties.AuthProperties}), such as `authenticationMethod` and `authenticationData`.
    * The Reason String and User Properties are left out if they make AUTH larger than the Maximum Packet Size of the broker.
+   * @throws {UnsupportedByProtocolVersionError} if the client uses MQTT 3.1.1, which has no AUTH. Nothing is sent.
    * @throws {SendPacketError} if the client is not connected.
    * @throws {PacketTooLargeError} if AUTH is larger than the Maximum Packet Size of the broker even without the Reason String
    * and User Properties. Nothing is sent.
@@ -1275,6 +1277,11 @@ export abstract class BaseMqttClient {
     properties?: MqttProperties.AuthProperties,
   ): Promise<void> {
     const deferred = createRequestDeferred<void>();
+    if (this.protocolVersion === Mqtt.ProtocolVersion.MqttV3_1_1) {
+      // Packet type 15 is Reserved in MQTT 3.1.1 (2.2.1): the broker would close the connection on it [MQTT-4.8.0-1].
+      deferred.reject(new UnsupportedByProtocolVersionError('auth() needs MQTT 5.0: MQTT 3.1.1 has no AUTH'));
+      return deferred.promise;
+    }
     const packet: AuthPacket = {
       type: 'auth',
       reasonCode,
@@ -1971,7 +1978,8 @@ export abstract class BaseMqttClient {
 
   /**
    * Whether the packet is one that the broker must not send while connect() waits for CONNACK. With MQTT 5.0, the broker
-   * sends AUTH only before CONNACK [MQTT-3.2.0-1]; with MQTT 3.1.1, CONNACK is the first packet it sends [MQTT-3.2.0-1].
+   * sends AUTH only before CONNACK [MQTT-3.2.0-1]; with MQTT 3.1.1, CONNACK is the first packet it sends [MQTT-3.2.0-1],
+   * and AUTH is never received: the decoder rejects its packet type 15, which is Reserved there, as a malformed packet.
    * DISCONNECT is not counted: the broker must not send it before CONNACK either [MQTT-3.14.0-1], but the client closes
    * the connection on it anyway, and emits the `disconnect` event, which tells why.
    */
@@ -1982,9 +1990,8 @@ export abstract class BaseMqttClient {
     switch (packet.type) {
       case 'connack':
       case 'disconnect':
-        return false;
       case 'auth':
-        return this.protocolVersion === Mqtt.ProtocolVersion.MqttV3_1_1;
+        return false;
       default:
         return true;
     }
