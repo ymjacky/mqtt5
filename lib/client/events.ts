@@ -17,9 +17,15 @@ export interface CustomEventMap {
   'closed': CustomEvent<void>;
 }
 
-/** A listener for an event in {@link CustomEventMap}. */
+/**
+ * A listener for an event in {@link CustomEventMap}.
+ *
+ * Catch the errors in the listener: the client does not use its return value, and does not catch what it throws.
+ * An error thrown by the listener, or the rejection of the promise of an `async` listener, is then not handled by anyone:
+ * Deno terminates the process, and a browser reports it in the console. An `async` listener can still be passed.
+ */
 export interface CustomEventListener<T = unknown> {
-  (evt: T): void | Promise<void>;
+  (evt: T): void;
 }
 
 /** The type of `event.detail` of an event in {@link CustomEventMap}. */
