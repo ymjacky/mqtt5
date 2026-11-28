@@ -149,9 +149,10 @@ export function packetToBytes(
  * @param protocolVersion the protocol version to decode the packet for.
  * @returns the decoded packet.
  * @throws {MqttPacketsError.MqttPacketParseError} if the bytes cannot be decoded: they are not exactly one packet, or the
- * packet is a Malformed Packet or a Protocol Error, e.g. a field goes past the end of the packet, a property is included
- * more than once (MQTT 5.0 4.13), a PUBLISH with QoS 1 or QoS 2 has a packet ID of 0 or an AUTH has no Authentication
- * Method, or its packet type is Reserved: 0, or
+ * packet is a Malformed Packet or a Protocol Error, e.g. a field goes past the end of the packet, the flags of the fixed
+ * header are not the ones that its packet type must have (all packet types but PUBLISH: 0b0010 for PUBREL, SUBSCRIBE and
+ * UNSUBSCRIBE, 0b0000 for the others), a property is included more than once (MQTT 5.0 4.13), a PUBLISH with QoS 1 or QoS 2
+ * has a packet ID of 0 or an AUTH has no Authentication Method, or its packet type is Reserved: 0, or
  * 15 (AUTH) with MQTT 3.1.1. It is also thrown, with `MqttPacketsError.InvalidProtocolVersionError` as its cause, when
  * `protocolVersion` or the Protocol Level of a CONNECT is not 4 (MQTT 3.1.1) or 5 (MQTT 5.0). `cause` is the error that was
  * found.
@@ -199,9 +200,11 @@ function parsePacket(
 
   switch (packetTypeId) {
     case Mqtt.PacketType.Connect:
+      expectFlags('CONNECT', packetFlags, Mqtt.FixedHeaderFlag.Connect);
       packet = connectParse(variableHeaderAndPayload, remainingLength);
       break;
     case Mqtt.PacketType.Connack:
+      expectFlags('CONNACK', packetFlags, Mqtt.FixedHeaderFlag.Connack);
       packet = connackParse(variableHeaderAndPayload, remainingLength, protocolVersion);
       break;
     case Mqtt.PacketType.Publish:
@@ -213,39 +216,54 @@ function parsePacket(
       );
       break;
     case Mqtt.PacketType.Puback:
+      expectFlags('PUBACK', packetFlags, Mqtt.FixedHeaderFlag.Puback);
       packet = pubackParse(variableHeaderAndPayload, remainingLength, protocolVersion);
       break;
     case Mqtt.PacketType.Pubrec:
+      expectFlags('PUBREC', packetFlags, Mqtt.FixedHeaderFlag.Pubrec);
       packet = pubrecParse(variableHeaderAndPayload, remainingLength, protocolVersion);
       break;
     case Mqtt.PacketType.Pubrel:
+      expectFlags('PUBREL', packetFlags, Mqtt.FixedHeaderFlag.Pubrel);
       packet = pubrelParse(variableHeaderAndPayload, remainingLength, protocolVersion);
       break;
     case Mqtt.PacketType.Pubcomp:
+      expectFlags('PUBCOMP', packetFlags, Mqtt.FixedHeaderFlag.Pubcomp);
       packet = pubcompParse(variableHeaderAndPayload, remainingLength, protocolVersion);
       break;
     case Mqtt.PacketType.Subscribe:
+      expectFlags('SUBSCRIBE', packetFlags, Mqtt.FixedHeaderFlag.Subscribe);
       packet = subscribeParse(variableHeaderAndPayload, remainingLength, protocolVersion);
       break;
     case Mqtt.PacketType.Suback:
+      expectFlags('SUBACK', packetFlags, Mqtt.FixedHeaderFlag.Suback);
       packet = subackParse(variableHeaderAndPayload, remainingLength, protocolVersion);
       break;
     case Mqtt.PacketType.Unsubscribe:
+      expectFlags('UNSUBSCRIBE', packetFlags, Mqtt.FixedHeaderFlag.Unsubscribe);
       packet = unsubscribeParse(variableHeaderAndPayload, remainingLength, protocolVersion);
       break;
     case Mqtt.PacketType.Unsuback:
+      expectFlags('UNSUBACK', packetFlags, Mqtt.FixedHeaderFlag.Unsuback);
       packet = unsubackParse(variableHeaderAndPayload, remainingLength, protocolVersion);
       break;
     case Mqtt.PacketType.Pingreq:
+      expectFlags('PINGREQ', packetFlags, Mqtt.FixedHeaderFlag.Pingreq);
       packet = pingreqParse(remainingLength);
       break;
     case Mqtt.PacketType.Pingresp:
+      expectFlags('PINGRESP', packetFlags, Mqtt.FixedHeaderFlag.Pingresp);
       packet = pingrespParse(remainingLength);
       break;
     case Mqtt.PacketType.Disconnect:
+      expectFlags('DISCONNECT', packetFlags, Mqtt.FixedHeaderFlag.Disconnect);
       packet = disconnectParse(variableHeaderAndPayload, remainingLength, protocolVersion);
       break;
     case Mqtt.PacketType.Auth:
+      // With MQTT 3.1.1, packet type 15 is Reserved: authParse() rejects it, whatever its flags.
+      if (protocolVersion >= Mqtt.ProtocolVersion.MqttV5) {
+        expectFlags('AUTH', packetFlags, Mqtt.FixedHeaderFlag.Auth);
+      }
       packet = authParse(variableHeaderAndPayload, remainingLength, protocolVersion);
       break;
     default:
@@ -253,4 +271,23 @@ function parsePacket(
   }
 
   return packet as AnyPacket;
+}
+
+/**
+ * Checks the flags of the fixed header (its lower 4 bits) of a packet type other than PUBLISH. They are reserved and must have
+ * the value that the packet type defines [MQTT-2.1.3-1] (MQTT 3.1.1 [MQTT-2.2.2-1]): 0b0010 for PUBREL, SUBSCRIBE and
+ * UNSUBSCRIBE, 0b0000 for the others. A packet with other flags is a Malformed Packet (MQTT 5.0 2.1.3; MQTT 3.1.1 2.2.2: the
+ * receiver closes the connection [MQTT-2.2.2-2]).
+ * @throws {MqttUtils.MqttUtilsError.MalformedDataError} if the flags are not the expected ones.
+ */
+function expectFlags(packetName: string, packetFlags: number, expected: number): void {
+  if (packetFlags !== expected) {
+    throw new MqttUtils.MqttUtilsError.MalformedDataError(
+      `the flags of the fixed header of ${packetName} must be ${toFlagBits(expected)} (got ${toFlagBits(packetFlags)})`,
+    );
+  }
+}
+
+function toFlagBits(flags: number): string {
+  return `0b${flags.toString(2).padStart(4, '0')}`;
 }

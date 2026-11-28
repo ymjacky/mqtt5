@@ -1,6 +1,6 @@
-import { assertEquals, assertInstanceOf, assertThrows } from '@std/assert';
+import { assert, assertEquals, assertInstanceOf, assertThrows } from '@std/assert';
 import * as Mqtt from '../../../lib/mqtt/mod.ts';
-import { decode, MqttPacketsError } from '../../../lib/mqtt_packets/mod.ts';
+import { type AnyPacket, decode, MqttPacketsError, packetToBytes } from '../../../lib/mqtt_packets/mod.ts';
 import { MqttUtilsError } from '../../../lib/mqtt_utils/mod.ts';
 
 const V5 = Mqtt.ProtocolVersion.MqttV5;
@@ -122,11 +122,100 @@ Deno.test('decode throws for a packet type that is Reserved', () => {
   const cases: [string, number[], Mqtt.ProtocolVersion][] = [
     ['type 0', [0x00, 0x00], V5],
     ['type 0 (MQTT 3.1.1)', [0x00, 0x00], V3],
-    // AUTH is new in MQTT 5.0.
+    ['type 0 with the flags 0b1111', [0x0F, 0x00], V5],
+    // AUTH is new in MQTT 5.0. Its flags do not matter: the packet type is Reserved.
     ['type 15 (MQTT 3.1.1)', [0xF0, 0x00], V3],
+    ['type 15 with the flags 0b0001 (MQTT 3.1.1)', [0xF1, 0x00], V3],
   ];
   for (const [name, bytes, protocolVersion] of cases) {
     assertInstanceOf(decodeError(bytes, protocolVersion, name), MqttPacketsError.UnsupportedPacketError, name);
+  }
+});
+
+/** `flags` as 4 bits, e.g. 0b0010. */
+function toBits(flags: number): string {
+  return `0b${flags.toString(2).padStart(4, '0')}`;
+}
+
+/**
+ * A packet of each type but PUBLISH, and the flags that its fixed header must have: 0b0010 for PUBREL, SUBSCRIBE and
+ * UNSUBSCRIBE, 0b0000 for the others (MQTT 5.0 2.1.3 Table 2-2, and the same in MQTT 3.1.1 2.2.2 Table 2.2). MQTT 3.1.1 has
+ * no AUTH.
+ */
+function packetsWithReservedFlags(protocolVersion: Mqtt.ProtocolVersion): [AnyPacket, number][] {
+  const packets: [AnyPacket, number][] = [
+    [{ type: 'connect', clientId: 'c', protocolVersion }, 0b0000],
+    [{ type: 'connack', sessionPresent: false }, 0b0000],
+    [{ type: 'puback', packetId: 1 }, 0b0000],
+    [{ type: 'pubrec', packetId: 1 }, 0b0000],
+    [{ type: 'pubrel', packetId: 1 }, 0b0010],
+    [{ type: 'pubcomp', packetId: 1 }, 0b0000],
+    [{ type: 'subscribe', packetId: 1, subscriptions: [{ topicFilter: 'f', qos: 0 }] }, 0b0010],
+    [{ type: 'suback', packetId: 1, reasonCodes: [0x00], returnCodes: [0x00] }, 0b0000],
+    [{ type: 'unsubscribe', packetId: 1, topicFilters: ['f'] }, 0b0010],
+    [{ type: 'unsuback', packetId: 1, reasonCodes: [0x00] }, 0b0000],
+    [{ type: 'pingreq' }, 0b0000],
+    [{ type: 'pingresp' }, 0b0000],
+    [{ type: 'disconnect' }, 0b0000],
+  ];
+  if (protocolVersion === V5) {
+    packets.push([{ type: 'auth', reasonCode: 0x00, properties: { authenticationMethod: 'M' } }, 0b0000]);
+  }
+  return packets;
+}
+
+Deno.test('decode throws for fixed header flags that the packet type cannot have, instead of ignoring them', () => {
+  // The flags are reserved in every packet type but PUBLISH [MQTT-2.1.3-1] (MQTT 3.1.1 [MQTT-2.2.2-1]): other flags make a
+  // Malformed Packet (MQTT 5.0 2.1.3), and the receiver closes the connection (MQTT 3.1.1 [MQTT-2.2.2-2]).
+  for (const protocolVersion of [V5, V3]) {
+    for (const [packet, expected] of packetsWithReservedFlags(protocolVersion)) {
+      const [first = 0, ...rest] = packetToBytes(packet, protocolVersion);
+      assertEquals(first & 0x0F, expected, `${packet.type} is encoded with ${toBits(expected)} (${protocolVersion})`);
+      for (let flags = 0b0000; flags <= 0b1111; flags++) {
+        const name = `${packet.type} with ${toBits(flags)} (${protocolVersion})`;
+        const bytes = [(first & 0xF0) | flags, ...rest];
+        if (flags === expected) {
+          assertEquals(decode(new Uint8Array(bytes), protocolVersion).type, packet.type, name);
+          continue;
+        }
+        const cause = decodeError(bytes, protocolVersion, name);
+        assertInstanceOf(cause, MqttUtilsError.MalformedDataError, name);
+        assertEquals(
+          cause.message,
+          `malformed data: the flags of the fixed header of ${packet.type.toUpperCase()} must be ${toBits(expected)} (got ${toBits(flags)})`,
+          name,
+        );
+      }
+    }
+  }
+});
+
+Deno.test('decode checks the flags of the fixed header before the fields of the packet', () => {
+  const cases: [string, number[]][] = [
+    // With the flags 0b0000, a Protocol Error: an AUTH with a Remaining Length of 0 has no Authentication Method.
+    ['an AUTH with a Remaining Length of 0', [0xF1, 0x00]],
+    // With the flags 0b0000, a Malformed Packet for the Packet Identifier, which goes past the end.
+    ['a PUBACK whose Packet Identifier goes past the end', [0x41, 0x01, 0x00]],
+  ];
+  for (const [name, bytes] of cases) {
+    const cause = decodeError(bytes, V5, name);
+    assertInstanceOf(cause, MqttUtilsError.MalformedDataError, name);
+    assertEquals(cause.message.includes('the flags of the fixed header'), true, `${name}: ${cause.message}`);
+  }
+});
+
+Deno.test('decode reads the flags of PUBLISH as DUP, QoS and RETAIN, which are not reserved', () => {
+  for (let flags = 0b0000; flags <= 0b1111; flags++) {
+    const qos = (flags & 0b0110) >> 1;
+    if (qos === 3) {
+      continue; // a Malformed Packet [MQTT-3.3.1-4]
+    }
+    // Topic Name 'a', the Packet Identifier 1 with QoS 1 and QoS 2, no properties and no payload.
+    const variableHeader = [0x00, 0x01, 0x61, ...(qos === 0 ? [] : [0x00, 0x01]), 0x00];
+    const packet = decode(new Uint8Array([0x30 | flags, variableHeader.length, ...variableHeader]), V5);
+    assert(packet.type === 'publish', toBits(flags));
+    const expected = { dup: (flags & 0b1000) !== 0, qos, retain: (flags & 0b0001) !== 0 };
+    assertEquals({ dup: packet.dup, qos: packet.qos, retain: packet.retain }, expected, toBits(flags));
   }
 });
 
