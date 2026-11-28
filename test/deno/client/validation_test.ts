@@ -1,5 +1,5 @@
 import { assert, assertThrows } from '@std/assert';
-import { Mqtt } from '../../../deno/mod.ts';
+import { Mqtt, type MqttProperties } from '../../../deno/mod.ts';
 import { InvalidArgumentError, InvalidPropertyError, InvalidTopicFilterError, InvalidTopicNameError } from '../../../lib/client/error.ts';
 import {
   validateAuth,
@@ -467,7 +467,7 @@ Deno.test('validateClientOptions does not put the clientId, the username or the 
 
 Deno.test('validateAuth accepts the Reason Codes of AUTH, and no Reason Code', () => {
   for (const reasonCode of [undefined, Mqtt.ReasonCode.Success, Mqtt.ReasonCode.ContinueAuthentication, Mqtt.ReasonCode.ReAuthenticate]) {
-    validateAuth(reasonCode);
+    validateAuth(reasonCode, undefined);
   }
 });
 
@@ -475,7 +475,7 @@ Deno.test('validateAuth rejects the other Reason Codes, also the ones that the t
   for (let reasonCode = 0; reasonCode <= 0xFF; reasonCode++) {
     if (reasonCode !== 0x00 && reasonCode !== 0x18 && reasonCode !== 0x19) {
       assertThrows(
-        () => validateAuth(reasonCode),
+        () => validateAuth(reasonCode, undefined),
         InvalidArgumentError,
         'reasonCode must be 0x00 (Success), 0x18 (Continue authentication) or 0x19',
         `${reasonCode}`,
@@ -483,6 +483,42 @@ Deno.test('validateAuth rejects the other Reason Codes, also the ones that the t
     }
   }
   for (const reasonCode of [0x118, -1, 24.5, NaN]) {
-    assertThrows(() => validateAuth(reasonCode), InvalidArgumentError, `(got ${reasonCode})`, `${reasonCode}`);
+    assertThrows(() => validateAuth(reasonCode, undefined), InvalidArgumentError, `(got ${reasonCode})`, `${reasonCode}`);
   }
+});
+
+Deno.test('validateAuth accepts valid properties of every kind that AUTH can carry', () => {
+  const properties: MqttProperties.AuthProperties = {
+    authenticationMethod: 'SCRAM-SHA-1',
+    authenticationData: new Uint8Array(65_535),
+    reasonString: 'あ'.repeat(21_845),
+    userProperties: [{ key: 'k', val: 'v' }, { key: '', val: '' }],
+  };
+  for (const reasonCode of [undefined, Mqtt.ReasonCode.Success, Mqtt.ReasonCode.ContinueAuthentication, Mqtt.ReasonCode.ReAuthenticate]) {
+    validateAuth(reasonCode, undefined);
+    validateAuth(reasonCode, {});
+    validateAuth(reasonCode, properties);
+  }
+});
+
+Deno.test('validateAuth rejects invalid properties, instead of leaving them to the encoder', () => {
+  // The encoder failed with a message that does not name the property (or with a TypeError), or sent a string
+  // authenticationData as zero bytes. The values that are not of the type are what JavaScript callers may pass.
+  const cases: [unknown, string][] = [
+    [{ authenticationMethod: 'a\u0000' }, 'properties.authenticationMethod "a\\u0000" must not contain U+0000'],
+    [{ authenticationMethod: 'a\uD800' }, 'properties.authenticationMethod "a\\ud800" must not contain a lone surrogate'],
+    [{ authenticationMethod: 1 }, 'properties.authenticationMethod must be a string'],
+    [{ authenticationData: 'str' }, 'properties.authenticationData must be a Uint8Array'],
+    [{ authenticationData: new Uint8Array(65_536) }, 'properties.authenticationData must be at most 65535 bytes long (got 65536)'],
+    [{ reasonString: 'a'.repeat(65_536) }, 'properties.reasonString must be at most 65535 bytes long in UTF-8'],
+    [{ reasonString: 5 }, 'properties.reasonString must be a string'],
+    [{ userProperties: 'x' }, 'properties.userProperties must be an array of { key, val }'],
+    [{ userProperties: [{ key: 1, val: 'v' }] }, 'properties.userProperties[0].key must be a string'],
+    [{ userProperties: [{ key: 'k', val: 'v' }, { key: 'k', val: 'v\u0000' }] }, 'properties.userProperties[1].val "v\\u0000" must not contain U+0000'],
+  ];
+  for (const [properties, message] of cases) {
+    assertThrows(() => validateAuth(Mqtt.ReasonCode.ReAuthenticate, properties as MqttProperties.AuthProperties), InvalidPropertyError, message, message);
+  }
+  // The Reason Code is checked first.
+  assertThrows(() => validateAuth(Mqtt.ReasonCode.NotAuthorized, { reasonString: 'a\u0000' }), InvalidArgumentError, 'reasonCode');
 });

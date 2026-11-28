@@ -1272,6 +1272,8 @@ export abstract class BaseMqttClient {
    * @throws {UnsupportedByProtocolVersionError} if the client uses MQTT 3.1.1, which has no AUTH. Nothing is sent.
    * @throws {InvalidArgumentError} if `reasonCode` is not one that AUTH can carry: 0x00 (Success), 0x18 (Continue
    * authentication) or 0x19 (Re-authenticate). Nothing is sent.
+   * @throws {InvalidPropertyError} if a property is invalid, e.g. a string with U+0000 or an `authenticationData` that is not a
+   * Uint8Array. Nothing is sent.
    * @throws {SendPacketError} if the client is not connected.
    * @throws {PacketTooLargeError} if AUTH is larger than the Maximum Packet Size of the broker even without the Reason String
    * and User Properties. Nothing is sent.
@@ -1287,9 +1289,9 @@ export abstract class BaseMqttClient {
       return deferred.promise;
     }
     try {
-      validateAuth(reasonCode);
+      validateAuth(reasonCode, properties);
     } catch (err) {
-      // InvalidArgumentError
+      // InvalidArgumentError, InvalidPropertyError
       deferred.reject(err as Error);
       return deferred.promise;
     }

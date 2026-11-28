@@ -568,15 +568,17 @@ export function validateDisconnect(
 }
 
 /**
- * Checks the Reason Code of auth(). AUTH can carry only 0x00 (Success), 0x18 (Continue authentication) and 0x19
- * (Re-authenticate) [MQTT-3.15.2-1]. The type of the argument is `Mqtt.ReasonCode`, which also has the codes of the other
- * packets.
- * @throws {InvalidArgumentError}
+ * Checks the Reason Code and the properties of auth() (MQTT 5.0: auth() rejects before with MQTT 3.1.1, which has no AUTH).
+ * AUTH can carry only 0x00 (Success), 0x18 (Continue authentication) and 0x19 (Re-authenticate) [MQTT-3.15.2-1]. The type of
+ * the argument is `Mqtt.ReasonCode`, which also has the codes of the other packets.
+ * @throws {InvalidArgumentError} if the Reason Code is not one of them.
+ * @throws {InvalidPropertyError} if a property is invalid.
  */
-export function validateAuth(reasonCode: number | undefined): void {
+export function validateAuth(reasonCode: number | undefined, properties: MqttProperties.AuthProperties | undefined): void {
   if (reasonCode !== undefined && !authReasonCodes.has(reasonCode)) {
     throw new InvalidArgumentError(
       `reasonCode must be 0x00 (Success), 0x18 (Continue authentication) or 0x19 (Re-authenticate) (got ${reasonCode})`,
     );
   }
+  validateProperties(properties, 'properties');
 }
