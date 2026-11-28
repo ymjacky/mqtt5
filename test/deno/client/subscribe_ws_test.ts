@@ -44,7 +44,7 @@ Deno.test({ name: '@subscribe ws', only: false }, async (context) => {
             [Mqtt.ReasonCode.GrantedQoS0],
           );
         });
-        const result = await client.subscribe('topicA', Mqtt.QoS.AtMostOnce);
+        const result = await client.subscribe('topicA', { qos: Mqtt.QoS.AtMostOnce });
         assertEquals(result.reasons[0], Mqtt.ReasonCode.GrantedQoS0);
       } catch (err) {
         fail(`error occured: ${err}`);
@@ -91,7 +91,7 @@ Deno.test({ name: '@subscribe ws', only: false }, async (context) => {
             [Mqtt.ReasonCode.GrantedQoS1],
           );
         });
-        const result = await client.subscribe('topicA', Mqtt.QoS.AtLeastOnce);
+        const result = await client.subscribe('topicA', { qos: Mqtt.QoS.AtLeastOnce });
         assertEquals(result.reasons[0], Mqtt.ReasonCode.GrantedQoS1);
       } catch (err) {
         fail(`error occured: ${err}`);
@@ -138,7 +138,7 @@ Deno.test({ name: '@subscribe ws', only: false }, async (context) => {
             [Mqtt.ReasonCode.GrantedQoS2],
           );
         });
-        const result = await client.subscribe('topicA', Mqtt.QoS.ExactlyOnce);
+        const result = await client.subscribe('topicA', { qos: Mqtt.QoS.ExactlyOnce });
         assertEquals(result.reasons[0], Mqtt.ReasonCode.GrantedQoS2);
       } catch (err) {
         fail(`error occured: ${err}`);
@@ -186,7 +186,7 @@ Deno.test({ name: '@subscribe ws', only: false }, async (context) => {
             [Mqtt.ReasonCode.GrantedQoS0],
           );
         });
-        const result = await client.subscribe('topicA', Mqtt.QoS.AtMostOnce);
+        const result = await client.subscribe('topicA', { qos: Mqtt.QoS.AtMostOnce });
         assertEquals(result.reasons[0], Mqtt.ReasonCode.GrantedQoS0);
       } catch (err) {
         fail(`error occured: ${err}`);
@@ -234,7 +234,7 @@ Deno.test({ name: '@subscribe ws', only: false }, async (context) => {
             [Mqtt.ReasonCode.GrantedQoS1],
           );
         });
-        const result = await client.subscribe('topicA', Mqtt.QoS.AtLeastOnce);
+        const result = await client.subscribe('topicA', { qos: Mqtt.QoS.AtLeastOnce });
         assertEquals(result.reasons[0], Mqtt.ReasonCode.GrantedQoS1);
       } catch (err) {
         fail(`error occured: ${err}`);
@@ -282,7 +282,7 @@ Deno.test({ name: '@subscribe ws', only: false }, async (context) => {
             [Mqtt.ReasonCode.GrantedQoS2],
           );
         });
-        const result = await client.subscribe('topicA', Mqtt.QoS.ExactlyOnce);
+        const result = await client.subscribe('topicA', { qos: Mqtt.QoS.ExactlyOnce });
         assertEquals(result.reasons[0], Mqtt.ReasonCode.GrantedQoS2);
       } catch (err) {
         fail(`error occured: ${err}`);
@@ -624,7 +624,7 @@ Deno.test({ name: '@subscribe ws', only: false }, async (context) => {
             [Mqtt.ReasonCode.GrantedQoS0],
           );
         });
-        const result = await client.subscribe('topicA', Mqtt.QoS.AtMostOnce, properties);
+        const result = await client.subscribe('topicA', { qos: Mqtt.QoS.AtMostOnce, properties });
         assertEquals(result.reasons[0], Mqtt.ReasonCode.GrantedQoS0);
       } catch (err) {
         fail(`error occured: ${err}`);
@@ -708,8 +708,7 @@ Deno.test({ name: '@subscribe ws', only: false }, async (context) => {
 
         const result = await client.subscribe(
           ['topicA', 'topicB', 'topicC'],
-          Mqtt.QoS.AtLeastOnce,
-          properties,
+          { qos: Mqtt.QoS.AtLeastOnce, properties },
         );
 
         assertEquals(result.reasons[0], Mqtt.ReasonCode.GrantedQoS0);
@@ -793,7 +792,7 @@ Deno.test({ name: '@receive malformed suback ws', only: false }, async (context)
           broker.sendRawBytes(client.clientId, malformedPacket);
         });
 
-        client.subscribe('topicA', Mqtt.QoS.AtLeastOnce);
+        client.subscribe('topicA', { qos: Mqtt.QoS.AtLeastOnce });
 
         await promise;
       } catch (err) {

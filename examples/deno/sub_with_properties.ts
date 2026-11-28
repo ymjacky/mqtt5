@@ -32,7 +32,7 @@ async function main() {
     ],
     subscriptionIdentifier: 1,
   };
-  await client.subscribe(['topicA', 'topicB', 'topicC'], Mqtt.QoS.AtLeastOnce, subProperties);
+  await client.subscribe(['topicA', 'topicB', 'topicC'], { qos: Mqtt.QoS.AtLeastOnce, properties: subProperties });
 }
 
 main();

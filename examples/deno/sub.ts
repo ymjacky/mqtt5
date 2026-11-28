@@ -24,7 +24,7 @@ async function main() {
     logger(`topic: ${packet.topic}`, `message: ${receiveMessage}`);
   });
 
-  await client.subscribe(['topicA', 'topicB', 'topicC'], Mqtt.QoS.AtLeastOnce);
+  await client.subscribe(['topicA', 'topicB', 'topicC'], { qos: Mqtt.QoS.AtLeastOnce });
 }
 
 main();

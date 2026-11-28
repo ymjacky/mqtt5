@@ -49,7 +49,7 @@
  * });
  *
  * await client.connect();
- * await client.subscribe('topicA', Mqtt.QoS.AtLeastOnce);
+ * await client.subscribe('topicA', { qos: Mqtt.QoS.AtLeastOnce });
  * ```
  *
  * @example Publish a message
@@ -86,7 +86,7 @@
  *
  * try {
  *   await client.connect();
- *   await client.subscribe('sensors/+/temperature', Mqtt.QoS.AtLeastOnce);
+ *   await client.subscribe('sensors/+/temperature', { qos: Mqtt.QoS.AtLeastOnce });
  * } catch (err) {
  *   if (err instanceof ClientErrors.ConnectTimeout || err instanceof ClientErrors.ConnectionClosed) {
  *     console.error('could not connect to the broker');

@@ -492,11 +492,11 @@ Deno.test({ name: '@CONNACK Wildcard, Shared and Subscription Identifiers Availa
     try {
       await client.connect();
       const err = await assertRejects(
-        () => client.subscribe('a', Mqtt.QoS.AtMostOnce, { subscriptionIdentifier: 1 }),
+        () => client.subscribe('a', { qos: Mqtt.QoS.AtMostOnce, properties: { subscriptionIdentifier: 1 } }),
         ClientErrors.SubscriptionIdentifiersNotSupportedError,
       );
       assertInstanceOf(err, ClientErrors.NotSupportedByBrokerError);
-      await client.subscribe('a', Mqtt.QoS.AtMostOnce);
+      await client.subscribe('a', { qos: Mqtt.QoS.AtMostOnce });
       assertEquals(b.received, ['SUBSCRIBE a']);
       await client.disconnect();
     } finally {
@@ -510,7 +510,7 @@ Deno.test({ name: '@CONNACK Wildcard, Shared and Subscription Identifiers Availa
     const client = new MqttClient({ clientId: 'cid', logger });
     try {
       await client.connect();
-      await client.subscribe('$share/group1/a/+', Mqtt.QoS.AtMostOnce, { subscriptionIdentifier: 1 });
+      await client.subscribe('$share/group1/a/+', { qos: Mqtt.QoS.AtMostOnce, properties: { subscriptionIdentifier: 1 } });
       assertEquals(b.received, ['SUBSCRIBE $share/group1/a/+']);
       await client.disconnect();
     } finally {

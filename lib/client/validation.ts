@@ -15,7 +15,8 @@ import * as Mqtt from '../mqtt/mod.ts';
 import type * as MqttProperties from '../mqtt_properties/mod.ts';
 import * as MqttUtils from '../mqtt_utils/mod.ts';
 import { authReasonCodes } from '../mqtt_packets/field_values.ts';
-import type { ClientOptions, ConnectOptions, SubscriptionOption } from './client_types.ts';
+import type { Subscription } from '../mqtt_packets/mod.ts';
+import type { ClientOptions, ConnectOptions } from './client_types.ts';
 import {
   InvalidArgumentError,
   InvalidPropertyError,
@@ -360,7 +361,7 @@ export function validatePublishCapabilities(qos: number, retain: boolean, capabi
  * @throws {SubscriptionIdentifiersNotSupportedError}
  */
 export function validateSubscribeCapabilities(
-  subscriptions: SubscriptionOption[],
+  subscriptions: Subscription[],
   properties: MqttProperties.SubscribeProperties | undefined,
   capabilities: BrokerCapabilities,
 ): void {
@@ -384,7 +385,7 @@ export function validateSubscribeCapabilities(
  * @throws {InvalidPropertyError}
  */
 export function validateSubscribe(
-  subscriptions: SubscriptionOption[],
+  subscriptions: Subscription[],
   properties: MqttProperties.SubscribeProperties | undefined,
   protocolVersion: Mqtt.ProtocolVersion,
 ): void {

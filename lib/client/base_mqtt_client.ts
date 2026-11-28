@@ -140,7 +140,7 @@ function copyPublishProperties(properties: MqttProperties.UserPublishProperties)
  * import { type BaseMqttClient, Mqtt } from '@ymjacky/mqtt5';
  *
  * async function subscribeAll(client: BaseMqttClient, topics: string[]) {
- *   await client.subscribe(topics, Mqtt.QoS.AtLeastOnce);
+ *   await client.subscribe(topics, { qos: Mqtt.QoS.AtLeastOnce });
  * }
  * ```
  */
@@ -791,15 +791,22 @@ export abstract class BaseMqttClient {
   }
 
   /**
-   * Subscribes to a topic filter and waits for SUBACK.
+   * Subscribes to one or more topic filters with one SUBSCRIBE packet, and waits for SUBACK.
+   *
+   * Each topic filter is a string, or a {@link ClientTypes.Subscription} with its own Subscription Options. `options` holds
+   * the Subscription Options of every topic filter: an option that a {@link ClientTypes.Subscription} does not set takes the
+   * value of `options`, and then its default (e.g. QoS 0). The SUBSCRIBE properties of `options` are sent once for all the
+   * topic filters, so a Subscription Identifier is the same for all of them.
+   * With MQTT 3.1.1, only the QoS is sent: No Local, Retain As Published, Retain Handling and the properties are not.
    * A rejection of an ignored promise does not terminate the process; await the promise to handle failures.
-   * @param topicFilter topic name or topic filter
-   * @param qos QoS level. Defaults to `Mqtt.QoS.AtMostOnce`.
-   * @param properties MQTT 5.0 SUBSCRIBE properties ({@link MqttProperties.SubscribeProperties}).
-   * @returns the reason codes of SUBACK ({@link ClientTypes.SubscribeResults}).
+   * @param topicFilters a topic filter, or several: each is a string or a {@link ClientTypes.Subscription}.
+   * @param options {@link ClientTypes.SubscribeOptions}: the Subscription Options of every topic filter (QoS, and the MQTT 5.0
+   * No Local, Retain As Published and Retain Handling), and the MQTT 5.0 SUBSCRIBE properties ({@link MqttProperties.SubscribeProperties}).
+   * @returns the reason codes of SUBACK ({@link ClientTypes.SubscribeResults}), one per topic filter in the order of `topicFilters`.
    * @throws {StateIsNotOnlineError} if the client is not connected.
    * @throws {InvalidTopicFilterError} if a topic filter is invalid. Nothing is sent.
-   * @throws {InvalidArgumentError} if no topic filter is given, or a QoS, Retain Handling or No Local is invalid. Nothing is sent.
+   * @throws {InvalidArgumentError} if no topic filter is given, or a QoS, Retain Handling or No Local is invalid, e.g. No Local
+   * for a shared subscription, also when it is set in `options` for every topic filter. Nothing is sent.
    * @throws {InvalidPropertyError} if a property, e.g. the Subscription Identifier, is invalid. Nothing is sent.
    * @throws {WildcardSubscriptionsNotSupportedError} if a topic filter has a wildcard and the broker does not support them. Nothing is sent.
    * @throws {SharedSubscriptionsNotSupportedError} if a topic filter is a shared subscription and the broker does not support them. Nothing is sent.
@@ -813,153 +820,55 @@ export abstract class BaseMqttClient {
    *
    * const client = new MqttClient();
    *
-   * await client.subscribe('topicA', Mqtt.QoS.AtMostOnce);
-   * ```
-   */
-  public subscribe(
-    topicFilter: string,
-    qos?: Mqtt.QoS,
-    properties?: MqttProperties.SubscribeProperties,
-  ): Promise<ClientTypes.SubscribeResults>;
-
-  /**
-   * Subscribes to multiple topic filters with one SUBSCRIBE packet and waits for SUBACK.
-   * A rejection of an ignored promise does not terminate the process; await the promise to handle failures.
-   * @param topicFilters topic names or topic filters
-   * @param qos QoS level. Defaults to `Mqtt.QoS.AtMostOnce`.
-   * @param properties MQTT 5.0 SUBSCRIBE properties ({@link MqttProperties.SubscribeProperties}).
-   * @returns the reason codes of SUBACK ({@link ClientTypes.SubscribeResults}).
-   * @throws {StateIsNotOnlineError} if the client is not connected.
-   * @throws {InvalidTopicFilterError} if a topic filter is invalid. Nothing is sent.
-   * @throws {InvalidArgumentError} if no topic filter is given, or a QoS, Retain Handling or No Local is invalid. Nothing is sent.
-   * @throws {InvalidPropertyError} if a property, e.g. the Subscription Identifier, is invalid. Nothing is sent.
-   * @throws {WildcardSubscriptionsNotSupportedError} if a topic filter has a wildcard and the broker does not support them. Nothing is sent.
-   * @throws {SharedSubscriptionsNotSupportedError} if a topic filter is a shared subscription and the broker does not support them. Nothing is sent.
-   * @throws {SubscriptionIdentifiersNotSupportedError} if a Subscription Identifier is set and the broker does not support them. Nothing is sent.
-   * @throws {PacketTooLargeError} if SUBSCRIBE is larger than the Maximum Packet Size of the broker or than MQTT allows. Nothing is sent.
-   * @throws {PacketIdsExhaustedError} if all the packet IDs are in use by requests that have not completed. Nothing is sent.
-   * @throws {ConnectionClosed} if the connection is closed before SUBACK is received.
-   * @example
-   * ```ts
-   * import { Mqtt, MqttClient } from '@ymjacky/mqtt5';
+   * await client.subscribe('topicA'); // QoS 0
+   * await client.subscribe('topicA', { qos: Mqtt.QoS.AtLeastOnce });
+   * await client.subscribe(['topicA', 'topicB'], { qos: Mqtt.QoS.AtLeastOnce });
    *
-   * const client = new MqttClient();
+   * // MQTT 5.0 Subscription Options, and a Subscription Identifier
+   * await client.subscribe('topicA', {
+   *   qos: Mqtt.QoS.AtLeastOnce,
+   *   noLocal: true,
+   *   retainHandling: Mqtt.RetainHandling.DoNotSend,
+   *   properties: { subscriptionIdentifier: 1 },
+   * });
    *
-   * await client.subscribe(['topicA', 'topicB'], Mqtt.QoS.AtMostOnce);
-   * ```
-   */
-  public subscribe(
-    topicFilters: string[],
-    qos?: Mqtt.QoS,
-    properties?: MqttProperties.SubscribeProperties,
-  ): Promise<ClientTypes.SubscribeResults>;
-
-  /**
-   * Subscribes to a topic filter with MQTT 5.0 subscription options and waits for SUBACK.
-   * A rejection of an ignored promise does not terminate the process; await the promise to handle failures.
-   * @param subscription topic filter and subscription options ({@link ClientTypes.SubscriptionOption}). Its `qos` takes precedence over the `qos` argument.
-   * @param qos QoS level. Defaults to `Mqtt.QoS.AtMostOnce`.
-   * @param properties MQTT 5.0 SUBSCRIBE properties ({@link MqttProperties.SubscribeProperties}).
-   * @returns the reason codes of SUBACK ({@link ClientTypes.SubscribeResults}).
-   * @throws {StateIsNotOnlineError} if the client is not connected.
-   * @throws {InvalidTopicFilterError} if a topic filter is invalid. Nothing is sent.
-   * @throws {InvalidArgumentError} if no topic filter is given, or a QoS, Retain Handling or No Local is invalid. Nothing is sent.
-   * @throws {InvalidPropertyError} if a property, e.g. the Subscription Identifier, is invalid. Nothing is sent.
-   * @throws {WildcardSubscriptionsNotSupportedError} if a topic filter has a wildcard and the broker does not support them. Nothing is sent.
-   * @throws {SharedSubscriptionsNotSupportedError} if a topic filter is a shared subscription and the broker does not support them. Nothing is sent.
-   * @throws {SubscriptionIdentifiersNotSupportedError} if a Subscription Identifier is set and the broker does not support them. Nothing is sent.
-   * @throws {PacketTooLargeError} if SUBSCRIBE is larger than the Maximum Packet Size of the broker or than MQTT allows. Nothing is sent.
-   * @throws {PacketIdsExhaustedError} if all the packet IDs are in use by requests that have not completed. Nothing is sent.
-   * @throws {ConnectionClosed} if the connection is closed before SUBACK is received.
-   * @example
-   * ```ts
-   * import { Mqtt, MqttClient } from '@ymjacky/mqtt5';
-   *
-   * const client = new MqttClient();
-   *
-   * await client.subscribe({ topicFilter: 'topicA', qos: Mqtt.QoS.AtMostOnce, retainHandling: Mqtt.RetainHandling.DoNotSend, retainAsPublished: true, noLocal: true });
-   * ```
-   */
-  public subscribe(
-    subscription: ClientTypes.SubscriptionOption,
-    qos?: Mqtt.QoS,
-    properties?: MqttProperties.SubscribeProperties,
-  ): Promise<ClientTypes.SubscribeResults>;
-
-  /**
-   * Subscribes to multiple topic filters with subscription options with one SUBSCRIBE packet and waits for SUBACK.
-   * A rejection of an ignored promise does not terminate the process; await the promise to handle failures.
-   * @param subscriptions topic filters and subscription options ({@link ClientTypes.SubscriptionOption}). Their `qos` takes precedence over the `qos` argument.
-   * @param qos QoS level. Defaults to `Mqtt.QoS.AtMostOnce`.
-   * @param properties MQTT 5.0 SUBSCRIBE properties ({@link MqttProperties.SubscribeProperties}).
-   * @returns the reason codes of SUBACK ({@link ClientTypes.SubscribeResults}).
-   * @throws {StateIsNotOnlineError} if the client is not connected.
-   * @throws {InvalidTopicFilterError} if a topic filter is invalid. Nothing is sent.
-   * @throws {InvalidArgumentError} if no topic filter is given, or a QoS, Retain Handling or No Local is invalid. Nothing is sent.
-   * @throws {InvalidPropertyError} if a property, e.g. the Subscription Identifier, is invalid. Nothing is sent.
-   * @throws {WildcardSubscriptionsNotSupportedError} if a topic filter has a wildcard and the broker does not support them. Nothing is sent.
-   * @throws {SharedSubscriptionsNotSupportedError} if a topic filter is a shared subscription and the broker does not support them. Nothing is sent.
-   * @throws {SubscriptionIdentifiersNotSupportedError} if a Subscription Identifier is set and the broker does not support them. Nothing is sent.
-   * @throws {PacketTooLargeError} if SUBSCRIBE is larger than the Maximum Packet Size of the broker or than MQTT allows. Nothing is sent.
-   * @throws {PacketIdsExhaustedError} if all the packet IDs are in use by requests that have not completed. Nothing is sent.
-   * @throws {ConnectionClosed} if the connection is closed before SUBACK is received.
-   * @example
-   * ```ts
-   * import { Mqtt, MqttClient } from '@ymjacky/mqtt5';
-   *
-   * const client = new MqttClient();
-   *
+   * // A topic filter with its own options: topicB is QoS 2 with No Local, topicA and topicC are QoS 1.
    * await client.subscribe(
-   *   [
-   *     { topicFilter: 'topicA', qos: Mqtt.QoS.AtMostOnce },
-   *     { topicFilter: 'topicB', qos: Mqtt.QoS.AtLeastOnce },
-   *     { topicFilter: 'topicC', qos: Mqtt.QoS.ExactlyOnce },
-   *     { topicFilter: 'topicD', qos: Mqtt.QoS.ExactlyOnce, retainHandling: Mqtt.RetainHandling.DoNotSend, retainAsPublished: true, noLocal: true }
-   *   ],
+   *   ['topicA', { topicFilter: 'topicB', qos: Mqtt.QoS.ExactlyOnce, noLocal: true }, 'topicC'],
+   *   { qos: Mqtt.QoS.AtLeastOnce },
    * );
    * ```
    */
   public subscribe(
-    subscriptions: ClientTypes.SubscriptionOption[],
-    qos?: Mqtt.QoS,
-    properties?: MqttProperties.SubscribeProperties,
-  ): Promise<ClientTypes.SubscribeResults>;
-
-  /**
-   * Subscribes to one or more topic filters and waits for SUBACK.
-   */
-  public subscribe(
-    input: ClientTypes.SubscriptionOption | string | (ClientTypes.SubscriptionOption | string)[],
-    qos?: Mqtt.QoS,
-    properties?: MqttProperties.SubscribeProperties,
+    topicFilters: string | ClientTypes.Subscription | (string | ClientTypes.Subscription)[],
+    options?: ClientTypes.SubscribeOptions,
   ): Promise<ClientTypes.SubscribeResults> {
     const deferred = createRequestDeferred<ClientTypes.SubscribeResults>();
-    this.sendSubscribe(input, qos, properties, deferred).catch((err) => deferred.reject(err));
+    this.sendSubscribe(topicFilters, options, deferred).catch((err) => deferred.reject(err));
     return deferred.promise;
   }
 
   /** Sends SUBSCRIBE for subscribe(). SUBACK settles `deferred`. */
   private async sendSubscribe(
-    input: ClientTypes.SubscriptionOption | string | (ClientTypes.SubscriptionOption | string)[],
-    qos: Mqtt.QoS | undefined,
-    properties: MqttProperties.SubscribeProperties | undefined,
+    topicFilters: string | ClientTypes.Subscription | (string | ClientTypes.Subscription)[],
+    options: ClientTypes.SubscribeOptions | undefined,
     deferred: Deferred<ClientTypes.SubscribeResults>,
   ): Promise<void> {
     if (this.#state.kind !== 'online') {
       throw new StateIsNotOnlineError('subscribe');
     }
 
-    const arr = Array.isArray(input) ? input : [input];
-    const subs = arr.map<ClientTypes.SubscriptionOption>((sub) => {
-      return (typeof sub === 'object')
-        ? {
-          topicFilter: sub.topicFilter,
-          qos: sub.qos ?? qos ?? Mqtt.QoS.AtMostOnce,
-          retainHandling: sub.retainHandling,
-          retainAsPublished: sub.retainAsPublished,
-          noLocal: sub.noLocal,
-        }
-        : { topicFilter: sub, qos: qos ?? Mqtt.QoS.AtMostOnce };
+    const properties = options?.properties;
+    // Each option of a topic filter: its own value, then that of `options`, then the default.
+    const subs: SubscribePacket['subscriptions'] = (Array.isArray(topicFilters) ? topicFilters : [topicFilters]).map((sub) => {
+      const own: ClientTypes.Subscription = (typeof sub === 'object') ? sub : { topicFilter: sub };
+      return {
+        topicFilter: own.topicFilter,
+        qos: own.qos ?? options?.qos ?? Mqtt.QoS.AtMostOnce,
+        retainHandling: own.retainHandling ?? options?.retainHandling,
+        retainAsPublished: own.retainAsPublished ?? options?.retainAsPublished,
+        noLocal: own.noLocal ?? options?.noLocal,
+      };
     });
     validateSubscribe(subs, properties, this.protocolVersion);
     validateSubscribeCapabilities(subs, properties, this.#brokerCapabilities);
@@ -980,43 +889,11 @@ export abstract class BaseMqttClient {
   }
 
   /**
-   * Unsubscribes from a topic filter and waits for UNSUBACK.
+   * Unsubscribes from one or more topic filters with one UNSUBSCRIBE packet, and waits for UNSUBACK.
+   * With MQTT 3.1.1, the properties are not sent.
    * A rejection of an ignored promise does not terminate the process; await the promise to handle failures.
-   * @param topicFilter topic name or topic filter
-   * @param properties MQTT 5.0 UNSUBSCRIBE properties ({@link MqttProperties.UnsubscribeProperties}).
-   * @returns the reason codes of UNSUBACK ({@link ClientTypes.UnsubscribeResults}).
-   * @throws {StateIsNotOnlineError} if the client is not connected.
-   * @throws {InvalidTopicFilterError} if a topic filter is invalid. Nothing is sent.
-   * @throws {InvalidArgumentError} if no topic filter is given. Nothing is sent.
-   * @throws {InvalidPropertyError} if a property is invalid. Nothing is sent.
-   * @throws {PacketTooLargeError} if UNSUBSCRIBE is larger than the Maximum Packet Size of the broker or than MQTT allows. Nothing is sent.
-   * @throws {PacketIdsExhaustedError} if all the packet IDs are in use by requests that have not completed. Nothing is sent.
-   * @throws {ConnectionClosed} if the connection is closed before UNSUBACK is received.
-   * @example
-   * ```ts
-   * import { MqttClient, MqttProperties } from '@ymjacky/mqtt5';
-   *
-   * const client = new MqttClient();
-   *
-   * await client.unsubscribe('topicA');
-   *
-   * const properties: MqttProperties.UnsubscribeProperties = {
-   *   userProperties: [
-   *     { key: 'userProp1', val: 'userData1' },
-   *     { key: 'userProp2', val: 'userData2' },
-   *     { key: 'userProp2', val: 'userData3' },
-   *   ]
-   * };
-   * await client.unsubscribe('topicB', properties);
-   * ```
-   */
-  public unsubscribe(topicFilter: string, properties?: MqttProperties.UnsubscribeProperties): Promise<ClientTypes.UnsubscribeResults>;
-
-  /**
-   * Unsubscribes from multiple topic filters with one UNSUBSCRIBE packet and waits for UNSUBACK.
-   * A rejection of an ignored promise does not terminate the process; await the promise to handle failures.
-   * @param topicFilters topic names or topic filters
-   * @param properties MQTT 5.0 UNSUBSCRIBE properties ({@link MqttProperties.UnsubscribeProperties}).
+   * @param topicFilters a topic filter, or several.
+   * @param options {@link ClientTypes.UnsubscribeOptions}: the MQTT 5.0 UNSUBSCRIBE properties ({@link MqttProperties.UnsubscribeProperties}).
    * @returns the reason codes of UNSUBACK ({@link ClientTypes.UnsubscribeResults}).
    * @throws {StateIsNotOnlineError} if the client is not connected.
    * @throws {InvalidTopicFilterError} if a topic filter is invalid. Nothing is sent.
@@ -1031,40 +908,41 @@ export abstract class BaseMqttClient {
    *
    * const client = new MqttClient();
    *
-   * await client.unsubscribe(
-   *   [
-   *     'topicA',
-   *     'topicB',
-   *     'topicC',
-   *   ],
-   * );
+   * await client.unsubscribe('topicA');
+   * await client.unsubscribe(['topicA', 'topicB', 'topicC']);
+   *
+   * // MQTT 5.0 properties
+   * await client.unsubscribe('topicA', {
+   *   properties: {
+   *     userProperties: [
+   *       { key: 'userProp1', val: 'userData1' },
+   *       { key: 'userProp2', val: 'userData2' },
+   *     ],
+   *   },
+   * });
    * ```
    */
-  public unsubscribe(topicFilters: string[], properties?: MqttProperties.UnsubscribeProperties): Promise<ClientTypes.UnsubscribeResults>;
-
-  /**
-   * Unsubscribes from one or more topic filters and waits for UNSUBACK.
-   */
   public unsubscribe(
-    input: string | string[],
-    properties?: MqttProperties.UnsubscribeProperties,
+    topicFilters: string | string[],
+    options?: ClientTypes.UnsubscribeOptions,
   ): Promise<ClientTypes.UnsubscribeResults> {
     const deferred = createRequestDeferred<ClientTypes.UnsubscribeResults>();
-    this.sendUnsubscribe(input, properties, deferred).catch((err) => deferred.reject(err));
+    this.sendUnsubscribe(topicFilters, options, deferred).catch((err) => deferred.reject(err));
     return deferred.promise;
   }
 
   /** Sends UNSUBSCRIBE for unsubscribe(). UNSUBACK settles `deferred`. */
   private async sendUnsubscribe(
-    input: string | string[],
-    properties: MqttProperties.UnsubscribeProperties | undefined,
+    topicFilters: string | string[],
+    options: ClientTypes.UnsubscribeOptions | undefined,
     deferred: Deferred<ClientTypes.UnsubscribeResults>,
   ): Promise<void> {
     if (this.#state.kind !== 'online') {
       throw new StateIsNotOnlineError('unsubscribe');
     }
 
-    const unsubs = Array.isArray(input) ? input : [input];
+    const properties = options?.properties;
+    const unsubs = Array.isArray(topicFilters) ? topicFilters : [topicFilters];
     validateUnsubscribe(unsubs, properties, this.protocolVersion);
 
     const packet: UnsubscribePacket = {

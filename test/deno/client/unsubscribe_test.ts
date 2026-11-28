@@ -262,7 +262,7 @@ Deno.test({ name: '@unsubscribe', only: false }, async (context) => {
             [Mqtt.ReasonCode.Success],
           );
         });
-        const result = await client.unsubscribe('topicA', properties);
+        const result = await client.unsubscribe('topicA', { properties });
         assertEquals(result.reasonCodes?.[0], Mqtt.ReasonCode.Success);
       } catch (err) {
         fail(`error occured: ${err}`);
@@ -339,7 +339,7 @@ Deno.test({ name: '@unsubscribe', only: false }, async (context) => {
 
         const result = await client.unsubscribe(
           ['topicA', 'topicB', 'topicC', 'unspecified'],
-          properties,
+          { properties },
         );
 
         assertEquals(result.reasonCodes?.[0], Mqtt.ReasonCode.Success);
@@ -474,7 +474,7 @@ Deno.test({ name: '@unsubscribe invalid arguments', only: false }, async (contex
         }
         await assertRejects(() => client.unsubscribe(['topicA', 'a/#/b']), ClientErrors.InvalidTopicFilterError);
         await assertRejects(
-          () => client.unsubscribe('topicA', { userProperties: [{ key: 'k\u0000', val: 'v' }] }),
+          () => client.unsubscribe('topicA', { properties: { userProperties: [{ key: 'k\u0000', val: 'v' }] } }),
           ClientErrors.InvalidPropertyError,
         );
         // An ignored rejection does not become an unhandled rejection.

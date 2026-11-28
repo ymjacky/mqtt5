@@ -42,7 +42,7 @@
  * });
  *
  * await client.connect();
- * await client.subscribe('topicA', Mqtt.QoS.AtLeastOnce);
+ * await client.subscribe('topicA', { qos: Mqtt.QoS.AtLeastOnce });
  * await client.publish('topicA', 'hello', { qos: Mqtt.QoS.AtLeastOnce });
  * await client.disconnect();
  * ```
@@ -89,10 +89,10 @@
  * await client.connect();
  *
  * // Several topic filters at once; `+` matches one level, `#` matches the rest.
- * await client.subscribe(['topicB', 'sensors/+/temperature', 'logs/#'], Mqtt.QoS.AtLeastOnce);
+ * await client.subscribe(['topicB', 'sensors/+/temperature', 'logs/#'], { qos: Mqtt.QoS.AtLeastOnce });
  *
  * // Shared subscription: the messages are distributed among the clients of the group.
- * await client.subscribe('$share/group1/topicC', Mqtt.QoS.AtLeastOnce);
+ * await client.subscribe('$share/group1/topicC', { qos: Mqtt.QoS.AtLeastOnce });
  *
  * // MQTT 5.0 subscription options. `reasons` has one entry per topic filter (0x80 or more is a failure).
  * const { reasons } = await client.subscribe({
@@ -225,11 +225,11 @@
  * client.on('closed', async () => {
  *   await new Promise((resolve) => setTimeout(resolve, 5000));
  *   await client.connect({ properties: { sessionExpiryInterval: 3600 } });
- *   await client.subscribe('topicA', Mqtt.QoS.AtLeastOnce);
+ *   await client.subscribe('topicA', { qos: Mqtt.QoS.AtLeastOnce });
  * });
  *
  * await client.connect({ properties: { sessionExpiryInterval: 3600 } });
- * await client.subscribe('topicA', Mqtt.QoS.AtLeastOnce);
+ * await client.subscribe('topicA', { qos: Mqtt.QoS.AtLeastOnce });
  * ```
  *
  * @example Keep messages in flight across restarts (Deno KV)

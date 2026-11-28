@@ -51,7 +51,7 @@ client.on('publish', (event) => {
 });
 
 await client.connect();
-await client.subscribe('topicA', Mqtt.QoS.AtLeastOnce);
+await client.subscribe('topicA', { qos: Mqtt.QoS.AtLeastOnce });
 await client.publish('topicA', 'hello', { qos: Mqtt.QoS.AtLeastOnce });
 
 await client.disconnect();
@@ -222,15 +222,14 @@ client.on('publish', (event) => {
 
 await client.connect();
 
-await client.subscribe('topicA', Mqtt.QoS.AtLeastOnce);
-await client.subscribe(['topicB', 'sensors/+/temperature', 'logs/#'], Mqtt.QoS.AtLeastOnce);
+await client.subscribe('topicA', { qos: Mqtt.QoS.AtLeastOnce });
+await client.subscribe(['topicB', 'sensors/+/temperature', 'logs/#'], { qos: Mqtt.QoS.AtLeastOnce });
 
 // Shared subscription
-await client.subscribe('$share/group1/topicC', Mqtt.QoS.AtLeastOnce);
+await client.subscribe('$share/group1/topicC', { qos: Mqtt.QoS.AtLeastOnce });
 
 // MQTT 5.0 subscription options
-const result = await client.subscribe({
-  topicFilter: 'topicD',
+const result = await client.subscribe('topicD', {
   qos: Mqtt.QoS.AtLeastOnce,
   noLocal: true,
   retainAsPublished: true,
@@ -238,8 +237,25 @@ const result = await client.subscribe({
 });
 console.log(result.reasons);
 
+// MQTT 5.0 properties, sent once for all the topic filters of the call
+await client.subscribe(['sensors/+/humidity', 'sensors/+/pressure'], {
+  qos: Mqtt.QoS.AtLeastOnce,
+  properties: {
+    subscriptionIdentifier: 1,
+    userProperties: [{ key: 'app', val: 'dashboard' }],
+  },
+});
+
+// A topic filter with its own options: topicF is QoS 2, topicE and topicG are QoS 1.
+await client.subscribe(['topicE', { topicFilter: 'topicF', qos: Mqtt.QoS.ExactlyOnce }, 'topicG'], { qos: Mqtt.QoS.AtLeastOnce });
+
 await client.unsubscribe(['topicA', 'topicB']);
 ```
+
+The options of `subscribe()` (`qos`, `noLocal`, `retainAsPublished` and `retainHandling`) apply to every topic filter of the call. A topic filter given as an
+object (`{ topicFilter, qos, ... }`) can set its own, which take precedence option by option; an option that neither sets takes its default (QoS 0). The
+`properties` (e.g. `subscriptionIdentifier`) are sent once for all the topic filters of the call: subscribe in separate calls to give them different
+Subscription Identifiers.
 
 A broker can say in CONNACK (MQTT 5.0) that it does not support wildcard subscriptions, shared subscriptions or Subscription Identifiers. `subscribe()` then
 rejects a topic filter with `+` / `#`, a `$share/...` topic filter or a `subscriptionIdentifier` with `WildcardSubscriptionsNotSupportedError`,
@@ -442,7 +458,7 @@ await client.connect();
 
 const topicFilters = ['sensors/+/temperature', 'logs/#'];
 try {
-  const { reasons } = await client.subscribe(topicFilters, Mqtt.QoS.AtLeastOnce);
+  const { reasons } = await client.subscribe(topicFilters, { qos: Mqtt.QoS.AtLeastOnce });
   // One per topic filter: the granted QoS (0, 1 or 2; it can be lower than requested), or 0x80 or more on failure.
   reasons.forEach((reason, i) => {
     if (reason >= 0x80) {
@@ -503,7 +519,7 @@ client.on('publish', (event) => {
 });
 
 await client.connect();
-await client.subscribe('topicA', Mqtt.QoS.AtLeastOnce);
+await client.subscribe('topicA', { qos: Mqtt.QoS.AtLeastOnce });
 ```
 
 ### From a CDN (no build step)
@@ -552,7 +568,7 @@ client.on('publish', (event) => {
 });
 
 await client.connect();
-await client.subscribe('topicA', Mqtt.QoS.AtLeastOnce);
+await client.subscribe('topicA', { qos: Mqtt.QoS.AtLeastOnce });
 </script>
 ```
 
@@ -613,7 +629,7 @@ import { Mqtt, WebSocketMqttClient } from '@ymjacky/mqtt5/browser';
 // shallowRef(): `client.value` is the client itself, not a proxy.
 const client = shallowRef(new WebSocketMqttClient({ url: new URL('wss://broker.example.com:8081') }));
 await client.value.connect();
-await client.value.subscribe('topicA', Mqtt.QoS.AtLeastOnce);
+await client.value.subscribe('topicA', { qos: Mqtt.QoS.AtLeastOnce });
 
 // markRaw(): the client is not wrapped, also in a reactive object.
 const state = reactive({
