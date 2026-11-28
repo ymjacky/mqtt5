@@ -27,6 +27,7 @@ import {
   validateClientOptions,
   validateConnect,
   validateDisconnect,
+  validateOptionsArgument,
   validatePublish,
   validatePublishCapabilities,
   validateSubscribe,
@@ -575,7 +576,8 @@ export abstract class BaseMqttClient {
    * @throws {StateIsNotOnlineError} if the client is not connected.
    * @throws {InvalidTopicNameError} if `topic` or the Response Topic is not a valid Topic Name. Nothing is sent.
    * @throws {InvalidArgumentError} if a string payload contains a lone surrogate, which UTF-8 cannot encode, the QoS is not
-   * 0, 1 or 2, or `dup` is true with QoS 0. Nothing is sent.
+   * 0, 1 or 2, or `dup` is true with QoS 0. Also if `options` is not an object, or a fourth argument is given:
+   * the properties are `options.properties` since 0.3.0. Nothing is sent.
    * @throws {QoSNotSupportedError} if the QoS is higher than the Maximum QoS of the broker (CONNACK). Nothing is sent.
    * @throws {RetainNotSupportedError} if `retain` is true and the broker does not support retained messages. Nothing is sent.
    * @throws {InvalidPropertyError} if a property is invalid. Nothing is sent.
@@ -621,17 +623,20 @@ export abstract class BaseMqttClient {
     options?: ClientTypes.PublishOptions,
   ): Promise<ClientTypes.PublishResult> {
     const deferred = createRequestDeferred<ClientTypes.PublishResult>();
-    this.sendPublish(topic, payload, options, deferred).catch((err) => deferred.reject(err));
+    this.sendPublish(topic, payload, options, arguments.length, deferred).catch((err) => deferred.reject(err));
     return deferred.promise;
   }
 
-  /** Sends PUBLISH for publish(). The flow settles `deferred` (right away for QoS 0). */
+  /** Sends PUBLISH for publish(). The flow settles `deferred` (right away for QoS 0). `argumentCount` is the number of arguments of the call. */
   private async sendPublish(
     topic: string,
     payload: string | Uint8Array,
     options: ClientTypes.PublishOptions | undefined,
+    argumentCount: number,
     deferred: Deferred<ClientTypes.PublishResult>,
   ): Promise<void> {
+    // First, also while not connected: the arguments before 0.3.0, e.g. from JavaScript, would send something else.
+    validateOptionsArgument('publish', options, argumentCount);
     if (this.#state.kind !== 'online') {
       throw new StateIsNotOnlineError('publish');
     }
@@ -806,7 +811,8 @@ export abstract class BaseMqttClient {
    * @throws {StateIsNotOnlineError} if the client is not connected.
    * @throws {InvalidTopicFilterError} if a topic filter is invalid. Nothing is sent.
    * @throws {InvalidArgumentError} if no topic filter is given, or a QoS, Retain Handling or No Local is invalid, e.g. No Local
-   * for a shared subscription, also when it is set in `options` for every topic filter. Nothing is sent.
+   * for a shared subscription, also when it is set in `options` for every topic filter. Also if `options` is not an object, e.g. a
+   * QoS, or a third argument is given: the QoS and the properties are in `options` since 0.3.0. Nothing is sent.
    * @throws {InvalidPropertyError} if a property, e.g. the Subscription Identifier, is invalid. Nothing is sent.
    * @throws {WildcardSubscriptionsNotSupportedError} if a topic filter has a wildcard and the broker does not support them. Nothing is sent.
    * @throws {SharedSubscriptionsNotSupportedError} if a topic filter is a shared subscription and the broker does not support them. Nothing is sent.
@@ -844,16 +850,19 @@ export abstract class BaseMqttClient {
     options?: ClientTypes.SubscribeOptions,
   ): Promise<ClientTypes.SubscribeResults> {
     const deferred = createRequestDeferred<ClientTypes.SubscribeResults>();
-    this.sendSubscribe(topicFilters, options, deferred).catch((err) => deferred.reject(err));
+    this.sendSubscribe(topicFilters, options, arguments.length, deferred).catch((err) => deferred.reject(err));
     return deferred.promise;
   }
 
-  /** Sends SUBSCRIBE for subscribe(). SUBACK settles `deferred`. */
+  /** Sends SUBSCRIBE for subscribe(). SUBACK settles `deferred`. `argumentCount` is the number of arguments of the call. */
   private async sendSubscribe(
     topicFilters: string | ClientTypes.Subscription | (string | ClientTypes.Subscription)[],
     options: ClientTypes.SubscribeOptions | undefined,
+    argumentCount: number,
     deferred: Deferred<ClientTypes.SubscribeResults>,
   ): Promise<void> {
+    // First, also while not connected: the arguments before 0.3.0, e.g. from JavaScript, would send something else.
+    validateOptionsArgument('subscribe', options, argumentCount);
     if (this.#state.kind !== 'online') {
       throw new StateIsNotOnlineError('subscribe');
     }
@@ -897,7 +906,8 @@ export abstract class BaseMqttClient {
    * @returns the reason codes of UNSUBACK ({@link ClientTypes.UnsubscribeResults}).
    * @throws {StateIsNotOnlineError} if the client is not connected.
    * @throws {InvalidTopicFilterError} if a topic filter is invalid. Nothing is sent.
-   * @throws {InvalidArgumentError} if no topic filter is given. Nothing is sent.
+   * @throws {InvalidArgumentError} if no topic filter is given. Also if `options` is not an object, has `userProperties`, or a third argument
+   * is given: the properties are `options.properties` since 0.3.0. Nothing is sent.
    * @throws {InvalidPropertyError} if a property is invalid. Nothing is sent.
    * @throws {PacketTooLargeError} if UNSUBSCRIBE is larger than the Maximum Packet Size of the broker or than MQTT allows. Nothing is sent.
    * @throws {PacketIdsExhaustedError} if all the packet IDs are in use by requests that have not completed. Nothing is sent.
@@ -927,16 +937,19 @@ export abstract class BaseMqttClient {
     options?: ClientTypes.UnsubscribeOptions,
   ): Promise<ClientTypes.UnsubscribeResults> {
     const deferred = createRequestDeferred<ClientTypes.UnsubscribeResults>();
-    this.sendUnsubscribe(topicFilters, options, deferred).catch((err) => deferred.reject(err));
+    this.sendUnsubscribe(topicFilters, options, arguments.length, deferred).catch((err) => deferred.reject(err));
     return deferred.promise;
   }
 
-  /** Sends UNSUBSCRIBE for unsubscribe(). UNSUBACK settles `deferred`. */
+  /** Sends UNSUBSCRIBE for unsubscribe(). UNSUBACK settles `deferred`. `argumentCount` is the number of arguments of the call. */
   private async sendUnsubscribe(
     topicFilters: string | string[],
     options: ClientTypes.UnsubscribeOptions | undefined,
+    argumentCount: number,
     deferred: Deferred<ClientTypes.UnsubscribeResults>,
   ): Promise<void> {
+    // First, also while not connected: the arguments before 0.3.0, e.g. from JavaScript, would send something else.
+    validateOptionsArgument('unsubscribe', options, argumentCount);
     if (this.#state.kind !== 'online') {
       throw new StateIsNotOnlineError('unsubscribe');
     }
@@ -985,6 +998,8 @@ export abstract class BaseMqttClient {
    *
    * @param options {@link ClientTypes.DisconnectOptions}: `force`, and the MQTT 5.0 Reason Code and DISCONNECT properties
    * ({@link MqttProperties.DisconnectProperties}). With MQTT 3.1.1, the Reason Code and the properties are not sent.
+   * @throws {InvalidArgumentError} if `options` is not an object, e.g. `true`, or a second argument is given: the options are an
+   * object since 0.3.0, e.g. `{ force: true }`. Nothing is sent, also while not connected.
    * @throws {InvalidPropertyError} if a property is invalid, e.g. a Session Expiry Interval other than 0 when that of CONNECT
    * was 0 or absent: the broker would not treat DISCONNECT as valid, and would publish the will message. Nothing is sent.
    * @throws {MqttPacketSerializeError} if DISCONNECT cannot be encoded, e.g. `reasonCode` is not a Reason Code of DISCONNECT
@@ -1033,6 +1048,8 @@ export abstract class BaseMqttClient {
    * ```
    */
   public async disconnect(options?: ClientTypes.DisconnectOptions): Promise<void> {
+    // First, also while not connected: the arguments before 0.3.0, e.g. from JavaScript, would send something else.
+    validateOptionsArgument('disconnect', options, arguments.length);
     const force = options?.force ?? false;
     const reasonCode = options?.reasonCode;
     const properties = options?.properties;
