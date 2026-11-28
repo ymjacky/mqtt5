@@ -2,6 +2,7 @@ import * as Mqtt from '../mqtt/mod.ts';
 import * as MqttProperties from '../mqtt_properties/mod.ts';
 import { readProperties } from '../mqtt_properties/read_properties.ts';
 import { ByteReader, concatBytes, remainingLengthToBytes } from '../mqtt_utils/mod.ts';
+import { disconnectReasonCodes, reasonCodeValue } from './field_values.ts';
 import type { DisconnectPacket } from './packet_types.ts';
 
 export function toBytes(
@@ -14,13 +15,13 @@ export function toBytes(
   const variableHeaderChunks: (Uint8Array | number[])[] = [];
 
   if (protocolVersion > Mqtt.ProtocolVersion.MqttV3_1_1) {
-    const reasonCode = packet.reasonCode || 0x00; // 0x00 success
+    const reasonCode = reasonCodeValue('DISCONNECT', 'reasonCode', packet.reasonCode ?? 0x00, disconnectReasonCodes); // 0x00 success
     if (packet.properties) {
-      variableHeaderChunks.push([reasonCode & 0xFF]);
+      variableHeaderChunks.push([reasonCode]);
       variableHeaderChunks.push(MqttProperties.propertiesToBytes(packet.properties));
     } else {
       if (reasonCode !== 0x00) {
-        variableHeaderChunks.push([reasonCode & 0xFF]);
+        variableHeaderChunks.push([reasonCode]);
       }
     }
   }

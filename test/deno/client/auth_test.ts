@@ -1,6 +1,6 @@
-import { ClientErrors, Mqtt, MqttClient, type MqttProperties } from '../../../deno/mod.ts';
+import { ClientErrors, Mqtt, MqttClient, MqttPackets, type MqttProperties } from '../../../deno/mod.ts';
 import { TestBroker } from '../broker/test_broker.ts';
-import { assertEquals, assertRejects, fail } from '@std/assert';
+import { assertEquals, assertInstanceOf, assertRejects, fail } from '@std/assert';
 
 function logger(msg: string, ...args: unknown[]): void {
   console.log('[Test Client]', msg, ...args);
@@ -230,6 +230,157 @@ Deno.test({ name: '@auth too large', only: false }, async (context) => {
     },
   );
 }); // @auth too large
+
+// AUTH can carry only 0x00 (Success), 0x18 (Continue authentication) and 0x19 (Re-authenticate) [MQTT-3.15.2-1], but the type
+// of the argument, Mqtt.ReasonCode, also has the codes of the other packets.
+Deno.test({ name: '@auth with a Reason Code that AUTH cannot carry', only: false }, async (context) => {
+  await context.step('auth() rejects with InvalidArgumentError and sends nothing; the connection stays open', async () => {
+    const broker = new TestBroker();
+    const client = new MqttClient({ clientId: 'cid', logger });
+    try {
+      const received: string[] = [];
+      broker.on('connect', (event) => {
+        const packet = event.detail;
+        broker.sendConnack(packet.clientId, false, packet.protocolVersion);
+      });
+      broker.on('auth', (event) => {
+        received.push(`auth ${event.detail.reasonCode}`);
+      });
+      broker.on('publish', (event) => {
+        received.push(`publish ${event.detail.topic}`);
+      });
+      broker.listen();
+      await client.connect();
+
+      await assertRejects(
+        () => client.auth(Mqtt.ReasonCode.NotAuthorized, { authenticationMethod: 'M' }),
+        ClientErrors.InvalidArgumentError,
+        'reasonCode must be 0x00 (Success), 0x18 (Continue authentication) or 0x19 (Re-authenticate) (got 135)',
+      );
+      // The broker gets the next packets on the same connection, and nothing before them.
+      await client.auth(Mqtt.ReasonCode.ReAuthenticate, { authenticationMethod: 'M' });
+      await client.publish('topic/after', 'x');
+      await waitFor(() => received.length > 1, 'the AUTH and the PUBLISH');
+      assertEquals(received, [`auth ${Mqtt.ReasonCode.ReAuthenticate}`, 'publish topic/after']);
+    } finally {
+      await client.disconnect(true);
+      await broker.destroy();
+    }
+  });
+
+  await context.step('auth() rejects with InvalidArgumentError also while not connected', async () => {
+    const client = new MqttClient({ clientId: 'cid', logger });
+
+    // ignored on purpose: the rejection must not terminate the process
+    client.auth(Mqtt.ReasonCode.QuotaExceeded);
+
+    await assertRejects(() => client.auth(Mqtt.ReasonCode.QuotaExceeded), ClientErrors.InvalidArgumentError, '(got 151)');
+  });
+}); // @auth with a Reason Code that AUTH cannot carry
+
+Deno.test({ name: '@auth with an invalid property', only: false }, async (context) => {
+  // The values that are not of the type are what JavaScript callers may pass.
+  const cases: [unknown, string][] = [
+    // It was sent as 3 bytes of 0.
+    [{ authenticationMethod: 'M', authenticationData: 'str' }, 'properties.authenticationData must be a Uint8Array'],
+    // The encoder failed with "TypeError: str.includes is not a function".
+    [{ authenticationMethod: 'M', userProperties: [{ key: 1, val: 'v' }] }, 'properties.userProperties[0].key must be a string'],
+    // The encoder failed with a message that did not name the property.
+    [{ authenticationMethod: 'M', reasonString: 'a\u0000' }, 'properties.reasonString "a\\u0000" must not contain U+0000'],
+  ];
+
+  await context.step('auth() rejects with InvalidPropertyError and sends nothing; the connection stays open', async () => {
+    const broker = new TestBroker();
+    const client = new MqttClient({ clientId: 'cid', logger });
+    try {
+      const received: string[] = [];
+      broker.on('connect', (event) => {
+        const packet = event.detail;
+        broker.sendConnack(packet.clientId, false, packet.protocolVersion);
+      });
+      broker.on('auth', (event) => {
+        received.push(`auth ${event.detail.reasonCode}`);
+      });
+      broker.on('publish', (event) => {
+        received.push(`publish ${event.detail.topic}`);
+      });
+      broker.listen();
+      await client.connect();
+
+      for (const [properties, message] of cases) {
+        await assertRejects(
+          () => client.auth(Mqtt.ReasonCode.ReAuthenticate, properties as MqttProperties.AuthProperties),
+          ClientErrors.InvalidPropertyError,
+          message,
+        );
+      }
+      // The broker gets the next packets on the same connection, and nothing before them.
+      await client.auth(Mqtt.ReasonCode.ReAuthenticate, { authenticationMethod: 'M', authenticationData: new Uint8Array([0x64]) });
+      await client.publish('topic/after', 'x');
+      await waitFor(() => received.length > 1, 'the AUTH and the PUBLISH');
+      assertEquals(received, [`auth ${Mqtt.ReasonCode.ReAuthenticate}`, 'publish topic/after']);
+    } finally {
+      await client.disconnect(true);
+      await broker.destroy();
+    }
+  });
+
+  await context.step('auth() rejects with InvalidPropertyError also while not connected, instead of SendPacketError', async () => {
+    const client = new MqttClient({ clientId: 'cid', logger });
+
+    // ignored on purpose: the rejection must not terminate the process
+    client.auth(Mqtt.ReasonCode.ReAuthenticate, { reasonString: 'a\u0000' });
+
+    for (const [properties, message] of cases) {
+      await assertRejects(
+        () => client.auth(Mqtt.ReasonCode.ReAuthenticate, properties as MqttProperties.AuthProperties),
+        ClientErrors.InvalidPropertyError,
+        message,
+      );
+    }
+  });
+}); // @auth with an invalid property
+
+Deno.test({ name: '@auth without an Authentication Method', only: false }, async (context) => {
+  await context.step('auth() rejects with MqttPacketSerializeError and sends nothing; the connection stays open', async () => {
+    const broker = new TestBroker();
+    const client = new MqttClient({ clientId: 'cid', logger });
+    try {
+      const received: string[] = [];
+      broker.on('connect', (event) => {
+        const packet = event.detail;
+        broker.sendConnack(packet.clientId, false, packet.protocolVersion);
+      });
+      broker.on('auth', (event) => {
+        received.push(`auth ${event.detail.reasonCode}`);
+      });
+      broker.on('publish', (event) => {
+        received.push(`publish ${event.detail.topic}`);
+      });
+      broker.listen();
+      await client.connect();
+
+      // Every AUTH carries the Authentication Method (MQTT 5.0 3.15.2.2.2): the broker would take it as a Protocol Error.
+      const calls: [Mqtt.ReasonCode, MqttProperties.AuthProperties | undefined][] = [
+        [Mqtt.ReasonCode.ReAuthenticate, undefined],
+        [Mqtt.ReasonCode.ContinueAuthentication, { authenticationData: new Uint8Array([0x64]) }],
+        [Mqtt.ReasonCode.ReAuthenticate, {}],
+      ];
+      for (const [reasonCode, properties] of calls) {
+        const error = await assertRejects(() => client.auth(reasonCode, properties), MqttPackets.MqttPacketsError.MqttPacketSerializeError);
+        assertInstanceOf(error.cause, MqttPackets.MqttPacketsError.MissingPropertyError);
+      }
+      // The broker gets the next packets on the same connection, and nothing before them.
+      await client.auth(Mqtt.ReasonCode.ReAuthenticate, { authenticationMethod: 'M' });
+      await client.publish('topic/after', 'x');
+      await waitFor(() => received.length > 1, 'the AUTH and the PUBLISH');
+      assertEquals(received, [`auth ${Mqtt.ReasonCode.ReAuthenticate}`, 'publish topic/after']);
+    } finally {
+      await client.disconnect(true);
+      await broker.destroy();
+    }
+  });
+}); // @auth without an Authentication Method
 
 // MQTT 3.1.1 has no AUTH: its packet type 15 is Reserved (MQTT 3.1.1 2.2.1), and the receiver of it must close the
 // connection [MQTT-4.8.0-1].

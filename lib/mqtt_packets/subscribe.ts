@@ -3,13 +3,14 @@ import { ByteReader, concatBytes, numToQoS, numToTwoByteInteger, remainingLength
 import { ProtocolViolationError } from '../mqtt_utils/error.ts';
 import * as MqttProperties from '../mqtt_properties/mod.ts';
 import { readProperties } from '../mqtt_properties/read_properties.ts';
+import { packetIdValue, zeroToTwoValue } from './field_values.ts';
 import type { SubscribePacket, Subscription } from './packet_types.ts';
 
 export function toBytes(
   packet: SubscribePacket,
   protocolVersion: Mqtt.ProtocolVersion,
 ): Uint8Array {
-  const variableHeaderChunks: (Uint8Array | number[])[] = [numToTwoByteInteger(packet.packetId)];
+  const variableHeaderChunks: (Uint8Array | number[])[] = [numToTwoByteInteger(packetIdValue('SUBSCRIBE', packet.packetId))];
   if (protocolVersion > Mqtt.ProtocolVersion.MqttV3_1_1) {
     if (packet.properties) {
       variableHeaderChunks.push(MqttProperties.propertiesToBytes(packet.properties));
@@ -21,20 +22,27 @@ export function toBytes(
   const variableHeader = concatBytes(variableHeaderChunks);
 
   const payloadChunks: (Uint8Array | number[])[] = [];
-  for (const sub of packet.subscriptions) {
+  for (const [i, sub] of packet.subscriptions.entries()) {
+    const qos = zeroToTwoValue('SUBSCRIBE', `subscriptions[${i}].qos`, sub.qos);
     if (protocolVersion > Mqtt.ProtocolVersion.MqttV3_1_1) {
+      // MQTT 3.1.1 has no Retain Handling.
+      const retainHandling = zeroToTwoValue(
+        'SUBSCRIBE',
+        `subscriptions[${i}].retainHandling`,
+        sub.retainHandling ?? Mqtt.RetainHandling.AtTheTimeOfTheSubscribe,
+      );
       const subscriptionOptions = (0b0) | // 7bit reserved
         (0b0) | // 6bit reserved
-        (sub.retainHandling === Mqtt.RetainHandling.DoNotSend ? 0b00100000 : 0) | // 5bit for retainHandling
-        (sub.retainHandling === Mqtt.RetainHandling.AtSubscribeOnlyIfTheSubscriptionDoesNotCurrentlyExist ? 0b00010000 : 0) | // 4bit for retainHandling
+        (retainHandling === Mqtt.RetainHandling.DoNotSend ? 0b00100000 : 0) | // 5bit for retainHandling
+        (retainHandling === Mqtt.RetainHandling.AtSubscribeOnlyIfTheSubscriptionDoesNotCurrentlyExist ? 0b00010000 : 0) | // 4bit for retainHandling
         (sub.retainAsPublished ? 0b00001000 : 0) | // 3bit for retainAsPublished
         (sub.noLocal ? 0b00000100 : 0) | // 2bit for noLocal
-        (sub.qos === Mqtt.QoS.ExactlyOnce ? 0b00000010 : 0) | // 1bit for qos
-        (sub.qos === Mqtt.QoS.AtLeastOnce ? 0b00000001 : 0); // 0bit for qos
+        (qos === Mqtt.QoS.ExactlyOnce ? 0b00000010 : 0) | // 1bit for qos
+        (qos === Mqtt.QoS.AtLeastOnce ? 0b00000001 : 0); // 0bit for qos
 
       payloadChunks.push(stringToUtfEncodedString(sub.topicFilter), [subscriptionOptions]);
     } else {
-      payloadChunks.push(stringToUtfEncodedString(sub.topicFilter), [sub.qos]);
+      payloadChunks.push(stringToUtfEncodedString(sub.topicFilter), [qos]);
     }
   }
 

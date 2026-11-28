@@ -2,13 +2,14 @@ import * as Mqtt from '../mqtt/mod.ts';
 import { ByteReader, concatBytes, numToTwoByteInteger, remainingLengthToBytes } from '../mqtt_utils/mod.ts';
 import * as MqttProperties from '../mqtt_properties/mod.ts';
 import { readProperties } from '../mqtt_properties/read_properties.ts';
+import { answerPacketIdValue, reasonCodeValue, unsubackReasonCodes } from './field_values.ts';
 import type { UnsubackPacket } from './packet_types.ts';
 
 export function toBytes(
   packet: UnsubackPacket,
   protocolVersion: Mqtt.ProtocolVersion,
 ): Uint8Array {
-  const variableHeaderChunks: (Uint8Array | number[])[] = [numToTwoByteInteger(packet.packetId)]; //packetId
+  const variableHeaderChunks: (Uint8Array | number[])[] = [numToTwoByteInteger(answerPacketIdValue('UNSUBACK', packet.packetId))]; //packetId
   if (protocolVersion > Mqtt.ProtocolVersion.MqttV3_1_1) {
     // MQTT V5.0
     variableHeaderChunks.push(MqttProperties.propertiesToBytes(packet.properties));
@@ -17,10 +18,10 @@ export function toBytes(
   const variableHeader = concatBytes(variableHeaderChunks);
 
   if (protocolVersion > Mqtt.ProtocolVersion.MqttV3_1_1) {
-    const payload = packet.reasonCodes;
-    if (payload === undefined) {
+    if (packet.reasonCodes === undefined) {
       throw new Error('UNSUBACK has no reasonCodes');
     }
+    const payload = packet.reasonCodes.map((code, i) => reasonCodeValue('UNSUBACK', `reasonCodes[${i}]`, code, unsubackReasonCodes));
 
     const fixedHeader = [
       (Mqtt.PacketType.Unsuback << 4) + Mqtt.FixedHeaderFlag.Unsuback,

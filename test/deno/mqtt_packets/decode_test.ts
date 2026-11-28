@@ -91,8 +91,7 @@ Deno.test('decode reads an omitted Reason Code as 0x00 (MQTT 5.0)', () => {
   }
   // 3.14.2.1
   assertEquals(decode(new Uint8Array([0xE0, 0x00]), V5), { type: 'disconnect', reasonCode: Mqtt.ReasonCode.NormalDisconnection });
-  // 3.15.2.1
-  assertEquals(decode(new Uint8Array([0xF0, 0x00]), V5), { type: 'auth', reasonCode: Mqtt.ReasonCode.Success });
+  // An AUTH without a Reason Code (3.15.2.1) has no Authentication Method either, a Protocol Error: see below.
   // MQTT 3.1.1 has no Reason Code.
   assertEquals(decode(new Uint8Array([0x40, 0x02, 0x00, 0x01]), V3), { type: 'puback', packetId: 1 });
   assertEquals(decode(new Uint8Array([0xE0, 0x00]), V3), { type: 'disconnect' });
@@ -109,8 +108,8 @@ Deno.test('decode reads a Reason Code without a Property Length, and with a Prop
   const disconnect = { type: 'disconnect', reasonCode: Mqtt.ReasonCode.ServerShuttingDown } as const;
   assertEquals(decode(new Uint8Array([0xE0, 0x01, 0x8B]), V5), disconnect);
   assertEquals(decode(new Uint8Array([0xE0, 0x02, 0x8B, 0x00]), V5), disconnect);
-  // AUTH can omit the Property Length only together with the Reason Code: see auth_test.ts.
-  assertEquals(decode(new Uint8Array([0xF0, 0x02, 0x18, 0x00]), V5), { type: 'auth', reasonCode: Mqtt.ReasonCode.ContinueAuthentication });
+  // AUTH can omit the Property Length only together with the Reason Code, and always has the Authentication Method: see
+  // auth_test.ts.
 });
 
 Deno.test('decode reads a CONNACK of MQTT 3.1.1 for MQTT 5.0 without properties', () => {
@@ -139,6 +138,9 @@ Deno.test('decode throws a MqttPacketParseError caused by ProtocolViolationError
     ['CONNACK', [0x20, 0x05, 0x00, 0x00, 0x02, 0x25, 0x02]],
     // Reason String twice
     ['SUBACK', [0x90, 0x0C, 0x00, 0x01, 0x08, 0x1F, 0x00, 0x01, 0x72, 0x1F, 0x00, 0x01, 0x72, 0x00]],
+    // No Authentication Method (3.15.2.2.2): with a Remaining Length of 0, and with a Property Length of 0
+    ['AUTH', [0xF0, 0x00]],
+    ['AUTH', [0xF0, 0x02, 0x18, 0x00]],
   ];
   for (const [name, bytes] of cases) {
     assertInstanceOf(decodeError(bytes, V5, name), MqttUtilsError.ProtocolViolationError, name);

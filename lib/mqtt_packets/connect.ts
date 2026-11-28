@@ -1,13 +1,23 @@
-import { ByteReader, concatBytes, numToQoS, numToTwoByteInteger, remainingLengthToBytes, stringToUtfEncodedString, toBinaryData } from '../mqtt_utils/mod.ts';
+import {
+  ByteReader,
+  concatBytes,
+  maxTwoByteInteger,
+  numToQoS,
+  numToTwoByteInteger,
+  remainingLengthToBytes,
+  stringToUtfEncodedString,
+  toBinaryData,
+} from '../mqtt_utils/mod.ts';
 import * as Mqtt from '../mqtt/mod.ts';
 import * as MqttProperties from '../mqtt_properties/mod.ts';
 import { readProperties } from '../mqtt_properties/read_properties.ts';
 import { InvalidProtocolVersionError } from './error.ts';
+import { integerValue, protocolVersionValue, zeroToTwoValue } from './field_values.ts';
 import type { ConnectPacket } from './packet_types.ts';
 
 export function toBytes(packet: ConnectPacket): Uint8Array {
   const protocolName = stringToUtfEncodedString('MQTT');
-  const protocolVersion = packet.protocolVersion;
+  const protocolVersion = protocolVersionValue('CONNECT protocolVersion', packet.protocolVersion);
 
   const usernameFlag = typeof packet.username !== 'undefined';
   const passwordFlag = typeof packet.password !== 'undefined';
@@ -15,7 +25,7 @@ export function toBytes(packet: ConnectPacket): Uint8Array {
 
   const willFlag = packet.will ? true : false;
   const willRetain = (packet.will?.retain) ? true : false;
-  const willQoS = (packet.will?.qos) || 0;
+  const willQoS = packet.will ? zeroToTwoValue('CONNECT', 'will.qos', packet.will.qos ?? 0) : 0;
 
   const connectFlags = (usernameFlag ? 0b10000000 : 0) |
     (passwordFlag ? 0b01000000 : 0) |
@@ -25,7 +35,7 @@ export function toBytes(packet: ConnectPacket): Uint8Array {
     (willFlag ? 0b00000100 : 0) |
     (cleanSession ? 0b00000010 : 0);
 
-  const keepAlive = packet.keepAlive || 0; // 0 = Not send KeepAlive
+  const keepAlive = integerValue('CONNECT', 'keepAlive', packet.keepAlive ?? 0, 0, maxTwoByteInteger); // 0 = no keep alive
 
   // Collect variable header / payload chunks and concatenate them at the end
   // instead of spreading byte arrays into push()/Uint8Array.from(), which can

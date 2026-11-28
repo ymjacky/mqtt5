@@ -110,6 +110,9 @@ const invalidPackets: [string, number[], Mqtt.ReasonCode][] = [
   ],
   // An AUTH has either no Reason Code, or a Reason Code and the Property Length (MQTT 5.0 3.15.2.1).
   ['an AUTH that has a Reason Code but no Property Length', [0xF0, 0x01, 0x18], Mqtt.ReasonCode.MalformedPacket],
+  // Every AUTH carries the Authentication Method (MQTT 5.0 3.15.2.2.2), also one with a Remaining Length of 0.
+  ['an AUTH without an Authentication Method, a Protocol Error', [0xF0, 0x02, 0x18, 0x00], Mqtt.ReasonCode.ProtocolError],
+  ['an AUTH with a Remaining Length of 0, which has no Authentication Method', [0xF0, 0x00], Mqtt.ReasonCode.ProtocolError],
   // Packet ID 1, no properties, the Topic Filter 'a' with QoS 0.
   ['a SUBSCRIBE, which only a client sends', [0x82, 0x07, 0x00, 0x01, 0x00, 0x00, 0x01, 0x61, 0x00], Mqtt.ReasonCode.ProtocolError],
   // A Remaining Length is at most 4 bytes (MQTT 5.0 1.5.5): the client cannot tell where the next packet starts.

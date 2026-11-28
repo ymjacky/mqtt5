@@ -2,6 +2,7 @@ import * as Mqtt from '../mqtt/mod.ts';
 import * as MqttProperties from '../mqtt_properties/mod.ts';
 import { readProperties } from '../mqtt_properties/read_properties.ts';
 import { ByteReader, concatBytes, remainingLengthToBytes } from '../mqtt_utils/mod.ts';
+import { connackReasonCodes, reasonCodeValue, v3_1_1ConnackReturnCodes } from './field_values.ts';
 import type { ConnackPacket } from './packet_types.ts';
 
 export function toBytes(
@@ -10,12 +11,12 @@ export function toBytes(
 ): Uint8Array {
   const variableHeaderChunks: (Uint8Array | number[])[] = [[packet.sessionPresent ? 1 : 0]];
   if (protocolVersion > 4) {
-    const reasonCode = packet.reasonCode || 0x00; // 0x00 success
-    variableHeaderChunks.push([reasonCode & 0xFF]);
+    const reasonCode = reasonCodeValue('CONNACK', 'reasonCode', packet.reasonCode ?? 0x00, connackReasonCodes); // 0x00 success
+    variableHeaderChunks.push([reasonCode]);
     variableHeaderChunks.push(MqttProperties.propertiesToBytes(packet.properties));
   } else {
-    const returnCode = packet.returnCode || 0x00; // 0x00 success
-    variableHeaderChunks.push([returnCode & 0xFF]);
+    const returnCode = reasonCodeValue('CONNACK', 'returnCode', packet.returnCode ?? 0x00, v3_1_1ConnackReturnCodes); // 0x00 accepted
+    variableHeaderChunks.push([returnCode]);
   }
 
   const variableHeader = concatBytes(variableHeaderChunks);

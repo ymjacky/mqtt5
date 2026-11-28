@@ -493,6 +493,27 @@ Deno.test({ name: '@connect options that are Two Byte Integers', only: false }, 
   );
 }); // @connect options that are Two Byte Integers
 
+Deno.test({ name: '@connect protocolVersion option', only: false }, () => {
+  // CONNECT would carry another value as its Protocol Level, which the broker refuses. The string is what JavaScript callers
+  // may pass.
+  for (const value of [3, 6, 0, 4.5, NaN, '5'] as unknown as Mqtt.ProtocolVersion[]) {
+    const message = `protocolVersion must be 4 (MQTT 3.1.1) or 5 (MQTT 5.0) (got ${value})`;
+    assertThrows(() => new MqttClient({ clientId: 'cid', protocolVersion: value }), ClientErrors.InvalidArgumentError, message, `${value}`);
+    assertThrows(
+      () => new WebSocketMqttClient({ clientId: 'cid', protocolVersion: value, url: new URL('ws://127.0.0.1:8080') }),
+      ClientErrors.InvalidArgumentError,
+      message,
+      `${value}`,
+    );
+  }
+  // Left out (or undefined), it is MQTT 5.0.
+  for (const protocolVersion of [Mqtt.ProtocolVersion.MqttV5, Mqtt.ProtocolVersion.MqttV3_1_1, undefined]) {
+    new MqttClient({ clientId: 'cid', protocolVersion });
+    new WebSocketMqttClient({ clientId: 'cid', protocolVersion, url: new URL('ws://127.0.0.1:8080') });
+  }
+  new MqttClient();
+}); // @connect protocolVersion option
+
 Deno.test({ name: '@connect properties of 0', only: false }, async (context) => {
   await context.step(
     'sends a Topic Alias Maximum and a Will Delay Interval of 0 as they are given, instead of leaving them out',

@@ -23,6 +23,7 @@ import {
   type BrokerCapabilities,
   brokerCapabilitiesOf,
   unrestrictedBroker,
+  validateAuth,
   validateClientOptions,
   validateConnect,
   validateDisconnect,
@@ -234,7 +235,8 @@ export abstract class BaseMqttClient {
 
   /**
    * Creates a client. Use {@link MqttClient} or {@link WebSocketMqttClient}.
-   * @throws {InvalidArgumentError} if `keepAlive`, `topicAliasMaximumAboutSend` or `topicAliasMaximumAboutReceive`
+   * @throws {InvalidArgumentError} if `protocolVersion` is not `Mqtt.ProtocolVersion.MqttV5` or
+   * `Mqtt.ProtocolVersion.MqttV3_1_1`, if `keepAlive`, `topicAliasMaximumAboutSend` or `topicAliasMaximumAboutReceive`
    * is not an integer from 0 to 65,535, if
    * `clientId` or `username` is longer than 65,535 bytes in UTF-8 or contains U+0000 or a lone surrogate, if `password` is
    * longer than 65,535 bytes or a string with a lone surrogate, or if the `outgoingStore` cannot be used with the `clientId`.
@@ -1266,11 +1268,18 @@ export abstract class BaseMqttClient {
    * A rejection of an ignored promise does not terminate the process; await the promise to handle failures.
    * @param reasonCode a {@link Mqtt.ReasonCode}, e.g. `Mqtt.ReasonCode.ContinueAuthentication` or `Mqtt.ReasonCode.ReAuthenticate`.
    * @param properties AUTH properties ({@link MqttProperties.AuthProperties}), such as `authenticationMethod` and `authenticationData`.
+   * They must include `authenticationMethod`: every AUTH carries the Authentication Method (MQTT 5.0 3.15.2.2.2).
    * The Reason String and User Properties are left out if they make AUTH larger than the Maximum Packet Size of the broker.
    * @throws {UnsupportedByProtocolVersionError} if the client uses MQTT 3.1.1, which has no AUTH. Nothing is sent.
+   * @throws {InvalidArgumentError} if `reasonCode` is not one that AUTH can carry: 0x00 (Success), 0x18 (Continue
+   * authentication) or 0x19 (Re-authenticate). Nothing is sent.
+   * @throws {InvalidPropertyError} if a property is invalid, e.g. a string with U+0000 or an `authenticationData` that is not a
+   * Uint8Array. Nothing is sent.
    * @throws {SendPacketError} if the client is not connected.
    * @throws {PacketTooLargeError} if AUTH is larger than the Maximum Packet Size of the broker even without the Reason String
    * and User Properties. Nothing is sent.
+   * @throws {MqttPacketSerializeError} if `properties` has no `authenticationMethod` (its `cause` is
+   * `MqttPacketsError.MissingPropertyError`). Nothing is sent.
    */
   public auth(
     reasonCode?: Mqtt.ReasonCode,
@@ -1280,6 +1289,13 @@ export abstract class BaseMqttClient {
     if (this.protocolVersion === Mqtt.ProtocolVersion.MqttV3_1_1) {
       // Packet type 15 is Reserved in MQTT 3.1.1 (2.2.1): the broker would close the connection on it [MQTT-4.8.0-1].
       deferred.reject(new UnsupportedByProtocolVersionError('auth() needs MQTT 5.0: MQTT 3.1.1 has no AUTH'));
+      return deferred.promise;
+    }
+    try {
+      validateAuth(reasonCode, properties);
+    } catch (err) {
+      // InvalidArgumentError, InvalidPropertyError
+      deferred.reject(err as Error);
       return deferred.promise;
     }
     const packet: AuthPacket = {

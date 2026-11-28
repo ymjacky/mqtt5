@@ -40,6 +40,7 @@ import { parse as authParse, toBytes as authToBytes } from './auth.ts';
 
 import * as Mqtt from '../mqtt/mod.ts';
 import * as MqttPacketsError from './error.ts';
+import { protocolVersionValue } from './field_values.ts';
 /** Errors thrown when encoding or decoding packets. */
 export * as MqttPacketsError from './error.ts';
 
@@ -72,14 +73,19 @@ export type AnyPacket =
  * @throws {MqttPacketsError.MqttPacketSerializeError} if the packet cannot be encoded, e.g. a UTF-8 Encoded String (a topic,
  * the Client Identifier, a string property, ...) contains U+0000 or a lone surrogate or is longer than 65,535 bytes in UTF-8,
  * a string Password has a lone surrogate, an integer property has a value that it cannot have (e.g. a Receive Maximum of 0 or
- * a Maximum QoS of 2: see `MqttProperties.propertiesToBytes()`), a value does not fit its field, or the packet is an AUTH with
- * MQTT 3.1.1, which has no AUTH. Its `cause` tells why.
+ * a Maximum QoS of 2: see `MqttProperties.propertiesToBytes()`), another field has a value that it cannot have (see
+ * `MqttPacketsError.InvalidFieldValueError`: e.g. a packet ID of 0 in PUBLISH, a QoS of 3, or a Reason Code that the packet type cannot
+ * carry, such as 0x87 in AUTH), a value does not fit its field, the packet is an AUTH with MQTT 3.1.1, which has no AUTH, or
+ * an AUTH without an Authentication Method (`MqttPacketsError.MissingPropertyError`), or
+ * `protocolVersion` or the `protocolVersion` of a CONNECT is not 4 (MQTT 3.1.1) or 5 (MQTT 5.0)
+ * (`MqttPacketsError.InvalidProtocolVersionError`). Its `cause` tells why.
  */
 export function packetToBytes(
   packet: AnyPacket,
   protocolVersion: Mqtt.ProtocolVersion,
 ): Uint8Array {
   try {
+    protocolVersionValue('protocolVersion', protocolVersion);
     let bytes: Uint8Array;
     switch (packet.type) {
       case 'connect':
@@ -143,15 +149,19 @@ export function packetToBytes(
  * @param protocolVersion the protocol version to decode the packet for.
  * @returns the decoded packet.
  * @throws {MqttPacketsError.MqttPacketParseError} if the bytes cannot be decoded: they are not exactly one packet, or the
- * packet is a Malformed Packet or a Protocol Error, e.g. a field goes past the end of the packet or a property is included
- * more than once (MQTT 5.0 4.13), or its packet type is Reserved: 0, or 15 (AUTH) with MQTT 3.1.1. `cause` is the error that
- * was found.
+ * packet is a Malformed Packet or a Protocol Error, e.g. a field goes past the end of the packet, a property is included
+ * more than once (MQTT 5.0 4.13), a PUBLISH with QoS 1 or QoS 2 has a packet ID of 0 or an AUTH has no Authentication
+ * Method, or its packet type is Reserved: 0, or
+ * 15 (AUTH) with MQTT 3.1.1. It is also thrown, with `MqttPacketsError.InvalidProtocolVersionError` as its cause, when
+ * `protocolVersion` or the Protocol Level of a CONNECT is not 4 (MQTT 3.1.1) or 5 (MQTT 5.0). `cause` is the error that was
+ * found.
  */
 export function decode(
   buffer: Uint8Array,
   protocolVersion: Mqtt.ProtocolVersion = Mqtt.ProtocolVersion.MqttV5,
 ): AnyPacket {
   try {
+    protocolVersionValue('protocolVersion', protocolVersion);
     // fixed header
     const header = new MqttUtils.ByteReader(buffer);
     const firstByte = header.readByte();

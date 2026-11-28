@@ -2,7 +2,9 @@ import * as Mqtt from '../mqtt/mod.ts';
 import * as MqttProperties from '../mqtt_properties/mod.ts';
 import { readProperties } from '../mqtt_properties/read_properties.ts';
 import { ByteReader, concatBytes, remainingLengthToBytes } from '../mqtt_utils/mod.ts';
-import { UnsupportedPacketError } from './error.ts';
+import { ProtocolViolationError } from '../mqtt_utils/error.ts';
+import { MissingPropertyError, UnsupportedPacketError } from './error.ts';
+import { authReasonCodes, reasonCodeValue } from './field_values.ts';
 import type { AuthPacket } from './packet_types.ts';
 
 /**
@@ -24,15 +26,14 @@ export function toBytes(
   expectAuthInProtocolVersion(protocolVersion);
   const variableHeaderChunks: (Uint8Array | number[])[] = [];
 
-  const reasonCode = packet.reasonCode || 0x00; // 0x00 success
-  if (packet.properties) {
-    variableHeaderChunks.push([reasonCode & 0xFF]);
-    variableHeaderChunks.push(MqttProperties.propertiesToBytes(packet.properties));
-  } else {
-    if (reasonCode !== 0x00) {
-      variableHeaderChunks.push([reasonCode & 0xFF]);
-    }
+  const reasonCode = reasonCodeValue('AUTH', 'reasonCode', packet.reasonCode ?? 0x00, authReasonCodes); // 0x00 success
+  if (packet.properties?.authenticationMethod === undefined) {
+    throw new MissingPropertyError('AUTH must carry an authenticationMethod (MQTT 5.0 3.15.2.2.2)');
   }
+  // AUTH always has a property, the Authentication Method, so the Reason Code and the Property Length are always written:
+  // they can be omitted only when the Reason Code is 0x00 (Success) and there are no properties (MQTT 5.0 3.15.2.1).
+  variableHeaderChunks.push([reasonCode]);
+  variableHeaderChunks.push(MqttProperties.propertiesToBytes(packet.properties));
 
   const variableHeader = concatBytes(variableHeaderChunks);
 
@@ -52,22 +53,23 @@ export function parse(
   expectAuthInProtocolVersion(protocolVersion);
   const reader = new ByteReader(buffer, remainingLength);
 
-  // The Reason Code and the Property Length can be omitted when the Reason Code is 0x00 (Success) and there are no
-  // properties: the Remaining Length is 0 then (MQTT 5.0 3.15.2.1). Unlike DISCONNECT, the Property Length cannot be
-  // omitted alone.
+  // Every AUTH carries the Authentication Method: it is a Protocol Error to omit it (MQTT 5.0 3.15.2.2.2), for the client and
+  // for the server alike [MQTT-4.12.0-5]. So is an AUTH with a Remaining Length of 0, which 3.15.2.1 allows for the Reason Code
+  // 0x00 (Success) without properties: it has no Authentication Method.
   if (reader.remaining === 0) {
-    return {
-      type: 'auth',
-      reasonCode: Mqtt.ReasonCode.Success,
-    };
+    throw new ProtocolViolationError('AUTH must carry the Authentication Method (it has a Remaining Length of 0)');
   }
 
+  // Unlike DISCONNECT, the Property Length cannot be omitted alone: a Reason Code without it is a Malformed Packet.
   const reasonCode = reader.readByte();
   const properties = readProperties(reader);
   reader.expectEnd('AUTH');
+  if (properties?.authenticationMethod === undefined) {
+    throw new ProtocolViolationError('AUTH must carry the Authentication Method');
+  }
   return {
     type: 'auth',
     reasonCode,
-    ...(properties && { properties }),
+    properties,
   };
 }

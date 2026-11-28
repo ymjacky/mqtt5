@@ -2,13 +2,14 @@ import * as Mqtt from '../mqtt/mod.ts';
 import { ByteReader, concatBytes, numToTwoByteInteger, remainingLengthToBytes, stringToUtfEncodedString } from '../mqtt_utils/mod.ts';
 import * as MqttProperties from '../mqtt_properties/mod.ts';
 import { readProperties } from '../mqtt_properties/read_properties.ts';
+import { packetIdValue } from './field_values.ts';
 import type { UnsubscribePacket } from './packet_types.ts';
 
 export function toBytes(
   packet: UnsubscribePacket,
   protocolVersion: Mqtt.ProtocolVersion,
 ): Uint8Array {
-  const variableHeaderChunks: (Uint8Array | number[])[] = [numToTwoByteInteger(packet.packetId)];
+  const variableHeaderChunks: (Uint8Array | number[])[] = [numToTwoByteInteger(packetIdValue('UNSUBSCRIBE', packet.packetId))];
   if (protocolVersion > Mqtt.ProtocolVersion.MqttV3_1_1) {
     if (packet.properties) {
       variableHeaderChunks.push(MqttProperties.propertiesToBytes(packet.properties));
