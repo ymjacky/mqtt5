@@ -1,4 +1,4 @@
-import { type MqttProperties, WebSocketMqttClient } from '../../../deno/mod.ts';
+import { Mqtt, type MqttProperties, WebSocketMqttClient } from '../../../deno/mod.ts';
 import { TestWsBroker } from '../broker/test_ws_broker.ts';
 import { assertEquals, assertExists, fail } from '@std/assert';
 
@@ -177,7 +177,48 @@ Deno.test({ name: '@closing', only: false }, async (context) => {
           assertEquals(packet.properties?.sessionExpiryInterval, 300);
           resolve();
         });
-        await client.disconnect(false, properties);
+        await client.disconnect({ properties });
+
+        await promise;
+      } catch (err) {
+        fail(`error occured: ${err}`);
+      } finally {
+        await broker.destroy();
+      }
+    },
+  );
+
+  await context.step(
+    'disconnect with a Reason Code',
+    async () => {
+      const { promise, resolve } = Promise.withResolvers<void>();
+
+      const broker = new TestWsBroker();
+
+      try {
+        broker.listen();
+
+        const client = new WebSocketMqttClient({
+          clientId: 'cid',
+          url: new URL('ws://127.0.0.1:3000/'),
+          logger: logger,
+          clean: true,
+          connectTimeoutMS: 10000,
+          keepAlive: 10,
+        });
+
+        broker.on('connect', (event) => {
+          const packet = event.detail;
+          broker.sendConnack(packet.clientId, false, packet.protocolVersion);
+        });
+
+        await client.connect();
+
+        broker.on('disconnect', (event) => {
+          assertEquals(event.detail, { type: 'disconnect', reasonCode: Mqtt.ReasonCode.DisconnectWithWillMessage });
+          resolve();
+        });
+        await client.disconnect({ reasonCode: Mqtt.ReasonCode.DisconnectWithWillMessage });
 
         await promise;
       } catch (err) {
@@ -217,7 +258,7 @@ Deno.test({ name: '@closing', only: false }, async (context) => {
         broker.on('closed', () => {
           resolve();
         });
-        await client.disconnect(true);
+        await client.disconnect({ force: true });
 
         await promise;
       } catch (err) {

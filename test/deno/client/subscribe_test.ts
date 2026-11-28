@@ -1,4 +1,4 @@
-import { ClientErrors, type ClientTypes, Mqtt, MqttClient, type MqttProperties } from '../../../deno/mod.ts';
+import { ClientErrors, Mqtt, MqttClient, type MqttPackets, type MqttProperties } from '../../../deno/mod.ts';
 import { TestBroker } from '../broker/test_broker.ts';
 import { assertEquals, assertRejects, fail } from '@std/assert';
 
@@ -43,7 +43,7 @@ Deno.test({ name: '@subscribe', only: false }, async (context) => {
             [Mqtt.ReasonCode.GrantedQoS0],
           );
         });
-        const result = await client.subscribe('topicA', Mqtt.QoS.AtMostOnce);
+        const result = await client.subscribe('topicA', { qos: Mqtt.QoS.AtMostOnce });
         assertEquals(result.reasons[0], Mqtt.ReasonCode.GrantedQoS0);
       } catch (err) {
         fail(`error occured: ${err}`);
@@ -89,7 +89,7 @@ Deno.test({ name: '@subscribe', only: false }, async (context) => {
             [Mqtt.ReasonCode.GrantedQoS1],
           );
         });
-        const result = await client.subscribe('topicA', Mqtt.QoS.AtLeastOnce);
+        const result = await client.subscribe('topicA', { qos: Mqtt.QoS.AtLeastOnce });
         assertEquals(result.reasons[0], Mqtt.ReasonCode.GrantedQoS1);
       } catch (err) {
         fail(`error occured: ${err}`);
@@ -135,7 +135,7 @@ Deno.test({ name: '@subscribe', only: false }, async (context) => {
             [Mqtt.ReasonCode.GrantedQoS2],
           );
         });
-        const result = await client.subscribe('topicA', Mqtt.QoS.ExactlyOnce);
+        const result = await client.subscribe('topicA', { qos: Mqtt.QoS.ExactlyOnce });
         assertEquals(result.reasons[0], Mqtt.ReasonCode.GrantedQoS2);
       } catch (err) {
         fail(`error occured: ${err}`);
@@ -182,7 +182,7 @@ Deno.test({ name: '@subscribe', only: false }, async (context) => {
             [Mqtt.ReasonCode.GrantedQoS0],
           );
         });
-        const result = await client.subscribe('topicA', Mqtt.QoS.AtMostOnce);
+        const result = await client.subscribe('topicA', { qos: Mqtt.QoS.AtMostOnce });
         assertEquals(result.reasons[0], Mqtt.ReasonCode.GrantedQoS0);
       } catch (err) {
         fail(`error occured: ${err}`);
@@ -229,7 +229,7 @@ Deno.test({ name: '@subscribe', only: false }, async (context) => {
             [Mqtt.ReasonCode.GrantedQoS1],
           );
         });
-        const result = await client.subscribe('topicA', Mqtt.QoS.AtLeastOnce);
+        const result = await client.subscribe('topicA', { qos: Mqtt.QoS.AtLeastOnce });
         assertEquals(result.reasons[0], Mqtt.ReasonCode.GrantedQoS1);
       } catch (err) {
         fail(`error occured: ${err}`);
@@ -276,7 +276,7 @@ Deno.test({ name: '@subscribe', only: false }, async (context) => {
             [Mqtt.ReasonCode.GrantedQoS2],
           );
         });
-        const result = await client.subscribe('topicA', Mqtt.QoS.ExactlyOnce);
+        const result = await client.subscribe('topicA', { qos: Mqtt.QoS.ExactlyOnce });
         assertEquals(result.reasons[0], Mqtt.ReasonCode.GrantedQoS2);
       } catch (err) {
         fail(`error occured: ${err}`);
@@ -354,7 +354,7 @@ Deno.test({ name: '@subscribe', only: false }, async (context) => {
   );
 
   await context.step(
-    'subscribe qos0 subscription takes precedence over the qos argument',
+    'subscribe qos0 subscription takes precedence over the qos of the options',
     async () => {
       const broker = new TestBroker();
       try {
@@ -397,7 +397,7 @@ Deno.test({ name: '@subscribe', only: false }, async (context) => {
             { topicFilter: 'topicA', qos: Mqtt.QoS.AtMostOnce },
             { topicFilter: 'topicB', qos: Mqtt.QoS.ExactlyOnce },
           ],
-          Mqtt.QoS.AtLeastOnce,
+          { qos: Mqtt.QoS.AtLeastOnce },
         );
 
         assertEquals(result.reasons[0], Mqtt.ReasonCode.GrantedQoS0);
@@ -411,7 +411,7 @@ Deno.test({ name: '@subscribe', only: false }, async (context) => {
   );
 
   await context.step(
-    'subscribe without subscription qos uses the qos argument',
+    'subscribe without subscription qos uses the qos of the options',
     async () => {
       const broker = new TestBroker();
       try {
@@ -448,10 +448,10 @@ Deno.test({ name: '@subscribe', only: false }, async (context) => {
 
         const result = await client.subscribe(
           [
-            // qos is required by the type; a JavaScript caller can still omit it.
-            { topicFilter: 'topicA' } as ClientTypes.SubscriptionOption,
+            // qos is not set: the qos of the options is used.
+            { topicFilter: 'topicA' },
           ],
-          Mqtt.QoS.AtLeastOnce,
+          { qos: Mqtt.QoS.AtLeastOnce },
         );
 
         assertEquals(result.reasons[0], Mqtt.ReasonCode.GrantedQoS1);
@@ -499,8 +499,8 @@ Deno.test({ name: '@subscribe', only: false }, async (context) => {
           );
         });
 
-        // qos is required by the type; a JavaScript caller can still omit it.
-        const objectResult = await client.subscribe({ topicFilter: 'topicA' } as ClientTypes.SubscriptionOption);
+        // qos is not set, neither in the options: QoS 0.
+        const objectResult = await client.subscribe({ topicFilter: 'topicA' });
         assertEquals(objectResult.reasons[0], Mqtt.ReasonCode.GrantedQoS0);
 
         const stringResult = await client.subscribe('topicB');
@@ -773,7 +773,7 @@ Deno.test({ name: '@subscribe', only: false }, async (context) => {
             [Mqtt.ReasonCode.GrantedQoS0],
           );
         });
-        const result = await client.subscribe('topicA', Mqtt.QoS.AtMostOnce, properties);
+        const result = await client.subscribe('topicA', { qos: Mqtt.QoS.AtMostOnce, properties });
         assertEquals(result.reasons[0], Mqtt.ReasonCode.GrantedQoS0);
       } catch (err) {
         fail(`error occured: ${err}`);
@@ -856,8 +856,7 @@ Deno.test({ name: '@subscribe', only: false }, async (context) => {
 
         const result = await client.subscribe(
           ['topicA', 'topicB', 'topicC'],
-          Mqtt.QoS.AtLeastOnce,
-          properties,
+          { qos: Mqtt.QoS.AtLeastOnce, properties },
         );
 
         assertEquals(result.reasons[0], Mqtt.ReasonCode.GrantedQoS0);
@@ -940,7 +939,7 @@ Deno.test({ name: '@receive malformed suback', only: false }, async (context) =>
           broker.sendRawBytes(client.clientId, malformedPacket);
         });
 
-        client.subscribe('topicA', Mqtt.QoS.AtLeastOnce);
+        client.subscribe('topicA', { qos: Mqtt.QoS.AtLeastOnce });
 
         await promise;
       } catch (err) {
@@ -1006,7 +1005,7 @@ Deno.test({ name: '@subscribe invalid arguments', only: false }, async (context)
 
         // other arguments and options
         await assertRejects(() => client.subscribe([]), ClientErrors.InvalidArgumentError);
-        await assertRejects(() => client.subscribe('topicA', 3 as Mqtt.QoS), ClientErrors.InvalidArgumentError);
+        await assertRejects(() => client.subscribe('topicA', { qos: 3 as Mqtt.QoS }), ClientErrors.InvalidArgumentError);
         await assertRejects(() => client.subscribe({ topicFilter: 'topicA', qos: -1 as Mqtt.QoS }), ClientErrors.InvalidArgumentError);
         await assertRejects(
           () => client.subscribe({ topicFilter: 'topicA', qos: Mqtt.QoS.AtMostOnce, retainHandling: 3 as Mqtt.RetainHandling }),
@@ -1016,11 +1015,21 @@ Deno.test({ name: '@subscribe invalid arguments', only: false }, async (context)
           () => client.subscribe({ topicFilter: '$share/group/topicA', qos: Mqtt.QoS.AtMostOnce, noLocal: true }),
           ClientErrors.InvalidArgumentError,
         );
+        // The options of the call apply to every topic filter: noLocal also to a shared subscription [MQTT-3.8.3-4].
+        await assertRejects(
+          () => client.subscribe(['topicA', '$share/group/topicA'], { noLocal: true }),
+          ClientErrors.InvalidArgumentError,
+          '$share/group/topicA',
+        );
+        await assertRejects(() => client.subscribe('topicA', { retainHandling: 3 as Mqtt.RetainHandling }), ClientErrors.InvalidArgumentError);
 
         // properties
-        await assertRejects(() => client.subscribe('topicA', Mqtt.QoS.AtMostOnce, { subscriptionIdentifier: 0 }), ClientErrors.InvalidPropertyError);
         await assertRejects(
-          () => client.subscribe('topicA', Mqtt.QoS.AtMostOnce, { userProperties: [{ key: 'k', val: 'v\u0000' }] }),
+          () => client.subscribe('topicA', { qos: Mqtt.QoS.AtMostOnce, properties: { subscriptionIdentifier: 0 } }),
+          ClientErrors.InvalidPropertyError,
+        );
+        await assertRejects(
+          () => client.subscribe('topicA', { qos: Mqtt.QoS.AtMostOnce, properties: { userProperties: [{ key: 'k', val: 'v\u0000' }] } }),
           ClientErrors.InvalidPropertyError,
         );
         // An ignored rejection does not become an unhandled rejection.
@@ -1081,3 +1090,116 @@ Deno.test({ name: '@subscribe too large', only: false }, async (context) => {
     },
   );
 }); // @subscribe too large
+
+Deno.test({ name: '@subscribe options of the call and of each topic filter', only: false }, async (context) => {
+  /** Connects a client with `protocolVersion`, calls `subscribe` with it, and returns the SUBSCRIBE packet that the broker received. */
+  async function receivedSubscribe(
+    protocolVersion: Mqtt.ProtocolVersion,
+    subscribe: (client: MqttClient) => Promise<unknown>,
+  ): Promise<MqttPackets.SubscribePacket> {
+    const broker = new TestBroker();
+    const client = new MqttClient({ clientId: 'cid', logger, protocolVersion });
+    try {
+      broker.listen();
+      broker.on('connect', (event) => {
+        const packet = event.detail;
+        broker.sendConnack(packet.clientId, false, packet.protocolVersion);
+      });
+      const received = Promise.withResolvers<MqttPackets.SubscribePacket>();
+      broker.on('subscribe', (event) => {
+        const packet = event.detail;
+        received.resolve(packet);
+        broker.sendSuback('cid', packet.packetId, protocolVersion, packet.subscriptions.map(() => 0));
+      });
+      await client.connect();
+      await subscribe(client);
+      return await received.promise;
+    } finally {
+      await client.disconnect({ force: true });
+      await broker.destroy();
+    }
+  }
+
+  await context.step('a list can mix strings and objects: an object takes its own QoS, the strings that of the options', async () => {
+    const packet = await receivedSubscribe(Mqtt.ProtocolVersion.MqttV5, (client) =>
+      client.subscribe(
+        ['topicA', { topicFilter: 'topicB', qos: Mqtt.QoS.ExactlyOnce }, 'topicC'],
+        { qos: Mqtt.QoS.AtLeastOnce },
+      ));
+    assertEquals(packet.subscriptions.map(({ topicFilter, qos }) => ({ topicFilter, qos })), [
+      { topicFilter: 'topicA', qos: Mqtt.QoS.AtLeastOnce },
+      { topicFilter: 'topicB', qos: Mqtt.QoS.ExactlyOnce },
+      { topicFilter: 'topicC', qos: Mqtt.QoS.AtLeastOnce },
+    ]);
+  });
+
+  await context.step('the options are taken one by one: an object that sets some of them takes the others from the options', async () => {
+    const packet = await receivedSubscribe(Mqtt.ProtocolVersion.MqttV5, (client) =>
+      client.subscribe(
+        [{ topicFilter: 'topicA', noLocal: true }, 'topicB'],
+        { qos: Mqtt.QoS.AtLeastOnce, retainHandling: Mqtt.RetainHandling.DoNotSend },
+      ));
+    assertEquals(packet.subscriptions, [
+      { topicFilter: 'topicA', qos: Mqtt.QoS.AtLeastOnce, noLocal: true, retainAsPublished: false, retainHandling: Mqtt.RetainHandling.DoNotSend },
+      { topicFilter: 'topicB', qos: Mqtt.QoS.AtLeastOnce, noLocal: false, retainAsPublished: false, retainHandling: Mqtt.RetainHandling.DoNotSend },
+    ]);
+  });
+
+  await context.step('false and 0 set by an object take precedence over the options', async () => {
+    const packet = await receivedSubscribe(Mqtt.ProtocolVersion.MqttV5, (client) =>
+      client.subscribe(
+        [
+          {
+            topicFilter: 'topicA',
+            qos: Mqtt.QoS.AtMostOnce,
+            noLocal: false,
+            retainAsPublished: false,
+            retainHandling: Mqtt.RetainHandling.AtTheTimeOfTheSubscribe,
+          },
+          'topicB',
+        ],
+        { qos: Mqtt.QoS.ExactlyOnce, noLocal: true, retainAsPublished: true, retainHandling: Mqtt.RetainHandling.DoNotSend },
+      ));
+    assertEquals(packet.subscriptions, [
+      {
+        topicFilter: 'topicA',
+        qos: Mqtt.QoS.AtMostOnce,
+        noLocal: false,
+        retainAsPublished: false,
+        retainHandling: Mqtt.RetainHandling.AtTheTimeOfTheSubscribe,
+      },
+      { topicFilter: 'topicB', qos: Mqtt.QoS.ExactlyOnce, noLocal: true, retainAsPublished: true, retainHandling: Mqtt.RetainHandling.DoNotSend },
+    ]);
+  });
+
+  await context.step('without a QoS in the object or in the options, a topic filter is QoS 0', async () => {
+    const packet = await receivedSubscribe(
+      Mqtt.ProtocolVersion.MqttV5,
+      (client) => client.subscribe([{ topicFilter: 'topicA', noLocal: true }, 'topicB'], { retainAsPublished: true }),
+    );
+    assertEquals(packet.subscriptions.map(({ topicFilter, qos }) => ({ topicFilter, qos })), [
+      { topicFilter: 'topicA', qos: Mqtt.QoS.AtMostOnce },
+      { topicFilter: 'topicB', qos: Mqtt.QoS.AtMostOnce },
+    ]);
+  });
+
+  await context.step('MQTT 3.1.1: only the QoS is sent', async () => {
+    const packet = await receivedSubscribe(Mqtt.ProtocolVersion.MqttV3_1_1, (client) =>
+      client.subscribe(
+        ['topicA', { topicFilter: 'topicB', qos: Mqtt.QoS.ExactlyOnce, noLocal: true }],
+        {
+          qos: Mqtt.QoS.AtLeastOnce,
+          noLocal: true,
+          retainAsPublished: true,
+          retainHandling: Mqtt.RetainHandling.DoNotSend,
+          properties: { userProperties: [{ key: 'k', val: 'v' }] },
+        },
+      ));
+    // The broker decodes it as MQTT 3.1.1, which reads the options byte as a QoS: any other bit set would make it fail.
+    assertEquals(packet.subscriptions, [
+      { topicFilter: 'topicA', qos: Mqtt.QoS.AtLeastOnce },
+      { topicFilter: 'topicB', qos: Mqtt.QoS.ExactlyOnce },
+    ]);
+    assertEquals(packet.properties, undefined);
+  });
+}); // @subscribe options of the call and of each topic filter

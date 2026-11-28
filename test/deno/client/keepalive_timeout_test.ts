@@ -50,7 +50,7 @@ Deno.test({ name: '@keepAliveTimeout', only: false }, async (context) => {
         await promise;
 
         assertEquals(closed, false);
-        await client.disconnect(true);
+        await client.disconnect({ force: true });
       } finally {
         await broker.destroy();
       }
@@ -99,7 +99,7 @@ Deno.test({ name: '@keepAliveTimeout', only: false }, async (context) => {
         await promise;
 
         assertEquals(closed, false);
-        await client.disconnect(true);
+        await client.disconnect({ force: true });
       } finally {
         await broker.destroy();
       }
@@ -232,7 +232,7 @@ Deno.test({ name: '@keepAliveTimeout', only: false }, async (context) => {
         });
 
         await client.connect();
-        await client.disconnect(true);
+        await client.disconnect({ force: true });
       } finally {
         await broker.destroy();
       }
@@ -267,7 +267,7 @@ Deno.test({ name: '@keepAliveTimeout', only: false }, async (context) => {
 
         await client.connect();
         await promise;
-        await client.disconnect(true);
+        await client.disconnect({ force: true });
       } finally {
         await broker.destroy();
       }
@@ -307,7 +307,7 @@ Deno.test({ name: '@keepAliveTimeout', only: false }, async (context) => {
         // keepAlive (1 s) would send PINGREQ after about 1000 ms.
         const elapsed = await promise;
         assert(elapsed >= 1500, `PINGREQ was sent after ${elapsed} ms`);
-        await client.disconnect(true);
+        await client.disconnect({ force: true });
       } finally {
         await broker.destroy();
       }
@@ -344,7 +344,7 @@ Deno.test({ name: '@keepAliveTimeout', only: false }, async (context) => {
         await new Promise((resolve) => setTimeout(resolve, 1500));
 
         assertEquals(pingreqReceived, false);
-        await client.disconnect(true);
+        await client.disconnect({ force: true });
       } finally {
         await broker.destroy();
       }
@@ -373,9 +373,9 @@ Deno.test({ name: '@keepAliveTimeout', only: false }, async (context) => {
         });
 
         await client.connect();
-        await client.disconnect(true);
+        await client.disconnect({ force: true });
         await client.connect();
-        await client.disconnect(true);
+        await client.disconnect({ force: true });
 
         assertEquals(sentKeepAlives, [20, 20]);
       } finally {
@@ -410,7 +410,7 @@ Deno.test({ name: '@keepAliveTimeout', only: false }, async (context) => {
 
         const connack = await client.connect();
         assertEquals(connack.reasonCode, Mqtt.ReasonCode.Success);
-        await client.disconnect(true);
+        await client.disconnect({ force: true });
       } finally {
         await broker.destroy();
       }

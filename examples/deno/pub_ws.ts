@@ -15,7 +15,7 @@ async function main() {
   await client.connect();
 
   await client.publish('topicA', 'payload', { qos: Mqtt.QoS.AtLeastOnce });
-  await client.disconnect(true);
+  await client.disconnect({ force: true });
 }
 
 main();

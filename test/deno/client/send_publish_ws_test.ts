@@ -291,8 +291,7 @@ Deno.test({ name: '@publish_qos0 ws', only: false }, async (context) => {
         await client.publish(
           'topicA',
           new TextEncoder().encode('payloadA'),
-          {},
-          properties,
+          { properties },
         );
 
         await promise;
@@ -583,8 +582,7 @@ Deno.test({ name: '@publish_qos1 ws', only: false }, async (context) => {
         const result = await client.publish(
           'topicA',
           new TextEncoder().encode('payloadA'),
-          { qos: Mqtt.QoS.AtLeastOnce },
-          properties,
+          { qos: Mqtt.QoS.AtLeastOnce, properties },
         );
         assertEquals(result.result, Mqtt.ReasonCode.Success);
         assertEquals(result.reason, undefined);
@@ -919,8 +917,7 @@ Deno.test({ name: '@publish_qos2 ws', only: false }, async (context) => {
         const result = await client.publish(
           'topicA',
           new TextEncoder().encode('payloadA'),
-          { qos: Mqtt.QoS.ExactlyOnce },
-          properties,
+          { qos: Mqtt.QoS.ExactlyOnce, properties },
         );
         assertEquals(result.result, Mqtt.ReasonCode.Success);
         assertEquals(result.reason, undefined);

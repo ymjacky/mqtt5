@@ -79,12 +79,12 @@ Deno.test({ name: '@packet IDs exhausted', only: false }, async (context) => {
         assert(subscribe?.type === 'subscribe', subscribe?.type);
         assertEquals([subscribe.packetId, subscribe.subscriptions[0]?.topicFilter], [1, 'topicB']);
 
-        await client.disconnect(true);
+        await client.disconnect({ force: true });
         for (const result of await Promise.all(subscribing.slice(1))) {
           assert(result instanceof ClientErrors.ConnectionClosed, String(result));
         }
       } finally {
-        await client.disconnect(true);
+        await client.disconnect({ force: true });
         await server.close();
       }
     },

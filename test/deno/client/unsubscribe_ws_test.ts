@@ -267,7 +267,7 @@ Deno.test({ name: '@unsubscribe ws', only: false }, async (context) => {
             [Mqtt.ReasonCode.Success],
           );
         });
-        const result = await client.unsubscribe('topicA', properties);
+        const result = await client.unsubscribe('topicA', { properties });
         assertEquals(result.reasonCodes?.[0], Mqtt.ReasonCode.Success);
       } catch (err) {
         fail(`error occured: ${err}`);
@@ -345,7 +345,7 @@ Deno.test({ name: '@unsubscribe ws', only: false }, async (context) => {
 
         const result = await client.unsubscribe(
           ['topicA', 'topicB', 'topicC', 'unspecified'],
-          properties,
+          { properties },
         );
 
         assertEquals(result.reasonCodes?.[0], Mqtt.ReasonCode.Success);

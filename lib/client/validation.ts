@@ -15,7 +15,8 @@ import * as Mqtt from '../mqtt/mod.ts';
 import type * as MqttProperties from '../mqtt_properties/mod.ts';
 import * as MqttUtils from '../mqtt_utils/mod.ts';
 import { authReasonCodes } from '../mqtt_packets/field_values.ts';
-import type { ClientOptions, ConnectOptions, SubscriptionOption } from './client_types.ts';
+import type { Subscription } from '../mqtt_packets/mod.ts';
+import type { ClientOptions, ConnectOptions } from './client_types.ts';
 import {
   InvalidArgumentError,
   InvalidPropertyError,
@@ -360,7 +361,7 @@ export function validatePublishCapabilities(qos: number, retain: boolean, capabi
  * @throws {SubscriptionIdentifiersNotSupportedError}
  */
 export function validateSubscribeCapabilities(
-  subscriptions: SubscriptionOption[],
+  subscriptions: Subscription[],
   properties: MqttProperties.SubscribeProperties | undefined,
   capabilities: BrokerCapabilities,
 ): void {
@@ -384,7 +385,7 @@ export function validateSubscribeCapabilities(
  * @throws {InvalidPropertyError}
  */
 export function validateSubscribe(
-  subscriptions: SubscriptionOption[],
+  subscriptions: Subscription[],
   properties: MqttProperties.SubscribeProperties | undefined,
   protocolVersion: Mqtt.ProtocolVersion,
 ): void {
@@ -431,6 +432,52 @@ export function validateUnsubscribe(
   }
   if (isMqtt5(protocolVersion)) {
     validateProperties(properties, 'properties');
+  }
+}
+
+/**
+ * How publish(), disconnect(), subscribe() and unsubscribe() take their options since 0.3.0, for the messages of
+ * {@link validateOptionsArgument}: the number of their arguments, the options object, and the keys that the options did not
+ * have and the arguments before 0.3.0 had at the top.
+ */
+const optionsArguments: Record<
+  'publish' | 'disconnect' | 'subscribe' | 'unsubscribe',
+  { readonly arguments: number; readonly usage: string; readonly oldKeys: readonly string[] }
+> = {
+  publish: { arguments: 3, usage: '{ qos, retain, dup, properties }', oldKeys: [] },
+  disconnect: { arguments: 1, usage: '{ force, reasonCode, properties }', oldKeys: [] },
+  subscribe: { arguments: 2, usage: '{ qos, noLocal, retainAsPublished, retainHandling, properties }', oldKeys: [] },
+  // Before 0.3.0, the second argument of unsubscribe() was the UNSUBSCRIBE properties, whose only property is userProperties.
+  unsubscribe: { arguments: 2, usage: '{ properties }', oldKeys: ['userProperties'] },
+};
+
+/**
+ * Checks that publish(), disconnect(), subscribe() or unsubscribe() is called with its options as an object, as since 0.3.0.
+ * Before, they took them as separate arguments, e.g. `disconnect(true)`, `subscribe('topicA', 1)`, the properties of
+ * publish() as a fourth argument, or those of unsubscribe() as its second one. Called that way from JavaScript, which has no
+ * type check, they would send something else without an error: e.g. `disconnect(true)` would send DISCONNECT, and the broker
+ * would discard the will message.
+ * @param method the method.
+ * @param options its options argument.
+ * @param argumentCount the number of arguments it was called with (`arguments.length`).
+ * @throws {InvalidArgumentError} if `options` is neither undefined nor an object, more arguments are given, or `options` has a
+ * key that the arguments before 0.3.0 had at the top (`userProperties` for unsubscribe()).
+ */
+export function validateOptionsArgument(method: keyof typeof optionsArguments, options: unknown, argumentCount: number): void {
+  const { arguments: maximum, usage, oldKeys } = optionsArguments[method];
+  if (options !== undefined && (typeof options !== 'object' || options === null || Array.isArray(options))) {
+    throw new InvalidArgumentError(`${method}() takes its options as an object: ${usage} (got ${String(options)})`);
+  }
+  if (argumentCount > maximum) {
+    throw new InvalidArgumentError(
+      `${method}() takes at most ${maximum} argument${maximum === 1 ? '' : 's'} (got ${argumentCount}): pass the options as an object: ${usage}`,
+    );
+  }
+  if (typeof options === 'object' && options !== null) {
+    const oldKey = oldKeys.find((key) => key in options);
+    if (oldKey !== undefined) {
+      throw new InvalidArgumentError(`${method}() takes the properties as options.properties: ${usage} (got ${oldKey} in the options)`);
+    }
   }
 }
 

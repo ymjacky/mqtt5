@@ -6,7 +6,6 @@
 import type * as Mqtt from '../mqtt/mod.ts';
 import type * as MqttProperties from '../mqtt_properties/mod.ts';
 import type { IncomingStore, OutgoingStore } from '../mqtt_store/mod.ts';
-import type { Subscription } from '../mqtt_packets/mod.ts';
 
 /**
  * Options for the {@link MqttClient} and {@link WebSocketMqttClient} constructors. All options are optional,
@@ -152,13 +151,92 @@ export type PublishOptions = {
    * @default {false}
    */
   retain?: boolean;
+  /** MQTT 5.0 PUBLISH properties. Not sent with MQTT 3.1.1. */
+  properties?: MqttProperties.UserPublishProperties;
 };
 
 /**
- * A topic filter with its subscription options, passed to {@link MqttClient.subscribe} / {@link WebSocketMqttClient.subscribe}.
- * It is the same type as {@link MqttPackets.Subscription}, which describes each field.
+ * The Subscription Options of a topic filter (MQTT 5.0 3.8.3.1). All of them are optional: in a {@link Subscription}, an option
+ * that is not set takes the value of the {@link SubscribeOptions} of the call, and then its default.
+ * `noLocal`, `retainAsPublished` and `retainHandling` are MQTT 5.0 options: they are not sent with MQTT 3.1.1.
  */
-export type SubscriptionOption = Subscription;
+export type SubscriptionOptions = {
+  /**
+   * Maximum QoS the broker may use to send messages for this subscription: 0, 1 or 2.
+   * @default {Mqtt.QoS.AtMostOnce}
+   */
+  qos?: Mqtt.QoS;
+  /**
+   * When true, the broker does not send the client its own messages. Not allowed for a shared subscription.
+   * @default {false}
+   */
+  noLocal?: boolean;
+  /**
+   * When true, the broker keeps the retain flag of the messages as they were published.
+   * @default {false}
+   */
+  retainAsPublished?: boolean;
+  /**
+   * Whether retained messages are sent when subscribing: 0, 1 or 2. See {@link Mqtt.RetainHandling}.
+   * @default {Mqtt.RetainHandling.AtTheTimeOfTheSubscribe}
+   */
+  retainHandling?: Mqtt.RetainHandling;
+};
+
+/**
+ * A topic filter with its own Subscription Options, passed to {@link MqttClient.subscribe} / {@link WebSocketMqttClient.subscribe}.
+ * An option that is not set takes the value of the {@link SubscribeOptions} of the call, and then its default.
+ */
+export type Subscription = {
+  /** Topic filter, e.g. `sensors/+/temperature`, `logs/#` or `$share/group1/topicA`. */
+  topicFilter: string;
+} & SubscriptionOptions;
+
+/**
+ * Options for {@link MqttClient.subscribe} / {@link WebSocketMqttClient.subscribe}: the Subscription Options of every topic filter,
+ * unless a {@link Subscription} sets its own, and the SUBSCRIBE properties, which are sent once for all the topic filters.
+ */
+export type SubscribeOptions = SubscriptionOptions & {
+  /**
+   * MQTT 5.0 SUBSCRIBE properties. The Subscription Identifier is the same for every topic filter of the call: subscribe in
+   * separate calls to give them different ones. Not sent with MQTT 3.1.1.
+   */
+  properties?: MqttProperties.SubscribeProperties;
+};
+
+/** Options for {@link MqttClient.unsubscribe} / {@link WebSocketMqttClient.unsubscribe}. */
+export type UnsubscribeOptions = {
+  /** MQTT 5.0 UNSUBSCRIBE properties. Not sent with MQTT 3.1.1. */
+  properties?: MqttProperties.UnsubscribeProperties;
+};
+
+/**
+ * Options for {@link MqttClient.disconnect} / {@link WebSocketMqttClient.disconnect}.
+ *
+ * With MQTT 3.1.1, DISCONNECT has no Reason Code and no properties: `reasonCode` and `properties` are not sent, and the broker
+ * always discards the will message. Use `force` to have the will message published.
+ */
+export type DisconnectOptions = {
+  /**
+   * `true` to close the connection without sending DISCONNECT, so the broker publishes the will message.
+   * `reasonCode` and `properties` are not sent then.
+   * @default {false}
+   */
+  force?: boolean;
+  /**
+   * MQTT 5.0 Reason Code of DISCONNECT. The broker discards the will message on 0x00 (Normal disconnection); with
+   * `Mqtt.ReasonCode.DisconnectWithWillMessage` (0x04), the client disconnects normally and the broker publishes the will message.
+   * Other codes tell the broker why the client disconnects, e.g. `Mqtt.ReasonCode.UnspecifiedError` (0x80) or
+   * `Mqtt.ReasonCode.ImplementationSpecificError` (0x83). Not sent with MQTT 3.1.1.
+   * @default {Mqtt.ReasonCode.NormalDisconnection}
+   */
+  reasonCode?: Mqtt.ReasonCode;
+  /**
+   * MQTT 5.0 DISCONNECT properties. A Session Expiry Interval other than 0 can be set only when the Session Expiry Interval
+   * of CONNECT was not 0 (and not absent). Not sent with MQTT 3.1.1.
+   */
+  properties?: MqttProperties.DisconnectProperties;
+};
 
 /** Result of {@link MqttClient.publish} / {@link WebSocketMqttClient.publish}. */
 export type PublishResult = {

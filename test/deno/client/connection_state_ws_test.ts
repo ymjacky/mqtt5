@@ -74,7 +74,7 @@ Deno.test({ name: '@connection state ws: packets a broker must not send', only: 
           assertEquals(seenByBroker, [...expected]);
         } finally {
           globalThis.removeEventListener('error', onError);
-          await client.disconnect(true);
+          await client.disconnect({ force: true });
           await broker.destroy();
         }
       },
@@ -150,7 +150,7 @@ Deno.test({ name: '@connection state ws: connection refused by the broker', only
         assertEquals(connack.reasonCode, Mqtt.ReasonCode.Success);
         assertEquals(await client.publish('topicA', 'x'), { result: 0, reason: '' });
       } finally {
-        await client.disconnect(true);
+        await client.disconnect({ force: true });
         await broker.destroy();
       }
     },
@@ -159,7 +159,7 @@ Deno.test({ name: '@connection state ws: connection refused by the broker', only
 
 Deno.test({ name: '@connection state ws: disconnect() while connecting', only: false }, async (context) => {
   await context.step(
-    'disconnect(true) gives up a connect() that waits for CONNACK at once, and resolves',
+    'disconnect({ force: true }) gives up a connect() that waits for CONNACK at once, and resolves',
     async () => {
       const broker = new TestWsBroker();
       const client = new WebSocketMqttClient({ url: new URL('ws://127.0.0.1:3000/'), clientId: 'cid', logger: logger, connectTimeoutMS: 5000 });
@@ -173,11 +173,11 @@ Deno.test({ name: '@connection state ws: disconnect() while connecting', only: f
         await settleWithin(connectReceived.promise, 'CONNECT');
 
         // Not after connectTimeoutMS, and not rejected with the error of connect().
-        await settleWithin(client.disconnect(true), 'disconnect(true)', 500);
+        await settleWithin(client.disconnect({ force: true }), 'disconnect({ force: true })', 500);
         await assertRejects(() => settleWithin(connecting, 'connect()'), ClientErrors.ConnectionClosed);
         await assertRejects(() => client.publish('topicA', 'x'), ClientErrors.StateIsNotOnlineError);
       } finally {
-        await client.disconnect(true);
+        await client.disconnect({ force: true });
         await broker.destroy();
       }
     },
@@ -224,8 +224,8 @@ Deno.test({ name: '@connection state ws: a peer that does not answer', only: fal
         assertEquals(closedCount, 1);
         assertEquals(await client.publish('topicA', 'x'), { result: 0, reason: '' });
 
-        // disconnect(true) does not wait for the peer either.
-        await settleWithin(client.disconnect(true), 'disconnect(true)', 2000);
+        // disconnect({ force: true }) does not wait for the peer either.
+        await settleWithin(client.disconnect({ force: true }), 'disconnect({ force: true })', 2000);
         assertEquals(closedCount, 2);
       } finally {
         await server.close();

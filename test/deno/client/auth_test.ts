@@ -263,7 +263,7 @@ Deno.test({ name: '@auth with a Reason Code that AUTH cannot carry', only: false
       await waitFor(() => received.length > 1, 'the AUTH and the PUBLISH');
       assertEquals(received, [`auth ${Mqtt.ReasonCode.ReAuthenticate}`, 'publish topic/after']);
     } finally {
-      await client.disconnect(true);
+      await client.disconnect({ force: true });
       await broker.destroy();
     }
   });
@@ -320,7 +320,7 @@ Deno.test({ name: '@auth with an invalid property', only: false }, async (contex
       await waitFor(() => received.length > 1, 'the AUTH and the PUBLISH');
       assertEquals(received, [`auth ${Mqtt.ReasonCode.ReAuthenticate}`, 'publish topic/after']);
     } finally {
-      await client.disconnect(true);
+      await client.disconnect({ force: true });
       await broker.destroy();
     }
   });
@@ -376,7 +376,7 @@ Deno.test({ name: '@auth without an Authentication Method', only: false }, async
       await waitFor(() => received.length > 1, 'the AUTH and the PUBLISH');
       assertEquals(received, [`auth ${Mqtt.ReasonCode.ReAuthenticate}`, 'publish topic/after']);
     } finally {
-      await client.disconnect(true);
+      await client.disconnect({ force: true });
       await broker.destroy();
     }
   });
@@ -419,7 +419,7 @@ Deno.test({ name: '@auth with MQTT 3.1.1', only: false }, async (context) => {
       await waitFor(() => received.length > 0, 'the PUBLISH');
       assertEquals(received, ['publish topic/after']);
     } finally {
-      await client.disconnect(true);
+      await client.disconnect({ force: true });
       await broker.destroy();
     }
   });
@@ -457,7 +457,7 @@ Deno.test({ name: '@auth with MQTT 3.1.1', only: false }, async (context) => {
       assertEquals(authEvents, 0);
       assertEquals(disconnects, []);
     } finally {
-      await client.disconnect(true);
+      await client.disconnect({ force: true });
       await broker.destroy();
     }
   });

@@ -24,7 +24,7 @@ async function main() {
   });
 
   setTimeout(() => {
-    client.disconnect(true); // force disconnect
+    client.disconnect({ force: true });
   }, 10 * 1000);
 }
 

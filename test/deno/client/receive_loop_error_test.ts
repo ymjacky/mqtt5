@@ -72,7 +72,7 @@ Deno.test({ name: '@receive loop (TCP): an error that the received bytes do not 
       await waitUntil(() => connection.isClosed, 'the close of the connection', 1000);
       assertEquals(closedEvents, 1);
     } finally {
-      await client.disconnect(true);
+      await client.disconnect({ force: true });
       await server.close();
     }
   });
@@ -93,7 +93,7 @@ Deno.test({ name: '@receive loop (TCP): an error that the received bytes do not 
       await waitUntil(() => connection.isClosed, 'the close of the connection', 1000);
       assertEquals(closedEvents, 1);
     } finally {
-      await client.disconnect(true);
+      await client.disconnect({ force: true });
       await server.close();
     }
   });
@@ -112,7 +112,7 @@ Deno.test({ name: '@receive loop (TCP): an error that the received bytes do not 
       await waitUntil(() => first.isClosed, 'the close of the previous connection', 1000);
       assertEquals(second.isClosed, false);
     } finally {
-      await client.disconnect(true);
+      await client.disconnect({ force: true });
       await server.close();
     }
   });

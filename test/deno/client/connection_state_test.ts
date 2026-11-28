@@ -116,7 +116,7 @@ Deno.test({ name: '@connection state: keep alive', only: false }, async (context
         assert(elapsed >= 2400 && elapsed < 3400, `closed after ${elapsed} ms`);
         assertEquals(pingreqCount, 2);
       } finally {
-        await client.disconnect(true);
+        await client.disconnect({ force: true });
         await broker.destroy();
       }
     },
@@ -216,7 +216,7 @@ Deno.test({ name: '@connection state: connection refused by the broker', only: f
           await waitUntil(() => seenByBroker.length > 0, 'the close of the refused connection');
           assertEquals(seenByBroker, ['closed']);
         } finally {
-          await client.disconnect(true);
+          await client.disconnect({ force: true });
           await broker.destroy();
         }
       },
@@ -249,7 +249,7 @@ Deno.test({ name: '@connection state: connection refused by the broker', only: f
         assertEquals(connack.reasonCode, Mqtt.ReasonCode.Success);
         assertEquals(await client.publish('topicA', 'x'), { result: 0, reason: '' });
       } finally {
-        await client.disconnect(true);
+        await client.disconnect({ force: true });
         await broker.destroy();
       }
     },
@@ -339,7 +339,7 @@ Deno.test({ name: '@connection state: connect() failures', only: false }, async 
         assertEquals(await client.publish('topicA', 'x'), { result: 0, reason: '' });
         await waitUntil(() => second.received.length > received, 'PUBLISH on the second connection');
       } finally {
-        await client.disconnect(true);
+        await client.disconnect({ force: true });
         await server.close();
       }
     },
@@ -407,7 +407,7 @@ Deno.test({ name: '@connection state: session store while CONNACK is handled', o
           assertEquals(connack.reasonCode, Mqtt.ReasonCode.Success);
           assertEquals(events, ['closed', 'connack']);
         } finally {
-          await client.disconnect(true);
+          await client.disconnect({ force: true });
           await broker.destroy();
         }
       },
@@ -475,7 +475,7 @@ Deno.test({ name: '@connection state: session store while CONNACK is handled', o
         assertEquals(connackCount, 1);
       } finally {
         store.gate.resolve();
-        await client.disconnect(true);
+        await client.disconnect({ force: true });
         await server.close();
       }
     },
@@ -508,7 +508,7 @@ Deno.test({ name: '@connection state: default ports', only: false }, async (cont
           const connack = await settleWithin(client.connect(), 'connect()');
           assertEquals(connack.reasonCode, Mqtt.ReasonCode.Success);
         } finally {
-          await client.disconnect(true);
+          await client.disconnect({ force: true });
           await broker.destroy();
         }
       },
@@ -603,7 +603,7 @@ Deno.test({ name: '@connection state: after DISCONNECT is sent', only: false }, 
         await waitUntil(() => seenByBroker.includes('closed'), 'the close of the connection');
         assertEquals(seenByBroker, ['publish', 'disconnect', 'closed']);
       } finally {
-        await client.disconnect(true);
+        await client.disconnect({ force: true });
         await broker.destroy();
       }
     },
@@ -662,7 +662,7 @@ Deno.test({ name: '@connection state: after DISCONNECT is sent', only: false }, 
         assertEquals(seenByBroker, ['disconnect', 'closed', 'pubrec', 'pubcomp']);
         assertEquals(messages, ['qos1', 'qos2']);
       } finally {
-        await client.disconnect(true);
+        await client.disconnect({ force: true });
         await broker.destroy();
       }
     },
@@ -702,7 +702,7 @@ Deno.test({ name: '@connection state: after DISCONNECT is sent', only: false }, 
         await waitUntil(() => seenByBroker.includes('closed'), 'the close of the connection');
         assertEquals(seenByBroker, [`disconnect ${Mqtt.ReasonCode.MalformedPacket}`, 'closed']);
       } finally {
-        await client.disconnect(true);
+        await client.disconnect({ force: true });
         await broker.destroy();
       }
     },
@@ -745,7 +745,7 @@ Deno.test({ name: '@connection state: after DISCONNECT is sent', only: false }, 
         assertEquals(closedCount, 1);
         await settleWithin(closedAtBroker.promise, 'the connection seen by the broker');
       } finally {
-        await client.disconnect(true);
+        await client.disconnect({ force: true });
         await broker.destroy();
       }
     },
@@ -803,7 +803,7 @@ Deno.test({ name: '@connection state: disconnect() and the next connection', onl
         assertEquals(closedCount, 1);
       } finally {
         store.gate.resolve();
-        await client.disconnect(true);
+        await client.disconnect({ force: true });
         await server.close();
       }
     },
@@ -873,7 +873,7 @@ Deno.test({ name: '@connection state: publish() and the next connection', only: 
         assertEquals((await settleWithin(publishing, 'publish()')).result, 0);
       } finally {
         store.gate.resolve();
-        await client.disconnect(true);
+        await client.disconnect({ force: true });
         await server.close();
       }
     },
@@ -895,7 +895,7 @@ Deno.test({ name: '@connection state: publish() and the next connection', only: 
         assertEquals(receivedPacketTypes(second), ['connect']);
       } finally {
         store.gate.resolve();
-        await client.disconnect(true);
+        await client.disconnect({ force: true });
         await server.close();
       }
     },
@@ -934,7 +934,7 @@ Deno.test({ name: '@connection state: QoS 2 PUBLISH sent again by the broker', o
         await waitUntil(() => pubrecCount === 2, 'PUBREC for the PUBLISH with DUP');
         assertEquals(messageCount, 1);
       } finally {
-        await client.disconnect(true);
+        await client.disconnect({ force: true });
         await broker.destroy();
       }
     },
@@ -983,7 +983,7 @@ Deno.test({ name: '@connection state: keep alive, PINGREQ cannot be written', on
         assertEquals(result, undefined);
       } finally {
         globalThis.removeEventListener('unhandledrejection', onUnhandledRejection);
-        await client.disconnect(true);
+        await client.disconnect({ force: true });
         await broker.destroy();
       }
     },
@@ -1025,7 +1025,7 @@ Deno.test({ name: '@connection state: topic aliases of the broker', only: false 
         await waitUntil(() => messages.some((message) => message.endsWith('5th')), 'the messages on the second connection');
         assertEquals(messages, ['topicA:1st', 'topicA:2nd', 'topicB:4th', 'topicB:5th']);
       } finally {
-        await client.disconnect(true);
+        await client.disconnect({ force: true });
         await broker.destroy();
       }
     },
@@ -1034,7 +1034,7 @@ Deno.test({ name: '@connection state: topic aliases of the broker', only: false 
 
 Deno.test({ name: '@connection state: disconnect() while connecting', only: false }, async (context) => {
   await context.step(
-    'disconnect(true) gives up a connect() that waits for CONNACK at once, and resolves',
+    'disconnect({ force: true }) gives up a connect() that waits for CONNACK at once, and resolves',
     async () => {
       // Accepts the connection and never answers CONNECT.
       const server = new RawServer({ port: 1883 });
@@ -1050,12 +1050,12 @@ Deno.test({ name: '@connection state: disconnect() while connecting', only: fals
         await waitUntil(() => first.received.length > 0, 'CONNECT');
 
         // Not after connectTimeoutMS, and not rejected with the error of connect().
-        await settleWithin(client.disconnect(true), 'disconnect(true)', 500);
-        events.push('disconnect(true) resolved');
+        await settleWithin(client.disconnect({ force: true }), 'disconnect({ force: true })', 500);
+        events.push('disconnect({ force: true }) resolved');
 
         // connect() fails, the connection is closed, and the client is offline.
         await assertRejects(() => settleWithin(connecting, 'connect()'), ClientErrors.ConnectionClosed);
-        assertEquals(events, ['closed', 'disconnect(true) resolved']);
+        assertEquals(events, ['closed', 'disconnect({ force: true }) resolved']);
         await settleWithin(first.closed, 'the connection');
 
         // It can connect again right away.
@@ -1065,14 +1065,14 @@ Deno.test({ name: '@connection state: disconnect() while connecting', only: fals
         await second.send(connackBytes());
         assertEquals((await settleWithin(reconnecting, 'the second connect()')).reasonCode, Mqtt.ReasonCode.Success);
       } finally {
-        await client.disconnect(true);
+        await client.disconnect({ force: true });
         await server.close();
       }
     },
   );
 
   await context.step(
-    'disconnect(true) gives up a connect() whose connection is still being opened at once, and resolves',
+    'disconnect({ force: true }) gives up a connect() whose connection is still being opened at once, and resolves',
     async () => {
       const connect = Deno.connect;
       try {
@@ -1084,7 +1084,7 @@ Deno.test({ name: '@connection state: disconnect() while connecting', only: fals
         const connecting = client.connect();
         await delay(50);
 
-        await settleWithin(client.disconnect(true), 'disconnect(true)', 500);
+        await settleWithin(client.disconnect({ force: true }), 'disconnect({ force: true })', 500);
         await assertRejects(() => settleWithin(connecting, 'connect()'), ClientErrors.ConnectionClosed);
 
         // The connection that opens later is closed.
@@ -1099,7 +1099,7 @@ Deno.test({ name: '@connection state: disconnect() while connecting', only: fals
   );
 
   await context.step(
-    'disconnect() waits for connect(), and disconnect(true) called meanwhile gives up connect(): both resolve',
+    'disconnect() waits for connect(), and disconnect({ force: true }) called meanwhile gives up connect(): both resolve',
     async () => {
       // Accepts the connection and never answers CONNECT.
       const server = new RawServer({ port: 1883 });
@@ -1112,7 +1112,7 @@ Deno.test({ name: '@connection state: disconnect() while connecting', only: fals
         const disconnecting = client.disconnect();
         assertEquals(await stateOf(disconnecting, 100), 'pending');
 
-        await settleWithin(client.disconnect(true), 'disconnect(true)', 500);
+        await settleWithin(client.disconnect({ force: true }), 'disconnect({ force: true })', 500);
         await settleWithin(disconnecting, 'disconnect()', 500);
         await assertRejects(() => settleWithin(connecting, 'connect()'), ClientErrors.ConnectionClosed);
         // Nothing was sent after CONNECT.
@@ -1120,7 +1120,7 @@ Deno.test({ name: '@connection state: disconnect() while connecting', only: fals
         await settleWithin(connection.closed, 'the connection');
         assertEquals(connection.received.length, connectLength);
       } finally {
-        await client.disconnect(true);
+        await client.disconnect({ force: true });
         await server.close();
       }
     },
@@ -1141,7 +1141,7 @@ Deno.test({ name: '@connection state: disconnect() while connecting', only: fals
         await settleWithin(client.disconnect(), 'disconnect()');
         await assertRejects(() => connecting, ClientErrors.ConnectTimeout);
       } finally {
-        await client.disconnect(true);
+        await client.disconnect({ force: true });
         await server.close();
       }
     },

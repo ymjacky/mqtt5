@@ -114,7 +114,7 @@ Deno.test({ name: '@receive strings that are not valid UTF-8 Encoded Strings', o
           // The PUBLISH is not delivered, not even with U+FFFD in place of the ill-formed bytes.
           assertEquals(recorded.topics, ['topic/ok'], name);
         } finally {
-          await client.disconnect(true);
+          await client.disconnect({ force: true });
           await broker.destroy();
         }
       }
@@ -137,7 +137,7 @@ Deno.test({ name: '@receive strings that are not valid UTF-8 Encoded Strings', o
       assertEquals(recorded.disconnects, [Mqtt.ReasonCode.MalformedPacket]);
       assertEquals(recorded.topics, []);
     } finally {
-      await client.disconnect(true);
+      await client.disconnect({ force: true });
       await broker.destroy();
     }
   });
@@ -157,7 +157,7 @@ Deno.test({ name: '@receive strings that are not valid UTF-8 Encoded Strings', o
       assertEquals(recorded.disconnects, []);
       assertEquals(recorded.topics, []);
     } finally {
-      await client.disconnect(true);
+      await client.disconnect({ force: true });
       await broker.destroy();
     }
   });
@@ -176,7 +176,7 @@ Deno.test({ name: '@receive strings that are not valid UTF-8 Encoded Strings', o
       assertEquals(recorded.disconnects, [Mqtt.ReasonCode.MalformedPacket]);
       assertEquals(recorded.topics, []);
     } finally {
-      await client.disconnect(true);
+      await client.disconnect({ force: true });
       await broker.destroy();
     }
   });
@@ -200,7 +200,7 @@ Deno.test({ name: '@receive U+FEFF at the start of a string', only: false }, asy
       assertEquals(recorded.userProperties, [[{ key: '\u{FEFF}k', val: '\u{FEFF}' }]]);
       assertEquals(recorded.disconnects, []);
     } finally {
-      await client.disconnect(true);
+      await client.disconnect({ force: true });
       await broker.destroy();
     }
   });

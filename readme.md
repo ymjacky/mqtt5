@@ -51,7 +51,7 @@ client.on('publish', (event) => {
 });
 
 await client.connect();
-await client.subscribe('topicA', Mqtt.QoS.AtLeastOnce);
+await client.subscribe('topicA', { qos: Mqtt.QoS.AtLeastOnce });
 await client.publish('topicA', 'hello', { qos: Mqtt.QoS.AtLeastOnce });
 
 await client.disconnect();
@@ -186,10 +186,13 @@ await client.connect();
 await client.publish('topicA', 'payload', { qos: Mqtt.QoS.AtMostOnce });
 await client.publish('topicA', new Uint8Array([1, 2, 3]), { qos: Mqtt.QoS.AtLeastOnce, retain: true });
 
-const result = await client.publish('topicA', 'payload', { qos: Mqtt.QoS.ExactlyOnce }, {
-  contentType: 'application/json',
-  messageExpiryInterval: 60,
-  userProperties: [{ key: 'userProp1', val: 'userData1' }],
+const result = await client.publish('topicA', 'payload', {
+  qos: Mqtt.QoS.ExactlyOnce,
+  properties: {
+    contentType: 'application/json',
+    messageExpiryInterval: 60,
+    userProperties: [{ key: 'userProp1', val: 'userData1' }],
+  },
 });
 console.log(result.result === Mqtt.ReasonCode.Success);
 ```
@@ -219,15 +222,14 @@ client.on('publish', (event) => {
 
 await client.connect();
 
-await client.subscribe('topicA', Mqtt.QoS.AtLeastOnce);
-await client.subscribe(['topicB', 'sensors/+/temperature', 'logs/#'], Mqtt.QoS.AtLeastOnce);
+await client.subscribe('topicA', { qos: Mqtt.QoS.AtLeastOnce });
+await client.subscribe(['topicB', 'sensors/+/temperature', 'logs/#'], { qos: Mqtt.QoS.AtLeastOnce });
 
 // Shared subscription
-await client.subscribe('$share/group1/topicC', Mqtt.QoS.AtLeastOnce);
+await client.subscribe('$share/group1/topicC', { qos: Mqtt.QoS.AtLeastOnce });
 
 // MQTT 5.0 subscription options
-const result = await client.subscribe({
-  topicFilter: 'topicD',
+const result = await client.subscribe('topicD', {
   qos: Mqtt.QoS.AtLeastOnce,
   noLocal: true,
   retainAsPublished: true,
@@ -235,8 +237,25 @@ const result = await client.subscribe({
 });
 console.log(result.reasons);
 
+// MQTT 5.0 properties, sent once for all the topic filters of the call
+await client.subscribe(['sensors/+/humidity', 'sensors/+/pressure'], {
+  qos: Mqtt.QoS.AtLeastOnce,
+  properties: {
+    subscriptionIdentifier: 1,
+    userProperties: [{ key: 'app', val: 'dashboard' }],
+  },
+});
+
+// A topic filter with its own options: topicF is QoS 2, topicE and topicG are QoS 1.
+await client.subscribe(['topicE', { topicFilter: 'topicF', qos: Mqtt.QoS.ExactlyOnce }, 'topicG'], { qos: Mqtt.QoS.AtLeastOnce });
+
 await client.unsubscribe(['topicA', 'topicB']);
 ```
+
+The options of `subscribe()` (`qos`, `noLocal`, `retainAsPublished` and `retainHandling`) apply to every topic filter of the call. A topic filter given as an
+object (`{ topicFilter, qos, ... }`) can set its own, which take precedence option by option; an option that neither sets takes its default (QoS 0). The
+`properties` (e.g. `subscriptionIdentifier`) are sent once for all the topic filters of the call: subscribe in separate calls to give them different
+Subscription Identifiers.
 
 A broker can say in CONNACK (MQTT 5.0) that it does not support wildcard subscriptions, shared subscriptions or Subscription Identifiers. `subscribe()` then
 rejects a topic filter with `+` / `#`, a `$share/...` topic filter or a `subscriptionIdentifier` with `WildcardSubscriptionsNotSupportedError`,
@@ -263,7 +282,7 @@ Register listeners with `client.on(type, listener)` and remove them with `client
 ## Disconnecting and reconnecting
 
 ```ts
-import { MqttClient } from '@ymjacky/mqtt5';
+import { Mqtt, MqttClient } from '@ymjacky/mqtt5';
 
 const client = new MqttClient({ clientId: 'clientA' });
 await client.connect();
@@ -274,8 +293,9 @@ client.on('closed', () => {
 });
 
 await client.disconnect(); // send DISCONNECT, then close
-// await client.disconnect(true); // close without sending DISCONNECT (the broker publishes the will message)
-// await client.disconnect(false, { reasonString: 'bye' }); // MQTT 5.0 properties
+// await client.disconnect({ force: true }); // close without sending DISCONNECT (the broker publishes the will message)
+// await client.disconnect({ properties: { reasonString: 'bye' } }); // MQTT 5.0 properties
+// await client.disconnect({ reasonCode: Mqtt.ReasonCode.DisconnectWithWillMessage }); // MQTT 5.0: the broker publishes the will message
 ```
 
 `disconnect()` sends DISCONNECT after the messages of the `publish()` calls made before it. Nothing is sent after DISCONNECT: until the connection is closed,
@@ -284,7 +304,12 @@ await client.disconnect(); // send DISCONNECT, then close
 A `sessionExpiryInterval` other than 0 can be set in the DISCONNECT properties only when `connect()` sent one other than 0. Otherwise the broker does not treat
 DISCONNECT as valid and publishes the will message, so `disconnect()` rejects with `InvalidPropertyError` and nothing is sent.
 
-While `connect()` is in progress, `disconnect()` waits for it and then disconnects; it resolves also when `connect()` fails. `disconnect(true)` gives up
+The broker discards the will message on a normal DISCONNECT (Reason Code 0x00). To disconnect normally and still have the will message published, set
+`reasonCode: Mqtt.ReasonCode.DisconnectWithWillMessage` (MQTT 5.0). With MQTT 3.1.1, DISCONNECT has no Reason Code and no properties: `reasonCode` and
+`properties` are not sent, and the broker always discards the will message; use `force` to have it published. With `force`, `reasonCode` and `properties`
+are not sent either.
+
+While `connect()` is in progress, `disconnect()` waits for it and then disconnects; it resolves also when `connect()` fails. `disconnect({ force: true })` gives up
 `connect()` at once: `connect()` rejects with `ConnectionClosed`.
 
 [examples/deno/reconnect.ts](https://github.com/ymjacky/mqtt5/blob/main/examples/deno/reconnect.ts) reconnects when the broker closes the connection, keeping
@@ -350,7 +375,7 @@ A rejected promise that is not awaited does not terminate the process, so await 
 | `StateIsNotOnlineError`   | `publish()`, `subscribe()`, `unsubscribe()`                        | The client is not connected.                                                                                                                                 |
 | `InvalidTopicNameError`   | `publish()`, `connect()`                                           | The topic, Response Topic or Will Topic is empty, or contains `+`, `#`, U+0000 or a lone surrogate (which UTF-8 cannot encode).                              |
 | `InvalidTopicFilterError` | `subscribe()`, `unsubscribe()`                                     | A topic filter is invalid, e.g. `a/#/b`, `a+` or `$share/group`.                                                                                             |
-| `InvalidArgumentError`    | `connect()`, `publish()`, `subscribe()`, `unsubscribe()`, `auth()`, the constructors (thrown) | Another argument is invalid, e.g. a QoS other than 0, 1 or 2, `dup: true` with QoS 0, a string payload that contains a lone surrogate (which UTF-8 cannot encode), an empty list of topic filters, `noLocal` on a shared subscription, or a Reason Code that AUTH cannot carry (only 0x00, 0x18 and 0x19). Constructors: an option is invalid, e.g. a `keepAlive` that is not an integer from 0 to 65535, or a `clientId` or `username` that contains U+0000 or a lone surrogate. |
+| `InvalidArgumentError`    | `connect()`, `publish()`, `subscribe()`, `unsubscribe()`, `disconnect()`, `auth()`, the constructors (thrown) | Another argument is invalid, e.g. a QoS other than 0, 1 or 2, `dup: true` with QoS 0, a string payload that contains a lone surrogate (which UTF-8 cannot encode), an empty list of topic filters, `noLocal` on a shared subscription, or a Reason Code that AUTH cannot carry (only 0x00, 0x18 and 0x19). `publish()`, `disconnect()`, `subscribe()`, `unsubscribe()`: the options are not an object, or more arguments are given, as before 0.3.0 (e.g. `disconnect(true)`, `subscribe('topicA', 1)`); with `unsubscribe()`, also `userProperties` in the options instead of `options.properties`. Constructors: an option is invalid, e.g. a `keepAlive` that is not an integer from 0 to 65535, or a `clientId` or `username` that contains U+0000 or a lone surrogate. |
 | `InvalidPropertyError`    | `connect()`, `publish()`, `subscribe()`, `unsubscribe()`, `disconnect()`, `auth()` | An MQTT 5.0 property is invalid, e.g. out of range (`subscriptionIdentifier: 0`, `receiveMaximum: 0`) or a string that contains U+0000 or a lone surrogate. `disconnect()`: also a `sessionExpiryInterval` other than 0 when `connect()` sent none. |
 | `PacketTooLargeError`     | `connect()`, `publish()`, `subscribe()`, `unsubscribe()`, `auth()` | The packet is larger than the Maximum Packet Size of the broker (MQTT 5.0) or than MQTT allows.                                                              |
 | `NotSupportedByBrokerError` | `publish()`, `subscribe()` | The broker said in CONNACK (MQTT 5.0) that it does not support what the call asks for; nothing is sent. Catch it to handle all of the following. `QoSNotSupportedError`: a QoS above the Maximum QoS (`err.maximumQoS` is the highest the broker accepts). `RetainNotSupportedError`: `retain: true`. `WildcardSubscriptionsNotSupportedError`, `SharedSubscriptionsNotSupportedError` and `SubscriptionIdentifiersNotSupportedError`: a topic filter with `+` / `#`, a `$share/...` topic filter, or a `subscriptionIdentifier`. |
@@ -433,7 +458,7 @@ await client.connect();
 
 const topicFilters = ['sensors/+/temperature', 'logs/#'];
 try {
-  const { reasons } = await client.subscribe(topicFilters, Mqtt.QoS.AtLeastOnce);
+  const { reasons } = await client.subscribe(topicFilters, { qos: Mqtt.QoS.AtLeastOnce });
   // One per topic filter: the granted QoS (0, 1 or 2; it can be lower than requested), or 0x80 or more on failure.
   reasons.forEach((reason, i) => {
     if (reason >= 0x80) {
@@ -494,7 +519,7 @@ client.on('publish', (event) => {
 });
 
 await client.connect();
-await client.subscribe('topicA', Mqtt.QoS.AtLeastOnce);
+await client.subscribe('topicA', { qos: Mqtt.QoS.AtLeastOnce });
 ```
 
 ### From a CDN (no build step)
@@ -543,7 +568,7 @@ client.on('publish', (event) => {
 });
 
 await client.connect();
-await client.subscribe('topicA', Mqtt.QoS.AtLeastOnce);
+await client.subscribe('topicA', { qos: Mqtt.QoS.AtLeastOnce });
 </script>
 ```
 
@@ -604,7 +629,7 @@ import { Mqtt, WebSocketMqttClient } from '@ymjacky/mqtt5/browser';
 // shallowRef(): `client.value` is the client itself, not a proxy.
 const client = shallowRef(new WebSocketMqttClient({ url: new URL('wss://broker.example.com:8081') }));
 await client.value.connect();
-await client.value.subscribe('topicA', Mqtt.QoS.AtLeastOnce);
+await client.value.subscribe('topicA', { qos: Mqtt.QoS.AtLeastOnce });
 
 // markRaw(): the client is not wrapped, also in a reactive object.
 const state = reactive({

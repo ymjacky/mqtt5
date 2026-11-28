@@ -140,7 +140,7 @@ Deno.test({ name: '@receive before CONNACK: a packet that the client cannot acce
           assertEquals(recorded.disconnects, []);
           assertEquals(recorded.closedEvents, 1);
         } finally {
-          await client.disconnect(true);
+          await client.disconnect({ force: true });
           await broker.destroy();
         }
       },
@@ -165,7 +165,7 @@ Deno.test({ name: '@receive before CONNACK: a packet that the client cannot acce
       assertEquals(recorded.disconnects, []);
       assertEquals(recorded.closedEvents, 1);
     } finally {
-      await client.disconnect(true);
+      await client.disconnect({ force: true });
       await broker.destroy();
     }
   });
@@ -184,7 +184,7 @@ Deno.test({ name: '@receive before CONNACK: a packet that the client cannot acce
       assertEquals(recorded.disconnects, []);
       assertEquals(recorded.closedEvents, 1);
     } finally {
-      await client.disconnect(true);
+      await client.disconnect({ force: true });
       await broker.destroy();
     }
   });
@@ -200,7 +200,7 @@ Deno.test({ name: '@receive before CONNACK: a packet that the client cannot acce
       const connack = await settleWithin(client.connect(), 'the second connect()', 1000);
       assertEquals(connack.reasonCode, Mqtt.ReasonCode.Success);
     } finally {
-      await client.disconnect(true);
+      await client.disconnect({ force: true });
       await broker.destroy();
     }
   });
@@ -219,7 +219,7 @@ Deno.test({ name: '@receive before CONNACK: a packet that the client cannot acce
       assertEquals(recorded.disconnects, []);
       assertEquals(recorded.closedEvents, 1);
     } finally {
-      await client.disconnect(true);
+      await client.disconnect({ force: true });
       await broker.destroy();
     }
   });
@@ -237,7 +237,7 @@ Deno.test({ name: '@receive before CONNACK: a packet that the client cannot acce
       assertEquals(recorded.disconnects, []);
       assertEquals(recorded.closedEvents, 1);
     } finally {
-      await client.disconnect(true);
+      await client.disconnect({ force: true });
       await broker.destroy();
     }
   });
@@ -310,7 +310,7 @@ Deno.test({ name: '@receive before CONNACK: a packet that the broker must not se
           assertEquals(handling.publishEvents, 0);
           assertEquals(handling.acknowledgments, []);
         } finally {
-          await client.disconnect(true);
+          await client.disconnect({ force: true });
           await broker.destroy();
         }
       },
@@ -336,7 +336,7 @@ Deno.test({ name: '@receive before CONNACK: a packet that the broker must not se
       assertEquals(recorded.disconnects, []);
       assertEquals(recorded.closedEvents, 0);
     } finally {
-      await client.disconnect(true);
+      await client.disconnect({ force: true });
       await broker.destroy();
     }
   });
@@ -361,7 +361,7 @@ Deno.test({ name: '@receive before CONNACK: a packet that the broker must not se
       assertEquals(recorded.disconnects, []);
       assertEquals(recorded.closedEvents, 0);
     } finally {
-      await client.disconnect(true);
+      await client.disconnect({ force: true });
       await broker.destroy();
     }
   });
@@ -387,7 +387,7 @@ Deno.test({ name: '@receive before CONNACK: a packet that the broker must not se
         assertEquals(recorded.disconnects, []);
         assertEquals(recorded.closedEvents, 1);
       } finally {
-        await client.disconnect(true);
+        await client.disconnect({ force: true });
         await broker.destroy();
       }
     },
@@ -419,7 +419,7 @@ Deno.test({ name: '@receive before CONNACK: a packet that the broker must not se
         assertEquals(handling.authEvents, 0);
         assertEquals(handling.acknowledgments, []);
       } finally {
-        await client.disconnect(true);
+        await client.disconnect({ force: true });
         await broker.destroy();
       }
     });
@@ -441,7 +441,7 @@ Deno.test({ name: '@receive before CONNACK: a packet that the broker must not se
       assertEquals(handling.publishEvents, 0);
       assertEquals(handling.acknowledgments, []);
     } finally {
-      await client.disconnect(true);
+      await client.disconnect({ force: true });
       await broker.destroy();
     }
   });

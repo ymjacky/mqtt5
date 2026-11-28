@@ -157,7 +157,7 @@ Deno.test({ name: '@receive packets whose fields do not fit them', only: false }
         assertEquals(recorded.disconnects, [Mqtt.ReasonCode.MalformedPacket]);
         assertEquals(recorded.topics, ['topic/ok']);
       } finally {
-        await client.disconnect(true);
+        await client.disconnect({ force: true });
         await broker.destroy();
       }
     });
@@ -176,7 +176,7 @@ Deno.test({ name: '@receive packets whose fields do not fit them', only: false }
       assertEquals(recorded.disconnects, []);
       assertEquals(recorded.topics, []);
     } finally {
-      await client.disconnect(true);
+      await client.disconnect({ force: true });
       await broker.destroy();
     }
   });
@@ -201,7 +201,7 @@ Deno.test({ name: '@receive packets whose fixed header has flags that their pack
         assertEquals(recorded.pubcomps, []);
         assertEquals(recorded.topics, ['topic/ok']);
       } finally {
-        await client.disconnect(true);
+        await client.disconnect({ force: true });
         await broker.destroy();
       }
     });
@@ -220,7 +220,7 @@ Deno.test({ name: '@receive packets whose fixed header has flags that their pack
       assertEquals(recorded.disconnects, []);
       assertEquals(recorded.pubcomps, []);
     } finally {
-      await client.disconnect(true);
+      await client.disconnect({ force: true });
       await broker.destroy();
     }
   });
@@ -238,7 +238,7 @@ Deno.test({ name: '@receive packets whose fixed header has flags that their pack
       assertEquals(recorded.disconnects, [Mqtt.ReasonCode.MalformedPacket]);
       assertEquals(recorded.pubcomps, []);
     } finally {
-      await client.disconnect(true);
+      await client.disconnect({ force: true });
       await broker.destroy();
     }
   });
@@ -263,7 +263,7 @@ Deno.test({ name: '@receive packets that are a Protocol Error', only: false }, a
         assertEquals(recorded.disconnects, [Mqtt.ReasonCode.ProtocolError]);
         assertEquals(recorded.topics, ['topic/ok']);
       } finally {
-        await client.disconnect(true);
+        await client.disconnect({ force: true });
         await broker.destroy();
       }
     },
@@ -282,7 +282,7 @@ Deno.test({ name: '@receive packets that are a Protocol Error', only: false }, a
       assertEquals(recorded.disconnects, [Mqtt.ReasonCode.ProtocolError]);
       assertEquals(recorded.topics, []);
     } finally {
-      await client.disconnect(true);
+      await client.disconnect({ force: true });
       await broker.destroy();
     }
   });
@@ -306,7 +306,7 @@ Deno.test({ name: '@receive PUBLISH with an empty Topic Name and no Topic Alias'
       assertEquals(recorded.topics, ['topic/ok']);
       assertEquals(recorded.pubacks, []);
     } finally {
-      await client.disconnect(true);
+      await client.disconnect({ force: true });
       await broker.destroy();
     }
   });
@@ -328,7 +328,7 @@ Deno.test({ name: '@receive PUBLISH with an empty Topic Name and no Topic Alias'
       assertEquals(recorded.topics, ['topic/ok']);
       assertEquals(recorded.pubacks, []);
     } finally {
-      await client.disconnect(true);
+      await client.disconnect({ force: true });
       await broker.destroy();
     }
   });
@@ -347,7 +347,7 @@ Deno.test({ name: '@receive PUBLISH with an empty Topic Name and no Topic Alias'
       assertEquals(recorded.topics, []);
       assertEquals(recorded.pubacks, []);
     } finally {
-      await client.disconnect(true);
+      await client.disconnect({ force: true });
       await broker.destroy();
     }
   });
@@ -374,7 +374,7 @@ Deno.test({ name: '@receive PUBLISH with QoS 1 or QoS 2 and a packet ID of 0', o
         assertEquals(recorded.topics, ['topic/ok']);
         assertEquals(qos === 1 ? recorded.pubacks : recorded.pubrecs, [1]);
       } finally {
-        await client.disconnect(true);
+        await client.disconnect({ force: true });
         await broker.destroy();
       }
     });
@@ -397,7 +397,7 @@ Deno.test({ name: '@receive PUBLISH with QoS 1 or QoS 2 and a packet ID of 0', o
       assertEquals(recorded.topics, ['topic/ok']);
       assertEquals(recorded.pubacks, [1]);
     } finally {
-      await client.disconnect(true);
+      await client.disconnect({ force: true });
       await broker.destroy();
     }
   });
@@ -416,7 +416,7 @@ Deno.test({ name: '@receive PUBLISH with QoS 1 or QoS 2 and a packet ID of 0', o
       assertEquals(recorded.topics, []);
       assertEquals(recorded.pubacks, []);
     } finally {
-      await client.disconnect(true);
+      await client.disconnect({ force: true });
       await broker.destroy();
     }
   });
@@ -440,7 +440,7 @@ Deno.test({ name: '@receive AUTH without an Authentication Method', only: false 
         assertEquals(recorded.disconnects, [Mqtt.ReasonCode.ProtocolError]);
         assertEquals(recorded.auths, [Mqtt.ReasonCode.ContinueAuthentication]);
       } finally {
-        await client.disconnect(true);
+        await client.disconnect({ force: true });
         await broker.destroy();
       }
     });
@@ -459,7 +459,7 @@ Deno.test({ name: '@receive AUTH without an Authentication Method', only: false 
       assertEquals(recorded.disconnects, [Mqtt.ReasonCode.ProtocolError]);
       assertEquals(recorded.auths, []);
     } finally {
-      await client.disconnect(true);
+      await client.disconnect({ force: true });
       await broker.destroy();
     }
   });
@@ -479,7 +479,7 @@ Deno.test({ name: '@receive DISCONNECT without a Reason Code', only: false }, as
       await waitFor(() => recorded.disconnectEvents.length === 1, 'the disconnect event');
       assertEquals(recorded.disconnectEvents, [{ type: 'disconnect', reasonCode: Mqtt.ReasonCode.NormalDisconnection }]);
     } finally {
-      await client.disconnect(true);
+      await client.disconnect({ force: true });
       await broker.destroy();
     }
   });

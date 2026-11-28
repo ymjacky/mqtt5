@@ -349,8 +349,8 @@ Deno.test({ name: '@send topic alias', only: false }, async (context) => {
 
         const properties: MqttProperties.UserPublishProperties = { contentType: 'text/plain' };
         await Promise.all([
-          client.publish('topicA', new TextEncoder().encode('1st'), { qos: Mqtt.QoS.AtLeastOnce }, properties), // topic alias 1
-          client.publish('topicB', new TextEncoder().encode('2nd'), { qos: Mqtt.QoS.AtLeastOnce }, properties), // topic alias 2
+          client.publish('topicA', new TextEncoder().encode('1st'), { qos: Mqtt.QoS.AtLeastOnce, properties }), // topic alias 1
+          client.publish('topicB', new TextEncoder().encode('2nd'), { qos: Mqtt.QoS.AtLeastOnce, properties }), // topic alias 2
         ]);
 
         assertEquals(received, [
@@ -409,7 +409,7 @@ Deno.test({ name: '@send topic alias', only: false }, async (context) => {
         });
 
         const properties: MqttProperties.UserPublishProperties = { contentType: 'text/plain' };
-        await client.publish('topicA', new TextEncoder().encode('1st'), { qos: Mqtt.QoS.AtLeastOnce }, properties); // topic alias 1
+        await client.publish('topicA', new TextEncoder().encode('1st'), { qos: Mqtt.QoS.AtLeastOnce, properties }); // topic alias 1
 
         // not acknowledged, so it is resent after reconnecting
         sendPuback = false;
@@ -426,7 +426,7 @@ Deno.test({ name: '@send topic alias', only: false }, async (context) => {
         sendPuback = true;
         await client.connect();
         assertEquals((await pubResult).result, Mqtt.ReasonCode.Success);
-        await client.publish('topicC', new TextEncoder().encode('3rd'), { qos: Mqtt.QoS.AtLeastOnce }, properties);
+        await client.publish('topicC', new TextEncoder().encode('3rd'), { qos: Mqtt.QoS.AtLeastOnce, properties });
 
         assertEquals(received, [
           { message: '1st', topic: 'topicA', topicAlias: 1 },

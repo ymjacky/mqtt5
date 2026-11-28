@@ -69,7 +69,7 @@ async function main() {
       throw new Error(`the broker refused the connection: reason code ${connack.reasonCode}`);
     }
     if (!connack.sessionPresent) {
-      await client.subscribe('topicA', Mqtt.QoS.AtLeastOnce);
+      await client.subscribe('topicA', { qos: Mqtt.QoS.AtLeastOnce });
     }
   }
 

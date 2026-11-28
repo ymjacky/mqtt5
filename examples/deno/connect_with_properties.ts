@@ -36,7 +36,7 @@ async function main() {
     reasonString: 'trouble',
     sessionExpiryInterval: 300,
   };
-  await client.disconnect(false, disconnectProperties);
+  await client.disconnect({ properties: disconnectProperties });
 }
 
 main();

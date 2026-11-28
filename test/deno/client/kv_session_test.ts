@@ -91,7 +91,7 @@ Deno.test({ name: '@session in Deno KV: after the process restarts', only: false
       assertEquals(b.received, ['PUBLISH 1 A', 'PUBLISH 2 B', 'PUBLISH 3 C']);
       b.broker.sendPuback('cid', 1, v5); // only 'A' is acknowledged
       await publishingA;
-      await first.disconnect(true);
+      await first.disconnect({ force: true });
       assertEquals(await keys(kv), [['mqtt5', 'cid', 'outgoing', 2], ['mqtt5', 'cid', 'outgoing', 3]]);
 
       // The second process has a new client and a new store on the same database. The broker has the session.
@@ -137,7 +137,7 @@ Deno.test({ name: '@session in Deno KV: after the process restarts', only: false
         first.publish('topicA', 'D', { qos: Mqtt.QoS.AtLeastOnce });
         await waitFor(() => b.received.length === 5, 'C and D');
         assertEquals(b.received, ['PUBLISH 1 X', 'PUBLISH 2 A', 'PUBLISH 3 B', 'PUBLISH 1 C', 'PUBLISH 4 D']);
-        await first.disconnect(true);
+        await first.disconnect({ force: true });
 
         // The second process resends them; the connection is lost before any PUBACK.
         b.received.length = 0;
@@ -190,7 +190,7 @@ Deno.test({ name: '@session in Deno KV: after the process restarts', only: false
       await first.connect();
       first.publish('topicA', 'A', { qos: Mqtt.QoS.ExactlyOnce });
       await waitFor(() => b.received.length === 1, 'PUBLISH');
-      await first.disconnect(true);
+      await first.disconnect({ force: true });
 
       b.received.length = 0;
       b.sessionPresent = true;
@@ -220,7 +220,7 @@ Deno.test({ name: '@session in Deno KV: after the process restarts', only: false
       await waitFor(() => b.received.length === 1, 'PUBLISH');
       b.broker.sendPubrec('cid', 1, v5);
       await waitFor(() => b.received.length === 2, 'PUBREL');
-      await first.disconnect(true);
+      await first.disconnect({ force: true });
 
       b.received.length = 0;
       b.sessionPresent = true;
@@ -247,7 +247,7 @@ Deno.test({ name: '@session in Deno KV: after the process restarts', only: false
       first.publish('topicA', 'A', { qos: Mqtt.QoS.AtLeastOnce });
       first.publish('topicA', 'B', { qos: Mqtt.QoS.ExactlyOnce });
       await waitFor(() => b.received.length === 2, 'the messages of the first process');
-      await first.disconnect(true);
+      await first.disconnect({ force: true });
       // the messages of another client stay
       await kvStore(kv, 'other').store({ type: 'pubrel', packetId: 1 });
 
@@ -275,7 +275,7 @@ Deno.test({ name: '@session in Deno KV: after the process restarts', only: false
       await first.connect();
       first.publish('topicA', 'A', { qos: Mqtt.QoS.AtLeastOnce });
       await waitFor(() => b.received.length === 1, 'PUBLISH');
-      await first.disconnect(true);
+      await first.disconnect({ force: true });
 
       b.received.length = 0;
       b.sessionPresent = true;
@@ -344,7 +344,7 @@ Deno.test({ name: '@session in Deno KV: client options', only: false }, async (c
       client.publish('topicA', 'A', { qos: Mqtt.QoS.AtLeastOnce });
       await waitFor(() => b.received.length === 1, 'PUBLISH');
       assertEquals(await keys(kv), [['mqtt5', 'clientB', 'outgoing', 1]]);
-      await client.disconnect(true);
+      await client.disconnect({ force: true });
     } finally {
       await b.broker.destroy();
       kv.close();
@@ -386,7 +386,7 @@ Deno.test({ name: '@session in Deno KV: client options', only: false }, async (c
         stored.push(packet as MqttPackets.PublishPacket);
       }
       assertEquals(stored.map((packet) => [packet.topic, packet.properties?.topicAlias]), [['topicA', undefined], ['topicA', undefined]]);
-      await client.disconnect(true);
+      await client.disconnect({ force: true });
     } finally {
       await b.broker.destroy();
       kv.close();
