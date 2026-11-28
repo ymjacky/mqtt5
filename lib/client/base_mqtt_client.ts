@@ -71,6 +71,8 @@ type Connection = {
   connectFailure?: Error;
   /** The disconnect() in progress: it settles when the connection is closed, or when DISCONNECT cannot be sent. */
   disconnect?: Deferred<void>;
+  /** Resolves when the connection is closed (detectClosed()): {@link BaseMqttClient.closed}. Never rejects. */
+  closed: Deferred<void>;
 };
 
 /** Where the client is, with what belongs to the connection in that state. */
@@ -499,7 +501,7 @@ export abstract class BaseMqttClient {
 
     this.#clean = clean;
     this.#connectProperties = connectProperties;
-    const connection: Connection = { connect: deferred };
+    const connection: Connection = { connect: deferred, closed: new Deferred<void>() };
     const opening = new AbortController();
     // Aborts the opening of the connection, or closes the connection. detectClosed() then rejects connect() with `reason`.
     const abort = (reason: Error) => {
@@ -1402,6 +1404,7 @@ export abstract class BaseMqttClient {
     this.#session.wakeSendQuotaWaiters();
 
     connection?.disconnect?.resolve();
+    connection?.closed.resolve();
 
     this.eventTarget.dispatchEvent(
       createCustomEvent('closed', {}),
@@ -2137,6 +2140,57 @@ export abstract class BaseMqttClient {
    */
   public get clientId(): string {
     return this.#clientId;
+  }
+
+  /**
+   * The state of the client (see {@link ClientTypes.ClientState}). Read-only.
+   * publish(), subscribe() and unsubscribe() reject with `StateIsNotOnlineError` unless it is `online`, and connect() rejects
+   * with `StateIsNotOfflineError` unless it is `offline`.
+   *
+   * It is `online` as soon as CONNACK has accepted the connection, which is before connect() resolves: connect() still
+   * updates the session first. The publish() calls made meanwhile wait until it has been updated and the messages kept in
+   * the session have been resent.
+   * @example
+   * ```ts
+   * import { MqttClient } from '@ymjacky/mqtt5';
+   *
+   * const client = new MqttClient();
+   * await client.connect();
+   * if (client.state === 'online') {
+   *   await client.publish('topicA', 'hello');
+   * }
+   * ```
+   */
+  public get state(): ClientTypes.ClientState {
+    return this.#state.kind;
+  }
+
+  /**
+   * A promise that resolves when the current connection is closed, for any reason: at the same time as the `closed` event.
+   * It never rejects. When the client is offline, it is already resolved.
+   *
+   * Each connection has its own promise: read it again after calling connect(). Unlike a `closed` listener registered
+   * too late, it is not missed: it is resolved also when the connection has been closed before it is read.
+   * @example
+   * Reconnect in a loop, instead of in a `closed` listener: an error of connect() is caught where it is awaited.
+   * ```ts
+   * import { MqttClient } from '@ymjacky/mqtt5';
+   *
+   * const client = new MqttClient();
+   * for (let attempt = 0; attempt < 10; attempt++) {
+   *   try {
+   *     await client.connect();
+   *   } catch (err) {
+   *     console.log('cannot connect:', err);
+   *   }
+   *   // Also resolved right away when connect() has failed or the broker has refused the connection.
+   *   await client.closed;
+   *   await new Promise((resolve) => setTimeout(resolve, 1000));
+   * }
+   * ```
+   */
+  public get closed(): Promise<void> {
+    return this.#state.kind === 'offline' ? Promise.resolve() : this.#state.connection.closed.promise;
   }
 
   /**

@@ -238,6 +238,18 @@ export type DisconnectOptions = {
   properties?: MqttProperties.DisconnectProperties;
 };
 
+/**
+ * State of the client: {@link MqttClient.state} / {@link WebSocketMqttClient.state}.
+ *
+ * | State           | Meaning                                                                                                  |
+ * | --------------- | -------------------------------------------------------------------------------------------------------- |
+ * | `offline`       | Not connected. connect() can be called.                                                                  |
+ * | `connecting`    | connect() is opening the connection, or has sent CONNECT and waits for CONNACK.                          |
+ * | `online`        | CONNACK has accepted the connection: publish(), subscribe() and unsubscribe() can be called.             |
+ * | `disconnecting` | disconnect() has sent DISCONNECT and waits for the connection to close. Nothing is sent any more.        |
+ */
+export type ClientState = 'offline' | 'connecting' | 'online' | 'disconnecting';
+
 /** Result of {@link MqttClient.publish} / {@link WebSocketMqttClient.publish}. */
 export type PublishResult = {
   /**

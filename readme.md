@@ -307,8 +307,8 @@ import { Mqtt, MqttClient } from '@ymjacky/mqtt5';
 const client = new MqttClient({ clientId: 'clientA' });
 await client.connect();
 
-// The client does not reconnect automatically. Reconnect from the closed event if needed, and catch the errors in the listener
-// (see Events).
+// The client does not reconnect automatically. Reconnect after `await client.closed` (see State and closed) or from the closed
+// event if needed, and catch the errors in the listener (see Events).
 client.on('closed', () => {
   console.log('connection closed');
 });
@@ -335,6 +335,34 @@ While `connect()` is in progress, `disconnect()` waits for it and then disconnec
 
 [examples/deno/reconnect.ts](https://github.com/ymjacky/mqtt5/blob/main/examples/deno/reconnect.ts) reconnects when the broker closes the connection, keeping
 the session so that QoS 1 / QoS 2 messages in flight are resent.
+
+### State and `closed`
+
+`client.state` tells where the client is: `'offline'`, `'connecting'`, `'online'` or `'disconnecting'`. `publish()`, `subscribe()` and `unsubscribe()` can be
+called only while it is `'online'`, which starts as soon as CONNACK accepts the connection, before `connect()` resolves.
+
+Read `client.state` when it is needed: the client emits no event when it changes. To know when it changes, await `connect()` or `client.closed`, or listen to
+the `connack` and `closed` events. With Vue, see [Vue](#vue) to show it in a page.
+
+`client.closed` is a promise that resolves when the current connection is closed, for any reason, at the same time as the `closed` event. It never rejects, and
+it is already resolved when the client is offline, so it cannot be missed. Awaiting it in a loop reconnects without a `closed` listener: an error of `connect()`
+is caught where it is awaited.
+
+```ts
+import { MqttClient } from '@ymjacky/mqtt5';
+
+const client = new MqttClient({ clientId: 'clientA' });
+for (let attempt = 0; attempt < 10; attempt++) {
+  try {
+    await client.connect();
+  } catch (err) {
+    console.error('cannot connect:', err);
+  }
+  // Also resolved right away when connect() has failed or the broker has refused the connection.
+  await client.closed;
+  await new Promise((resolve) => setTimeout(resolve, 1000));
+}
+```
 
 ### Disconnecting with `await using`
 
@@ -654,12 +682,34 @@ await client.value.connect();
 await client.value.subscribe('topicA', { qos: Mqtt.QoS.AtLeastOnce });
 
 // markRaw(): the client is not wrapped, also in a reactive object.
-const state = reactive({
+const app = reactive({
   client: markRaw(new WebSocketMqttClient({ url: new URL('wss://broker.example.com:8081') })),
   messages: [] as string[], // the received messages can be reactive
 });
-state.client.on('publish', (event) => state.messages.push(new TextDecoder().decode(event.detail.payload)));
+app.client.on('publish', (event) => app.messages.push(new TextDecoder().decode(event.detail.payload)));
 ```
+
+`client.state` is not reactive either: Vue does not see the changes inside the client, and the client emits no event for each change of its state. To show it
+in a page, copy it into a `ref()` when it may have changed: after calling `connect()`, and on the `connack` and `closed` events.
+
+```ts ignore
+import { ref, shallowRef } from 'vue';
+import { type ClientTypes, WebSocketMqttClient } from '@ymjacky/mqtt5/browser';
+
+const client = shallowRef(new WebSocketMqttClient({ url: new URL('wss://broker.example.com:8081') }));
+const status = ref<ClientTypes.ClientState>(client.value.state); // use `status` in the template
+const updateStatus = () => {
+  status.value = client.value.state;
+};
+client.value.on('connack', updateStatus); // 'online', or still 'connecting' when the broker refuses the connection
+client.value.on('closed', updateStatus); // 'offline'
+
+const connecting = client.value.connect();
+updateStatus(); // 'connecting'
+await connecting;
+```
+
+`status` does not show `'disconnecting'`: no event is emitted when the client sends DISCONNECT, and the connection is closed soon after.
 
 ## Features
 
@@ -802,7 +852,7 @@ A message is removed from the store when the broker acknowledges it. To remove t
 
 - Specifying CA certificates for WebSocket Secure (`wss://`). The runtime's trust store is used.
 - Disabling TLS certificate verification (`rejectUnauthorized`).
-- Automatic reconnection. Reconnect from the `closed` event, as in
+- Automatic reconnection. Reconnect after `await client.closed` or from the `closed` event, as in
   [examples/deno/reconnect.ts](https://github.com/ymjacky/mqtt5/blob/main/examples/deno/reconnect.ts).
 
 ## License
