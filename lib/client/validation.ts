@@ -479,6 +479,8 @@ function validatePasswordOption(value: unknown): void {
 
 /**
  * Checks the options of the client constructor that MQTT limits:
+ * - `protocolVersion`: `Mqtt.ProtocolVersion.MqttV3_1_1` (4) or `Mqtt.ProtocolVersion.MqttV5` (5). CONNECT would carry another
+ *   value as its Protocol Level, which the broker refuses, and the other packets would be encoded as one of the two.
  * - The Two Byte Integers: `keepAlive` (the Keep Alive of CONNECT), and, in MQTT 5.0, `topicAliasMaximumAboutReceive` (the
  *   Topic Alias Maximum of CONNECT) and `topicAliasMaximumAboutSend` (the largest Topic Alias to send). They must be integers
  *   from 0 to 65,535, the values a Two Byte Integer can hold: another value would not reach the broker as it is (e.g. a
@@ -490,6 +492,9 @@ function validatePasswordOption(value: unknown): void {
  * @throws {InvalidArgumentError}
  */
 export function validateClientOptions(options: ClientOptions | undefined, protocolVersion: Mqtt.ProtocolVersion): void {
+  if (protocolVersion !== Mqtt.ProtocolVersion.MqttV3_1_1 && protocolVersion !== Mqtt.ProtocolVersion.MqttV5) {
+    throw new InvalidArgumentError(`protocolVersion must be 4 (MQTT 3.1.1) or 5 (MQTT 5.0) (got ${protocolVersion})`);
+  }
   const names = isMqtt5(protocolVersion) ? ['keepAlive', 'topicAliasMaximumAboutSend', 'topicAliasMaximumAboutReceive'] as const : ['keepAlive'] as const;
   for (const name of names) {
     const value = options?.[name];

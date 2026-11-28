@@ -2,13 +2,14 @@
  * Checks of the fields of a packet to encode, other than the properties (`MqttProperties.propertiesToBytes()` checks those).
  * Without them, a value that does not fit its field would be sent as another value (e.g. a Reason Code of 256 as 0x00, a
  * packet ID of -1 as 65,535), and a value that MQTT does not allow (e.g. a packet ID of 0 in PUBLISH, a QoS of 3) would make
- * the packet a Malformed Packet or a Protocol Error for the receiver.
+ * the packet a Malformed Packet or a Protocol Error for the receiver. The protocol version that a packet is encoded or decoded
+ * for is checked here too.
  * @module
  */
 
 import * as Mqtt from '../mqtt/mod.ts';
 import { maxTwoByteInteger } from '../mqtt_utils/mod.ts';
-import { InvalidFieldValueError } from './error.ts';
+import { InvalidFieldValueError, InvalidProtocolVersionError } from './error.ts';
 
 /**
  * Checks an integer field, and returns it.
@@ -21,6 +22,20 @@ import { InvalidFieldValueError } from './error.ts';
 export function integerValue(packet: string, name: string, value: number, min: number, max: number): number {
   if (!Number.isInteger(value) || value < min || value > max) {
     throw new InvalidFieldValueError(`${packet} ${name} must be an integer from ${min} to ${max} (got ${value})`);
+  }
+  return value;
+}
+
+/**
+ * Checks a protocol version, and returns it. This library supports 4 (MQTT 3.1.1) and 5 (MQTT 5.0). Another value would be
+ * taken as one of them (the packets of 3 as MQTT 3.1.1, the packets of 6 as MQTT 5.0), and a CONNECT would carry it as its
+ * Protocol Level, which the receiver refuses.
+ * @param name what the value is, used in the error message, e.g. `CONNECT protocolVersion`.
+ * @throws {InvalidProtocolVersionError} if the value is not 4 or 5.
+ */
+export function protocolVersionValue(name: string, value: number): Mqtt.ProtocolVersion {
+  if (value !== Mqtt.ProtocolVersion.MqttV3_1_1 && value !== Mqtt.ProtocolVersion.MqttV5) {
+    throw new InvalidProtocolVersionError(`${name} must be 4 (MQTT 3.1.1) or 5 (MQTT 5.0) (got ${value})`);
   }
   return value;
 }

@@ -12,12 +12,12 @@ import * as Mqtt from '../mqtt/mod.ts';
 import * as MqttProperties from '../mqtt_properties/mod.ts';
 import { readProperties } from '../mqtt_properties/read_properties.ts';
 import { InvalidProtocolVersionError } from './error.ts';
-import { integerValue, zeroToTwoValue } from './field_values.ts';
+import { integerValue, protocolVersionValue, zeroToTwoValue } from './field_values.ts';
 import type { ConnectPacket } from './packet_types.ts';
 
 export function toBytes(packet: ConnectPacket): Uint8Array {
   const protocolName = stringToUtfEncodedString('MQTT');
-  const protocolVersion = packet.protocolVersion;
+  const protocolVersion = protocolVersionValue('CONNECT protocolVersion', packet.protocolVersion);
 
   const usernameFlag = typeof packet.username !== 'undefined';
   const passwordFlag = typeof packet.password !== 'undefined';

@@ -46,7 +46,11 @@ export class UnsupportedPacketError extends MqttClientError {
   }
 }
 
-/** The protocol version is not supported. */
+/**
+ * The protocol version is not one that this library supports: 4 (MQTT 3.1.1) or 5 (MQTT 5.0). It is the Protocol Level of a
+ * received CONNECT, the `protocolVersion` of a CONNECT to encode, or the protocol version given to `packetToBytes()` or
+ * `decode()`.
+ */
 export class InvalidProtocolVersionError extends MqttClientError {
   /** The name of the error class. */
   override readonly name = 'InvalidProtocolVersionError' as const;

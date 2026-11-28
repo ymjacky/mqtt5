@@ -334,6 +334,18 @@ Deno.test('validateConnect does not check the properties in MQTT 3.1.1: they are
   assertThrows(() => validateConnect({ will: { topic: 'a', payload: new Uint8Array(65_536) } }, V3), InvalidArgumentError, 'will.payload');
 });
 
+Deno.test('validateClientOptions rejects a protocolVersion that is not 4 or 5', () => {
+  // The string is what JavaScript callers may pass.
+  for (const value of [3, 6, 0, -1, 4.5, NaN, '5'] as unknown as Mqtt.ProtocolVersion[]) {
+    assertThrows(
+      () => validateClientOptions({ protocolVersion: value }, value),
+      InvalidArgumentError,
+      `protocolVersion must be 4 (MQTT 3.1.1) or 5 (MQTT 5.0) (got ${value})`,
+      `${value}`,
+    );
+  }
+});
+
 /** Values that a Two Byte Integer cannot hold. The string is what JavaScript callers may pass. */
 const notTwoByteIntegers = [65_536, 70_000, -1, 1.5, NaN, Infinity, -Infinity, '30' as unknown as number];
 

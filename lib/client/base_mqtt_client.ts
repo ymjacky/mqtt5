@@ -235,7 +235,8 @@ export abstract class BaseMqttClient {
 
   /**
    * Creates a client. Use {@link MqttClient} or {@link WebSocketMqttClient}.
-   * @throws {InvalidArgumentError} if `keepAlive`, `topicAliasMaximumAboutSend` or `topicAliasMaximumAboutReceive`
+   * @throws {InvalidArgumentError} if `protocolVersion` is not `Mqtt.ProtocolVersion.MqttV5` or
+   * `Mqtt.ProtocolVersion.MqttV3_1_1`, if `keepAlive`, `topicAliasMaximumAboutSend` or `topicAliasMaximumAboutReceive`
    * is not an integer from 0 to 65,535, if
    * `clientId` or `username` is longer than 65,535 bytes in UTF-8 or contains U+0000 or a lone surrogate, if `password` is
    * longer than 65,535 bytes or a string with a lone surrogate, or if the `outgoingStore` cannot be used with the `clientId`.
