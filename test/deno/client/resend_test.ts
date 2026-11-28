@@ -992,7 +992,7 @@ Deno.test({ name: '@resend too large', only: false }, async (context) => {
         const large = client.publish('topicA', new Uint8Array(100), { qos: Mqtt.QoS.AtLeastOnce });
         const small = client.publish('topicA', new Uint8Array(10), { qos: Mqtt.QoS.AtLeastOnce });
         await bothReceived;
-        await client.disconnect(true);
+        await client.disconnect({ force: true });
 
         reconnected = true;
         await client.connect();

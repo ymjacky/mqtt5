@@ -266,7 +266,7 @@ Register listeners with `client.on(type, listener)` and remove them with `client
 ## Disconnecting and reconnecting
 
 ```ts
-import { MqttClient } from '@ymjacky/mqtt5';
+import { Mqtt, MqttClient } from '@ymjacky/mqtt5';
 
 const client = new MqttClient({ clientId: 'clientA' });
 await client.connect();
@@ -277,8 +277,9 @@ client.on('closed', () => {
 });
 
 await client.disconnect(); // send DISCONNECT, then close
-// await client.disconnect(true); // close without sending DISCONNECT (the broker publishes the will message)
-// await client.disconnect(false, { reasonString: 'bye' }); // MQTT 5.0 properties
+// await client.disconnect({ force: true }); // close without sending DISCONNECT (the broker publishes the will message)
+// await client.disconnect({ properties: { reasonString: 'bye' } }); // MQTT 5.0 properties
+// await client.disconnect({ reasonCode: Mqtt.ReasonCode.DisconnectWithWillMessage }); // MQTT 5.0: the broker publishes the will message
 ```
 
 `disconnect()` sends DISCONNECT after the messages of the `publish()` calls made before it. Nothing is sent after DISCONNECT: until the connection is closed,
@@ -287,7 +288,12 @@ await client.disconnect(); // send DISCONNECT, then close
 A `sessionExpiryInterval` other than 0 can be set in the DISCONNECT properties only when `connect()` sent one other than 0. Otherwise the broker does not treat
 DISCONNECT as valid and publishes the will message, so `disconnect()` rejects with `InvalidPropertyError` and nothing is sent.
 
-While `connect()` is in progress, `disconnect()` waits for it and then disconnects; it resolves also when `connect()` fails. `disconnect(true)` gives up
+The broker discards the will message on a normal DISCONNECT (Reason Code 0x00). To disconnect normally and still have the will message published, set
+`reasonCode: Mqtt.ReasonCode.DisconnectWithWillMessage` (MQTT 5.0). With MQTT 3.1.1, DISCONNECT has no Reason Code and no properties: `reasonCode` and
+`properties` are not sent, and the broker always discards the will message; use `force` to have it published. With `force`, `reasonCode` and `properties`
+are not sent either.
+
+While `connect()` is in progress, `disconnect()` waits for it and then disconnects; it resolves also when `connect()` fails. `disconnect({ force: true })` gives up
 `connect()` at once: `connect()` rejects with `ConnectionClosed`.
 
 [examples/deno/reconnect.ts](https://github.com/ymjacky/mqtt5/blob/main/examples/deno/reconnect.ts) reconnects when the broker closes the connection, keeping

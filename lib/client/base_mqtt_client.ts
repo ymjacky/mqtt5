@@ -402,7 +402,7 @@ export abstract class BaseMqttClient {
    * @throws {InvalidPacketBeforeConnackError} if a packet that the client cannot accept is received before CONNACK, e.g. a
    * malformed CONNACK, or a PUBLISH, which the broker must not send before CONNACK. The client closes the connection
    * without sending DISCONNECT.
-   * @throws {ConnectionClosed} if the connection is closed before CONNACK is received, e.g. by `disconnect(true)`.
+   * @throws {ConnectionClosed} if the connection is closed before CONNACK is received, e.g. by `disconnect({ force: true })`.
    * `WebSocketMqttClient` also rejects with it when the connection cannot be opened.
    * @throws {Error} `MqttClient`: the error of opening the connection, e.g. `Deno.errors.ConnectionRefused` when the broker is not running,
    * or `Deno.errors.InvalidData` when the certificate of the broker is not trusted (`mqtts:`).
@@ -1093,20 +1093,24 @@ export abstract class BaseMqttClient {
    * Nothing is sent after DISCONNECT: until the connection is closed, publish(), subscribe() and unsubscribe() reject with
    * `StateIsNotOnlineError` as when the client is not connected, and received messages are not acknowledged
    * (the broker sends QoS 1 and 2 messages again after reconnecting, if it keeps the session).
-   * With `force`, closes the connection without sending DISCONNECT, so the broker publishes the will message.
+   * The broker discards the will message on DISCONNECT with the Reason Code 0x00 (Normal disconnection, the default); with
+   * `reasonCode: Mqtt.ReasonCode.DisconnectWithWillMessage` (MQTT 5.0), it publishes the will message.
+   * With `force`, closes the connection without sending DISCONNECT, so the broker publishes the will message;
+   * `reasonCode` and `properties` are not sent then.
    * Resolves immediately if the client is not connected.
    * While connect() is in progress, waits for it and then disconnects; if connect() fails, resolves, as the client is
    * offline then. With `force`, gives up connect() at once instead: connect() rejects with `ConnectionClosed`.
    * If a disconnect is already in progress, waits for the same close without sending DISCONNECT again;
-   * with `force`, closes the connection now instead of waiting for the broker. `properties` of this call are ignored.
+   * with `force`, closes the connection now instead of waiting for the broker. `reasonCode` and `properties` of this call are ignored.
    * The Reason String and User Properties are left out if they make DISCONNECT larger than the Maximum Packet Size of the broker.
    * If a property is invalid, or DISCONNECT cannot be encoded, the promise rejects, nothing is sent and the connection stays open.
    *
-   * @param force `true` to close without sending DISCONNECT.
-   * @param properties MQTT 5.0 DISCONNECT properties ({@link MqttProperties.DisconnectProperties}). A Session Expiry Interval
-   * other than 0 can be set only when the Session Expiry Interval of CONNECT was not 0 (and not absent).
+   * @param options {@link ClientTypes.DisconnectOptions}: `force`, and the MQTT 5.0 Reason Code and DISCONNECT properties
+   * ({@link MqttProperties.DisconnectProperties}). With MQTT 3.1.1, the Reason Code and the properties are not sent.
    * @throws {InvalidPropertyError} if a property is invalid, e.g. a Session Expiry Interval other than 0 when that of CONNECT
    * was 0 or absent: the broker would not treat DISCONNECT as valid, and would publish the will message. Nothing is sent.
+   * @throws {MqttPacketSerializeError} if DISCONNECT cannot be encoded, e.g. `reasonCode` is not a Reason Code of DISCONNECT
+   * (MQTT 5.0 3.14.2.1). Nothing is sent.
    * @example
    * normal disconnection
    * ```ts
@@ -1129,21 +1133,31 @@ export abstract class BaseMqttClient {
    *   reasonString: 'trouble',
    *   sessionExpiryInterval: 300,
    * };
-   * await client.disconnect(false, properties);
+   * await client.disconnect({ properties });
    * ```
+   *
+   * disconnecting normally, and having the broker publish the will message (MQTT 5.0)
+   * ```ts
+   * import { Mqtt, MqttClient } from '@ymjacky/mqtt5';
+   *
+   * const client = new MqttClient();
+   *
+   * await client.disconnect({ reasonCode: Mqtt.ReasonCode.DisconnectWithWillMessage });
+   * ```
+   *
    * force disconnect
    * ```ts
    * import { MqttClient } from '@ymjacky/mqtt5';
    *
    * const client = new MqttClient();
    *
-   * await client.disconnect(true);
+   * await client.disconnect({ force: true });
    * ```
    */
-  public async disconnect(
-    force: boolean = false,
-    properties?: MqttProperties.DisconnectProperties,
-  ): Promise<void> {
+  public async disconnect(options?: ClientTypes.DisconnectOptions): Promise<void> {
+    const force = options?.force ?? false;
+    const reasonCode = options?.reasonCode;
+    const properties = options?.properties;
     const state = this.#state;
     if (state.kind === 'offline') {
       return;
@@ -1199,7 +1213,7 @@ export abstract class BaseMqttClient {
           // The connection may have been closed while waiting, which resolved this call. Leave alone the connection that
           // the client may have opened since then.
           if (this.isCurrent(connection)) {
-            await this.doDisconnect(false, undefined, properties);
+            await this.doDisconnect(false, reasonCode, properties);
           }
         } finally {
           publishTurnFinished();
@@ -2105,7 +2119,7 @@ export abstract class BaseMqttClient {
     this.#timers.pingresp.start(this.#pingrespTimeoutMs, () => {
       this.log('PINGRESP was not received within pingrespTimeoutMS');
       // Nobody awaits this callback: a rejection must not be left unhandled.
-      this.disconnect(true).catch((err) => this.log('failed to close the connection:', err));
+      this.disconnect({ force: true }).catch((err) => this.log('failed to close the connection:', err));
     });
   }
 
@@ -2210,7 +2224,7 @@ export abstract class BaseMqttClient {
   }
 
   /**
-   * Calls {@link BaseMqttClient.disconnect} (without `force` and properties), so that the client can be declared with
+   * Calls {@link BaseMqttClient.disconnect} (without options), so that the client can be declared with
    * `await using`: it is disconnected when the scope is left, also when an error is thrown. Resolves immediately if the
    * client is not connected.
    *

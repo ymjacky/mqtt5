@@ -293,7 +293,7 @@ Deno.test({ name: '@receive topic alias that is not valid', only: false }, async
         assertEquals(recorded.topics, ['topic/ok']);
         assertEquals(recorded.pubacks, [1]);
       } finally {
-        await client.disconnect(true);
+        await client.disconnect({ force: true });
         await broker.destroy();
       }
     },
@@ -319,7 +319,7 @@ Deno.test({ name: '@receive topic alias that is not valid', only: false }, async
       assertEquals(recorded.topics, ['topic/a']);
       assertEquals(recorded.pubacks, [1]);
     } finally {
-      await client.disconnect(true);
+      await client.disconnect({ force: true });
       await broker.destroy();
     }
   });
@@ -345,7 +345,7 @@ Deno.test({ name: '@receive topic alias that is not valid', only: false }, async
         assertEquals(recorded.topics, ['topic/ok', 'topic/ok']);
         assertEquals(recorded.pubacks, [1, 2]);
       } finally {
-        await client.disconnect(true);
+        await client.disconnect({ force: true });
         await broker.destroy();
       }
     },
@@ -365,7 +365,7 @@ Deno.test({ name: '@receive topic alias that is not valid', only: false }, async
       assertEquals(recorded.topics, []);
       assertEquals(recorded.pubacks, []);
     } finally {
-      await client.disconnect(true);
+      await client.disconnect({ force: true });
       await broker.destroy();
     }
   });
@@ -391,7 +391,7 @@ Deno.test({ name: '@receive topic alias that is not valid', only: false }, async
         assertEquals(recorded.topics, []);
         assertEquals(recorded.pubacks, []);
       } finally {
-        await client.disconnect(true);
+        await client.disconnect({ force: true });
         await broker.destroy();
       }
     });
@@ -416,7 +416,7 @@ Deno.test({ name: '@receive topic alias that is not valid', only: false }, async
       assertEquals(recorded.topics, ['topic/a', 'topic/a']);
       assertEquals(recorded.pubacks, [1, 2]);
     } finally {
-      await client.disconnect(true);
+      await client.disconnect({ force: true });
       await broker.destroy();
     }
   });
@@ -435,7 +435,7 @@ Deno.test({ name: '@receive topic alias that is not valid', only: false }, async
       assertEquals(recorded.topics, []);
       assertEquals(recorded.pubacks, []);
     } finally {
-      await client.disconnect(true);
+      await client.disconnect({ force: true });
       await broker.destroy();
     }
   });

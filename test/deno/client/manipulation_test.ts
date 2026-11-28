@@ -175,8 +175,8 @@ Deno.test({ name: '@manipulation', only: false }, async (context) => {
           resolve();
         });
 
-        await client.disconnect(true);
-        await client.disconnect(true);
+        await client.disconnect({ force: true });
+        await client.disconnect({ force: true });
 
         await promise;
       } catch (err) {

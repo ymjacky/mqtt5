@@ -75,7 +75,7 @@ Deno.test({ name: '@receive packets larger than the Maximum Packet Size', only: 
         assertEquals(recorded.disconnects, [Mqtt.ReasonCode.PacketTooLarge]);
         assertEquals(recorded.published.length, 1);
       } finally {
-        await client.disconnect(true);
+        await client.disconnect({ force: true });
         await broker.destroy();
       }
     },
@@ -95,7 +95,7 @@ Deno.test({ name: '@receive packets larger than the Maximum Packet Size', only: 
       assertEquals(recorded.disconnects, [Mqtt.ReasonCode.PacketTooLarge]);
       assertEquals(recorded.published, []);
     } finally {
-      await client.disconnect(true);
+      await client.disconnect({ force: true });
       await broker.destroy();
     }
   });
@@ -114,7 +114,7 @@ Deno.test({ name: '@receive packets larger than the Maximum Packet Size', only: 
       assertEquals(recorded.disconnects, []);
       assertEquals(recorded.closed, false);
     } finally {
-      await client.disconnect(true);
+      await client.disconnect({ force: true });
       await broker.destroy();
     }
   });
@@ -133,7 +133,7 @@ Deno.test({ name: '@receive packets larger than the Maximum Packet Size', only: 
       assertEquals(recorded.published, [(MqttPackets.decode(publish) as MqttPackets.PublishPacket).payload.length]);
       assertEquals(recorded.closed, false);
     } finally {
-      await client.disconnect(true);
+      await client.disconnect({ force: true });
       await broker.destroy();
     }
   });
@@ -156,7 +156,7 @@ Deno.test({ name: '@receive packets larger than the Maximum Packet Size', only: 
         assertEquals(recorded.disconnects, [Mqtt.ReasonCode.PacketTooLarge]);
         assertEquals(recorded.published.length, 1);
       } finally {
-        await client.disconnect(true);
+        await client.disconnect({ force: true });
         await broker.destroy();
       }
     },

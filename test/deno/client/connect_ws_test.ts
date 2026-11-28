@@ -349,7 +349,7 @@ Deno.test({ name: '@connect ws failure leaves the client offline', only: false }
         // The client is offline: it can connect again right away.
         const connack = await client.connect();
         assertEquals(connack.reasonCode, Mqtt.ReasonCode.Success);
-        await client.disconnect(true);
+        await client.disconnect({ force: true });
       } finally {
         await broker.destroy();
       }

@@ -117,7 +117,7 @@ Deno.test({ name: '@CONNACK Receive Maximum', only: false }, async (context) => 
       }
       await client.disconnect();
     } finally {
-      await client.disconnect(true);
+      await client.disconnect({ force: true });
       await b.broker.destroy();
     }
   });
@@ -141,7 +141,7 @@ Deno.test({ name: '@CONNACK Receive Maximum', only: false }, async (context) => 
       await Promise.all([publishingA, publishingB, publishingC]);
       await client.disconnect();
     } finally {
-      await client.disconnect(true);
+      await client.disconnect({ force: true });
       await b.broker.destroy();
     }
   });
@@ -178,7 +178,7 @@ Deno.test({ name: '@CONNACK Receive Maximum', only: false }, async (context) => 
       assertEquals((await publishingC).result, Mqtt.ReasonCode.Success);
       await client.disconnect();
     } finally {
-      await client.disconnect(true);
+      await client.disconnect({ force: true });
       await b.broker.destroy();
     }
   });
@@ -201,7 +201,7 @@ Deno.test({ name: '@CONNACK Receive Maximum', only: false }, async (context) => 
       assertEquals(await client.publishInflightCount(), 1);
       assertEquals(b.received, ['PUBLISH A']);
     } finally {
-      await client.disconnect(true);
+      await client.disconnect({ force: true });
       await b.broker.destroy();
     }
   });
@@ -220,7 +220,7 @@ Deno.test({ name: '@CONNACK Receive Maximum', only: false }, async (context) => 
       await Promise.all(publishing);
       await client.disconnect();
     } finally {
-      await client.disconnect(true);
+      await client.disconnect({ force: true });
       await b.broker.destroy();
     }
   });
@@ -269,7 +269,7 @@ Deno.test({ name: '@CONNACK Receive Maximum when resending after reconnecting', 
         }
         await client.disconnect();
       } finally {
-        await client.disconnect(true);
+        await client.disconnect({ force: true });
         await b.broker.destroy();
       }
     },
@@ -312,7 +312,7 @@ Deno.test({ name: '@CONNACK Receive Maximum when resending after reconnecting', 
       await Promise.all(publishing);
       await client.disconnect();
     } finally {
-      await client.disconnect(true);
+      await client.disconnect({ force: true });
       await b.broker.destroy();
     }
   });
@@ -349,7 +349,7 @@ Deno.test({ name: '@CONNACK Receive Maximum when resending after reconnecting', 
       assertEquals((await publishingB).result, Mqtt.ReasonCode.Success);
       await client.disconnect();
     } finally {
-      await client.disconnect(true);
+      await client.disconnect({ force: true });
       await b.broker.destroy();
     }
   });
@@ -375,7 +375,7 @@ Deno.test({ name: '@CONNACK Maximum QoS and Retain Available', only: false }, as
       assertEquals(b.received, ['PUBLISH B']);
       await client.disconnect();
     } finally {
-      await client.disconnect(true);
+      await client.disconnect({ force: true });
       await b.broker.destroy();
     }
   });
@@ -393,7 +393,7 @@ Deno.test({ name: '@CONNACK Maximum QoS and Retain Available', only: false }, as
       assertEquals(b.received, ['PUBLISH B']);
       await client.disconnect();
     } finally {
-      await client.disconnect(true);
+      await client.disconnect({ force: true });
       await b.broker.destroy();
     }
   });
@@ -419,7 +419,7 @@ Deno.test({ name: '@CONNACK Maximum QoS and Retain Available', only: false }, as
       assertEquals(b.received, ['PUBLISH B']);
       await client.disconnect();
     } finally {
-      await client.disconnect(true);
+      await client.disconnect({ force: true });
       await b.broker.destroy();
     }
   });
@@ -442,7 +442,7 @@ Deno.test({ name: '@CONNACK Maximum QoS and Retain Available', only: false }, as
       await waitFor(() => b.received.length === 1, 'A on the second connection');
       assertEquals(b.received, ['PUBLISH A retain']);
     } finally {
-      await client.disconnect(true);
+      await client.disconnect({ force: true });
       await b.broker.destroy();
     }
   });
@@ -463,7 +463,7 @@ Deno.test({ name: '@CONNACK Wildcard, Shared and Subscription Identifiers Availa
       assertEquals(b.received, ['SUBSCRIBE a/b']);
       await client.disconnect();
     } finally {
-      await client.disconnect(true);
+      await client.disconnect({ force: true });
       await b.broker.destroy();
     }
   });
@@ -480,7 +480,7 @@ Deno.test({ name: '@CONNACK Wildcard, Shared and Subscription Identifiers Availa
       assertEquals(b.received, ['SUBSCRIBE a/+']);
       await client.disconnect();
     } finally {
-      await client.disconnect(true);
+      await client.disconnect({ force: true });
       await b.broker.destroy();
     }
   });
@@ -500,7 +500,7 @@ Deno.test({ name: '@CONNACK Wildcard, Shared and Subscription Identifiers Availa
       assertEquals(b.received, ['SUBSCRIBE a']);
       await client.disconnect();
     } finally {
-      await client.disconnect(true);
+      await client.disconnect({ force: true });
       await b.broker.destroy();
     }
   });
@@ -514,7 +514,7 @@ Deno.test({ name: '@CONNACK Wildcard, Shared and Subscription Identifiers Availa
       assertEquals(b.received, ['SUBSCRIBE $share/group1/a/+']);
       await client.disconnect();
     } finally {
-      await client.disconnect(true);
+      await client.disconnect({ force: true });
       await b.broker.destroy();
     }
   });
