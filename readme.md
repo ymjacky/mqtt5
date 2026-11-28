@@ -279,6 +279,26 @@ Register listeners with `client.on(type, listener)` and remove them with `client
 | `auth`       | `AuthPacket`       | The broker sends AUTH (MQTT 5.0 enhanced authentication).        |
 | `closed`     | -                  | The connection is closed, for any reason.                        |
 
+Catch the errors in the listener: the client does not use its return value, and does not catch what it throws. An error thrown by the listener, or the
+rejection of the promise of an `async` listener, is then not handled by anyone: Deno terminates the process, and a browser reports it in the console. This
+matters most for an `async` listener that calls the client, e.g. one that calls `connect()` on `closed` to reconnect: `connect()` rejects when the broker is not
+running.
+
+```ts
+import { MqttClient } from '@ymjacky/mqtt5';
+
+const client = new MqttClient({ clientId: 'clientA' });
+
+client.on('publish', async (event) => {
+  try {
+    const message = JSON.parse(new TextDecoder().decode(event.detail.payload));
+    await fetch('https://example.com/messages', { method: 'POST', body: JSON.stringify(message) });
+  } catch (err) {
+    console.error('could not handle the message:', err);
+  }
+});
+```
+
 ## Disconnecting and reconnecting
 
 ```ts
@@ -287,7 +307,8 @@ import { Mqtt, MqttClient } from '@ymjacky/mqtt5';
 const client = new MqttClient({ clientId: 'clientA' });
 await client.connect();
 
-// The client does not reconnect automatically. Reconnect from the closed event if needed.
+// The client does not reconnect automatically. Reconnect from the closed event if needed, and catch the errors in the listener
+// (see Events).
 client.on('closed', () => {
   console.log('connection closed');
 });
@@ -363,7 +384,8 @@ A call that fails is reported in one of two ways:
   `publish()`, `reasons` of `subscribe()` and `reasonCodes` of `unsubscribe()`. A reason code of 0x80 (128) or more is a failure. In MQTT 3.1.1, a CONNACK
   return code other than 0 and a SUBACK return code of 0x80 are failures.
 
-A rejected promise that is not awaited does not terminate the process, so await the calls whose failures you want to handle.
+A rejected promise that is not awaited does not terminate the process, so await the calls whose failures you want to handle. This is about the promises that
+the client returns. An error in an event listener is different: the client does not catch it, so catch it in the listener (see [Events](#events)).
 
 ### Errors
 
