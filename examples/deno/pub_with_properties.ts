@@ -14,7 +14,7 @@ async function main() {
   });
   await client.connect();
 
-  const pubProperties: MqttProperties.UserPublishProperties = {
+  const properties: MqttProperties.UserPublishProperties = {
     payloadFormatIndicator: 1,
     messageExpiryInterval: 60,
     responseTopic: 'responseTopicA',
@@ -26,7 +26,7 @@ async function main() {
     ],
     contentType: 'application/json',
   };
-  await client.publish('topicA', 'payload', { qos: Mqtt.QoS.AtMostOnce }, pubProperties);
+  await client.publish('topicA', 'payload', { qos: Mqtt.QoS.AtMostOnce, properties });
 }
 
 main();

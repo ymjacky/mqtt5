@@ -152,6 +152,8 @@ export type PublishOptions = {
    * @default {false}
    */
   retain?: boolean;
+  /** MQTT 5.0 PUBLISH properties. Not sent with MQTT 3.1.1. */
+  properties?: MqttProperties.UserPublishProperties;
 };
 
 /**

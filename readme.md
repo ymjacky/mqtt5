@@ -186,10 +186,13 @@ await client.connect();
 await client.publish('topicA', 'payload', { qos: Mqtt.QoS.AtMostOnce });
 await client.publish('topicA', new Uint8Array([1, 2, 3]), { qos: Mqtt.QoS.AtLeastOnce, retain: true });
 
-const result = await client.publish('topicA', 'payload', { qos: Mqtt.QoS.ExactlyOnce }, {
-  contentType: 'application/json',
-  messageExpiryInterval: 60,
-  userProperties: [{ key: 'userProp1', val: 'userData1' }],
+const result = await client.publish('topicA', 'payload', {
+  qos: Mqtt.QoS.ExactlyOnce,
+  properties: {
+    contentType: 'application/json',
+    messageExpiryInterval: 60,
+    userProperties: [{ key: 'userProp1', val: 'userData1' }],
+  },
 });
 console.log(result.result === Mqtt.ReasonCode.Success);
 ```

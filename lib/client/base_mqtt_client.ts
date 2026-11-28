@@ -569,8 +569,8 @@ export abstract class BaseMqttClient {
    *
    * @param topic topic name
    * @param payload payload. A Uint8Array is sent as it is; a string is encoded as UTF-8.
-   * @param options {@link ClientTypes.PublishOptions}: QoS, retain and DUP flags. QoS defaults to `Mqtt.QoS.AtMostOnce`.
-   * @param properties MQTT 5.0 PUBLISH properties ({@link MqttProperties.UserPublishProperties}).
+   * @param options {@link ClientTypes.PublishOptions}: QoS, retain and DUP flags, and the MQTT 5.0 PUBLISH properties
+   * ({@link MqttProperties.UserPublishProperties}). QoS defaults to `Mqtt.QoS.AtMostOnce`.
    * @returns the result of the publish flow ({@link ClientTypes.PublishResult}). Its `result` is the reason code; 0x80 (128) or more is a failure.
    * @throws {StateIsNotOnlineError} if the client is not connected.
    * @throws {InvalidTopicNameError} if `topic` or the Response Topic is not a valid Topic Name. Nothing is sent.
@@ -599,7 +599,7 @@ export abstract class BaseMqttClient {
    * await client.publish('topicA', new TextEncoder().encode('payloadA'), { qos: Mqtt.QoS.ExactlyOnce });
    * await client.publish('topicA', 'payloadA', { qos: Mqtt.QoS.AtLeastOnce, dup: true, retain: true });
    *
-   * const pubProperties: MqttProperties.UserPublishProperties = {
+   * const properties: MqttProperties.UserPublishProperties = {
    *   payloadFormatIndicator: 1,
    *   messageExpiryInterval: 60,
    *   responseTopic: 'responseTopicA',
@@ -611,17 +611,17 @@ export abstract class BaseMqttClient {
    *   ],
    *   contentType: 'application/json',
    * };
-   * await client.publish('topicA', 'payload', { qos: Mqtt.QoS.AtMostOnce }, pubProperties);
+   * await client.publish('topicA', 'payload', { properties });
+   * await client.publish('topicA', 'payload', { qos: Mqtt.QoS.AtLeastOnce, properties });
    * ```
    */
   public publish(
     topic: string,
     payload: string | Uint8Array,
     options?: ClientTypes.PublishOptions,
-    properties?: MqttProperties.UserPublishProperties,
   ): Promise<ClientTypes.PublishResult> {
     const deferred = createRequestDeferred<ClientTypes.PublishResult>();
-    this.sendPublish(topic, payload, options, properties, deferred).catch((err) => deferred.reject(err));
+    this.sendPublish(topic, payload, options, deferred).catch((err) => deferred.reject(err));
     return deferred.promise;
   }
 
@@ -630,7 +630,6 @@ export abstract class BaseMqttClient {
     topic: string,
     payload: string | Uint8Array,
     options: ClientTypes.PublishOptions | undefined,
-    properties: MqttProperties.UserPublishProperties | undefined,
     deferred: Deferred<ClientTypes.PublishResult>,
   ): Promise<void> {
     if (this.#state.kind !== 'online') {
@@ -640,6 +639,7 @@ export abstract class BaseMqttClient {
     const dup = options?.dup ?? false;
     const qos = options?.qos ?? Mqtt.QoS.AtMostOnce;
     const retain = options?.retain ?? false;
+    const properties = options?.properties;
     // Check the topic given by the caller: with a topic alias, the client itself sends an empty Topic Name.
     validatePublish(topic, payload, qos, dup, properties, this.protocolVersion);
 

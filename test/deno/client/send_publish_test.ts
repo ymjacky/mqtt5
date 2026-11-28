@@ -285,8 +285,7 @@ Deno.test({ name: '@publish_qos0', only: false }, async (context) => {
         await client.publish(
           'topicA',
           new TextEncoder().encode('payloadA'),
-          {},
-          properties,
+          { properties },
         );
 
         await promise;
@@ -573,8 +572,7 @@ Deno.test({ name: '@publish_qos1', only: false }, async (context) => {
         const result = await client.publish(
           'topicA',
           new TextEncoder().encode('payloadA'),
-          { qos: Mqtt.QoS.AtLeastOnce },
-          properties,
+          { qos: Mqtt.QoS.AtLeastOnce, properties },
         );
         assertEquals(result.result, Mqtt.ReasonCode.Success);
         assertEquals(result.reason, undefined);
@@ -905,8 +903,7 @@ Deno.test({ name: '@publish_qos2', only: false }, async (context) => {
         const result = await client.publish(
           'topicA',
           new TextEncoder().encode('payloadA'),
-          { qos: Mqtt.QoS.ExactlyOnce },
-          properties,
+          { qos: Mqtt.QoS.ExactlyOnce, properties },
         );
         assertEquals(result.result, Mqtt.ReasonCode.Success);
         assertEquals(result.reason, undefined);
@@ -1279,30 +1276,30 @@ Deno.test({ name: '@publish invalid topic', only: false }, async (context) => {
           await assertRejects(() => client.publish(topic, 'x'), ClientErrors.InvalidTopicNameError);
         }
         await assertRejects(
-          () => client.publish('topicA', 'x', { qos: Mqtt.QoS.AtLeastOnce }, { responseTopic: 'response/#' }),
+          () => client.publish('topicA', 'x', { qos: Mqtt.QoS.AtLeastOnce, properties: { responseTopic: 'response/#' } }),
           ClientErrors.InvalidTopicNameError,
         );
         await assertRejects(
-          () => client.publish('topicA', 'x', { qos: Mqtt.QoS.ExactlyOnce }, { responseTopic: '' }),
+          () => client.publish('topicA', 'x', { qos: Mqtt.QoS.ExactlyOnce, properties: { responseTopic: '' } }),
           ClientErrors.InvalidTopicNameError,
         );
         await assertRejects(() => client.publish('topicA', 'x', { qos: 3 as Mqtt.QoS }), ClientErrors.InvalidArgumentError);
         // [MQTT-3.3.1-2] The DUP flag must be 0 for QoS 0.
         await assertRejects(() => client.publish('topicA', 'x', { dup: true }), ClientErrors.InvalidArgumentError, 'dup');
         await assertRejects(
-          () => client.publish('topicA', 'x', { qos: Mqtt.QoS.AtLeastOnce }, { messageExpiryInterval: -1 }),
+          () => client.publish('topicA', 'x', { qos: Mqtt.QoS.AtLeastOnce, properties: { messageExpiryInterval: -1 } }),
           ClientErrors.InvalidPropertyError,
         );
         await assertRejects(
-          () => client.publish('topicA', 'x', { qos: Mqtt.QoS.AtLeastOnce }, { payloadFormatIndicator: 7 }),
+          () => client.publish('topicA', 'x', { qos: Mqtt.QoS.AtLeastOnce, properties: { payloadFormatIndicator: 7 } }),
           ClientErrors.InvalidPropertyError,
         );
         await assertRejects(
-          () => client.publish('topicA', 'x', { qos: Mqtt.QoS.AtLeastOnce }, { contentType: 'a\u0000b' }),
+          () => client.publish('topicA', 'x', { qos: Mqtt.QoS.AtLeastOnce, properties: { contentType: 'a\u0000b' } }),
           ClientErrors.InvalidPropertyError,
         );
         await assertRejects(
-          () => client.publish('topicA', 'x', { qos: Mqtt.QoS.AtLeastOnce }, { userProperties: [{ key: 'k', val: '\uDC00' }] }),
+          () => client.publish('topicA', 'x', { qos: Mqtt.QoS.AtLeastOnce, properties: { userProperties: [{ key: 'k', val: '\uDC00' }] } }),
           ClientErrors.InvalidPropertyError,
         );
         // An ignored rejection does not become an unhandled rejection.
@@ -1429,7 +1426,7 @@ Deno.test({ name: '@publish property of 0', only: false }, async (context) => {
 
         const client = new MqttClient({ clientId: 'cid', logger: logger });
         await client.connect();
-        await client.publish('topicA', 'payloadA', {}, { payloadFormatIndicator: 0 });
+        await client.publish('topicA', 'payloadA', { properties: { payloadFormatIndicator: 0 } });
 
         const publish = await publishReceived;
         // 0 means the same as no Payload Format Indicator, and a broker forwards it unaltered [MQTT-3.3.2-4].

@@ -60,11 +60,14 @@
  * // QoS 1: resolves when the broker acknowledges (PUBACK). `retain` asks the broker to keep the message.
  * await client.publish('topicA', new Uint8Array([1, 2, 3]), { qos: Mqtt.QoS.AtLeastOnce, retain: true });
  *
- * // QoS 2, with MQTT 5.0 properties as the fourth argument
- * const result = await client.publish('topicA', '{"temperature":23.5}', { qos: Mqtt.QoS.ExactlyOnce }, {
- *   contentType: 'application/json',
- *   messageExpiryInterval: 60,
- *   userProperties: [{ key: 'room', val: '1' }],
+ * // QoS 2, with MQTT 5.0 properties
+ * const result = await client.publish('topicA', '{"temperature":23.5}', {
+ *   qos: Mqtt.QoS.ExactlyOnce,
+ *   properties: {
+ *     contentType: 'application/json',
+ *     messageExpiryInterval: 60,
+ *     userProperties: [{ key: 'room', val: '1' }],
+ *   },
  * });
  * console.log(result.result === Mqtt.ReasonCode.Success);
  *

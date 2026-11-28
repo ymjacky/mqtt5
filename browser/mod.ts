@@ -63,8 +63,9 @@
  * await client.connect();
  *
  * // Resolves when the broker acknowledges the message (PUBACK for QoS 1).
- * await client.publish('topicA', JSON.stringify({ temperature: 23.5 }), { qos: Mqtt.QoS.AtLeastOnce }, {
- *   contentType: 'application/json',
+ * await client.publish('topicA', JSON.stringify({ temperature: 23.5 }), {
+ *   qos: Mqtt.QoS.AtLeastOnce,
+ *   properties: { contentType: 'application/json' },
  * });
  *
  * await client.disconnect();

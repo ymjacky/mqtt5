@@ -90,9 +90,9 @@ Deno.test({ name: '@resend from MemoryStore', only: false }, async (context) => 
           contentType: 'application/json',
         };
 
-        const pubResult1 = client.publish('topicA', new TextEncoder().encode('payloadA'), { qos: Mqtt.QoS.AtLeastOnce }, properties);
-        const pubResult2 = client.publish('topicA', new TextEncoder().encode('payloadA'), { qos: Mqtt.QoS.AtLeastOnce }, properties);
-        const pubResult3 = client.publish('topicA', new TextEncoder().encode('payloadA'), { qos: Mqtt.QoS.AtLeastOnce }, properties);
+        const pubResult1 = client.publish('topicA', new TextEncoder().encode('payloadA'), { qos: Mqtt.QoS.AtLeastOnce, properties });
+        const pubResult2 = client.publish('topicA', new TextEncoder().encode('payloadA'), { qos: Mqtt.QoS.AtLeastOnce, properties });
+        const pubResult3 = client.publish('topicA', new TextEncoder().encode('payloadA'), { qos: Mqtt.QoS.AtLeastOnce, properties });
 
         broker.on('disconnect', (event) => {
           const packet = event.detail;
@@ -309,9 +309,9 @@ Deno.test({ name: '@resend from MemoryStore', only: false }, async (context) => 
           contentType: 'application/json',
         };
 
-        const pubResult1 = client.publish('topicA', new TextEncoder().encode('payloadA'), { qos: Mqtt.QoS.ExactlyOnce }, properties);
-        const pubResult2 = client.publish('topicA', new TextEncoder().encode('payloadA'), { qos: Mqtt.QoS.ExactlyOnce }, properties);
-        const pubResult3 = client.publish('topicA', new TextEncoder().encode('payloadA'), { qos: Mqtt.QoS.ExactlyOnce }, properties);
+        const pubResult1 = client.publish('topicA', new TextEncoder().encode('payloadA'), { qos: Mqtt.QoS.ExactlyOnce, properties });
+        const pubResult2 = client.publish('topicA', new TextEncoder().encode('payloadA'), { qos: Mqtt.QoS.ExactlyOnce, properties });
+        const pubResult3 = client.publish('topicA', new TextEncoder().encode('payloadA'), { qos: Mqtt.QoS.ExactlyOnce, properties });
 
         broker.on('disconnect', (event) => {
           const packet = event.detail;
@@ -536,9 +536,9 @@ Deno.test({ name: '@resend from MemoryStore', only: false }, async (context) => 
           contentType: 'application/json',
         };
 
-        const pubResult1 = client.publish('topicA', new TextEncoder().encode('payloadA'), { qos: Mqtt.QoS.ExactlyOnce }, properties);
-        const pubResult2 = client.publish('topicA', new TextEncoder().encode('payloadA'), { qos: Mqtt.QoS.ExactlyOnce }, properties);
-        const pubResult3 = client.publish('topicA', new TextEncoder().encode('payloadA'), { qos: Mqtt.QoS.ExactlyOnce }, properties);
+        const pubResult1 = client.publish('topicA', new TextEncoder().encode('payloadA'), { qos: Mqtt.QoS.ExactlyOnce, properties });
+        const pubResult2 = client.publish('topicA', new TextEncoder().encode('payloadA'), { qos: Mqtt.QoS.ExactlyOnce, properties });
+        const pubResult3 = client.publish('topicA', new TextEncoder().encode('payloadA'), { qos: Mqtt.QoS.ExactlyOnce, properties });
 
         broker.on('disconnect', (event) => {
           const packet = event.detail;
@@ -803,9 +803,9 @@ Deno.test({ name: '@resend from MemoryStore', only: false }, async (context) => 
           contentType: 'application/json',
         };
 
-        const pubResult1 = client.publish('topicA', new TextEncoder().encode('payloadA'), { qos: Mqtt.QoS.AtLeastOnce }, properties);
-        const pubResult2 = client.publish('topicA', new TextEncoder().encode('payloadA'), { qos: Mqtt.QoS.AtLeastOnce }, properties);
-        const pubResult3 = client.publish('topicA', new TextEncoder().encode('payloadA'), { qos: Mqtt.QoS.AtLeastOnce }, properties);
+        const pubResult1 = client.publish('topicA', new TextEncoder().encode('payloadA'), { qos: Mqtt.QoS.AtLeastOnce, properties });
+        const pubResult2 = client.publish('topicA', new TextEncoder().encode('payloadA'), { qos: Mqtt.QoS.AtLeastOnce, properties });
+        const pubResult3 = client.publish('topicA', new TextEncoder().encode('payloadA'), { qos: Mqtt.QoS.AtLeastOnce, properties });
 
         broker.on('disconnect', (event) => {
           const packet = event.detail;
@@ -1142,7 +1142,7 @@ Deno.test({ name: '@resend: the payload and properties given to publish()', only
           const userProperty = { key: 'key1', val: 'val1' };
           const userProperties = [userProperty];
           const properties: MqttProperties.UserPublishProperties = { correlationData, userProperties, contentType: 'text/plain' };
-          const publishing = client.publish('topicA', payload, { qos }, properties);
+          const publishing = client.publish('topicA', payload, { qos, properties });
           await written.promise;
 
           // The application reuses the objects for its next message while the flow is not complete yet.
@@ -1213,7 +1213,7 @@ Deno.test({ name: '@resend: the payload and properties given to publish()', only
           const userProperty = { key: 'key1', val: 'val1' };
           const userProperties = [userProperty];
           const properties: MqttProperties.UserPublishProperties = { correlationData, userProperties, contentType: 'text/plain' };
-          const publishing = client.publish('topicA', payload, { qos }, properties);
+          const publishing = client.publish('topicA', payload, { qos, properties });
           // The application does not wait for publish() and reuses the objects for its next message.
           payload.set(encoder.encode('payloadB'));
           correlationData.set(encoder.encode('correlationB'));
