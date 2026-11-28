@@ -73,37 +73,17 @@ async function main() {
     }
   }
 
-  // True while connected. A connect attempt that fails also emits `closed`; this is false then, so no reconnect starts.
-  let online = false;
   // disconnect() was called: do not reconnect.
   let stopping = false;
 
-  client.on('closed', async () => {
-    if (!online || stopping) {
-      return;
-    }
-    online = false;
-    logger('connection closed, reconnecting');
-    // Catch the errors in the listener: the client does not, and an uncaught one would terminate the process.
-    try {
-      await start();
-      online = true;
-      logger('reconnected');
-    } catch (err) {
-      logger('gave up reconnecting:', err);
-      Deno.exit(1);
-    }
-  });
-
   await start();
-  online = true;
   logger('connected');
 
   // Publish every 5 s while connected. When the connection is closed before PUBACK arrives,
   // the message is resent after reconnecting and the promise resolves then.
   let count = 0;
   const timer = setInterval(() => {
-    if (!online) {
+    if (client.state !== 'online') {
       return;
     }
     client.publish('topicA', `message ${++count}`, { qos: Mqtt.QoS.AtLeastOnce })
@@ -118,6 +98,18 @@ async function main() {
     await client.disconnect();
     Deno.exit();
   });
+
+  // Reconnect each time the connection is closed. Done here, not in a `closed` listener: an error of start() rejects main(),
+  // and is caught below. client.closed is a new promise for each connection, already resolved if it has been closed.
+  for (;;) {
+    await client.closed;
+    if (stopping) {
+      return;
+    }
+    logger('connection closed, reconnecting');
+    await start();
+    logger('reconnected');
+  }
 }
 
 main().catch((err) => {
