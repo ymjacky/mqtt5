@@ -84,6 +84,7 @@ async function main() {
     }
     online = false;
     logger('connection closed, reconnecting');
+    // Catch the errors in the listener: the client does not, and an uncaught one would terminate the process.
     try {
       await start();
       online = true;

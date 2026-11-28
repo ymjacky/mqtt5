@@ -81,7 +81,8 @@
  *   connectTimeoutMS: 5000,
  * });
  *
- * // The client does not reconnect by itself. Do it from the closed event if needed.
+ * // The client does not reconnect by itself. Do it from the closed event if needed, and catch the errors in the listener:
+ * // the client does not, e.g. when connect() rejects because the broker cannot be reached.
  * client.on('closed', () => console.log('connection closed'));
  *
  * try {

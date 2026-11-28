@@ -223,9 +223,15 @@
  * const client = new MqttClient({ clientId: 'reconnectClient', clean: false });
  *
  * client.on('closed', async () => {
- *   await new Promise((resolve) => setTimeout(resolve, 5000));
- *   await client.connect({ properties: { sessionExpiryInterval: 3600 } });
- *   await client.subscribe('topicA', { qos: Mqtt.QoS.AtLeastOnce });
+ *   // Catch the errors in the listener: the client does not, and an uncaught one terminates the process.
+ *   // When connect() fails, e.g. the broker is not running yet, `closed` is emitted again, and this listener tries again.
+ *   try {
+ *     await new Promise((resolve) => setTimeout(resolve, 5000));
+ *     await client.connect({ properties: { sessionExpiryInterval: 3600 } });
+ *     await client.subscribe('topicA', { qos: Mqtt.QoS.AtLeastOnce });
+ *   } catch (err) {
+ *     console.error('could not reconnect:', err);
+ *   }
  * });
  *
  * await client.connect({ properties: { sessionExpiryInterval: 3600 } });
