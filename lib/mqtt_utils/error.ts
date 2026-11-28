@@ -42,7 +42,8 @@ export class UnencodableStringError extends MqttClientError {
 
 /**
  * The bytes of a received packet do not fit its structure: a field goes past the end of the packet or of its properties,
- * bytes are left after the last field, or a Variable Byte Integer is longer than 4 bytes. The packet is a Malformed Packet.
+ * bytes are left after the last field, a Variable Byte Integer is longer than 4 bytes, or the flags of the fixed header are
+ * not the ones that the packet type must have. The packet is a Malformed Packet.
  */
 export class MalformedDataError extends MqttClientError {
   /** The name of the error class. */

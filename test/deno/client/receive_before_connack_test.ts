@@ -100,6 +100,8 @@ const validConnack = [
 /** Packets that the client cannot accept while it waits for CONNACK (MQTT 5.0), and the reason it ends the connection with. */
 const invalidPackets: [string, number[], Mqtt.ReasonCode][] = [
   ['a CONNACK with a property that MQTT 5.0 does not define', connackWithUnknownProperty, Mqtt.ReasonCode.MalformedPacket],
+  // Otherwise a CONNACK that accepts the connection: the flags of CONNACK are reserved and must be 0b0000 [MQTT-2.1.3-1].
+  ['a CONNACK whose fixed header has the flags 0b0001', [0x21, 0x03, 0x00, 0x00, 0x00], Mqtt.ReasonCode.MalformedPacket],
   // Property Length 4: Reason String (0x1F) of length 1, the byte 0xFF, which is never in UTF-8 [MQTT-1.5.4-1].
   ['a CONNACK whose Reason String is not valid UTF-8', [0x20, 0x07, 0x00, 0x00, 0x04, 0x1F, 0x00, 0x01, 0xFF], Mqtt.ReasonCode.MalformedPacket],
   // Property Length 6: Receive Maximum (0x21) 10, twice (MQTT 5.0 3.2.2.3.3).
@@ -113,6 +115,8 @@ const invalidPackets: [string, number[], Mqtt.ReasonCode][] = [
   // Every AUTH carries the Authentication Method (MQTT 5.0 3.15.2.2.2), also one with a Remaining Length of 0.
   ['an AUTH without an Authentication Method, a Protocol Error', [0xF0, 0x02, 0x18, 0x00], Mqtt.ReasonCode.ProtocolError],
   ['an AUTH with a Remaining Length of 0, which has no Authentication Method', [0xF0, 0x00], Mqtt.ReasonCode.ProtocolError],
+  // The flags are checked before the fields: the same AUTH with the flags 0b0001 is a Malformed Packet.
+  ['an AUTH with a Remaining Length of 0 and the flags 0b0001', [0xF1, 0x00], Mqtt.ReasonCode.MalformedPacket],
   // Packet ID 1, no properties, the Topic Filter 'a' with QoS 0.
   ['a SUBSCRIBE, which only a client sends', [0x82, 0x07, 0x00, 0x01, 0x00, 0x00, 0x01, 0x61, 0x00], Mqtt.ReasonCode.ProtocolError],
   // A Remaining Length is at most 4 bytes (MQTT 5.0 1.5.5): the client cannot tell where the next packet starts.
@@ -394,6 +398,8 @@ Deno.test({ name: '@receive before CONNACK: a packet that the broker must not se
   const packetsBeforeConnackV3_1_1: [string, number[], Mqtt.ReasonCode][] = [
     ['a PUBLISH with QoS 1', bytesOf(publishQoS1, Mqtt.ProtocolVersion.MqttV3_1_1), Mqtt.ReasonCode.ProtocolError],
     ['a packet of type 15 (AUTH in MQTT 5.0)', [0xF0, 0x00], Mqtt.ReasonCode.MalformedPacket],
+    // A CONNACK that accepts the connection, but with the flags 0b0001 [MQTT-2.2.2-1]: the valid CONNACK after it comes too late.
+    ['a CONNACK whose fixed header has the flags 0b0001', [0x21, 0x02, 0x00, 0x00], Mqtt.ReasonCode.MalformedPacket],
   ];
   for (const [name, bytes, reasonCode] of packetsBeforeConnackV3_1_1) {
     await context.step(`MQTT 3.1.1: on ${name}, the client does not handle it, closes the connection, and connect() rejects`, async () => {

@@ -38,6 +38,16 @@ const publishWithTopicPastTheEnd = new Uint8Array([0x30, 0x05, 0x00, 0x0A, 0x61,
  */
 const publishWithPropertyPastThePropertyLength = new Uint8Array([0x30, 0x09, 0x00, 0x01, 0x61, 0x02, 0x02, 0x00, 0x78, 0x79, 0x7A]);
 
+/**
+ * Packets whose fixed header has flags that their packet type cannot have, which the encoder does not write: a PUBREL must
+ * have 0b0010, a PUBACK 0b0000. They are a Malformed Packet (MQTT 5.0 2.1.3), and with MQTT 3.1.1 the receiver closes the
+ * connection [MQTT-2.2.2-2].
+ */
+const packetsWithInvalidFlags: [string, Uint8Array][] = [
+  ['a PUBREL (packet ID 1) with the flags 0b0000', new Uint8Array([0x60, 0x02, 0x00, 0x01])],
+  ['a PUBACK (packet ID 7) with the flags 0b0101', new Uint8Array([0x45, 0x02, 0x00, 0x07])],
+];
+
 /** A PUBLISH with the Response Topic twice: a Protocol Error (MQTT 5.0 3.3.2.3.5). */
 const publishWithResponseTopicTwice = new Uint8Array([0x30, 0x0C, 0x00, 0x01, 0x61, 0x08, 0x08, 0x00, 0x01, 0x72, 0x08, 0x00, 0x01, 0x72]);
 
@@ -80,7 +90,7 @@ const authsWithoutAuthenticationMethod: [string, Uint8Array][] = [
 
 /**
  * What a client receives and what the broker gets back: the topics of `publish` events, the Reason Codes of `auth` events,
- * the packet IDs of PUBACK and PUBREC and the DISCONNECT Reason Codes.
+ * the packet IDs of PUBACK, PUBREC and PUBCOMP and the DISCONNECT Reason Codes.
  */
 function record(client: MqttClient | WebSocketMqttClient, broker: TestBroker | TestWsBroker) {
   const recorded = {
@@ -88,6 +98,7 @@ function record(client: MqttClient | WebSocketMqttClient, broker: TestBroker | T
     auths: [] as (number | undefined)[],
     pubacks: [] as number[],
     pubrecs: [] as number[],
+    pubcomps: [] as number[],
     disconnects: [] as (number | undefined)[],
     disconnectEvents: [] as MqttPackets.DisconnectPacket[],
     closed: false,
@@ -109,6 +120,9 @@ function record(client: MqttClient | WebSocketMqttClient, broker: TestBroker | T
   });
   broker.on('pubrec', (event) => {
     recorded.pubrecs.push(event.detail.packetId);
+  });
+  broker.on('pubcomp', (event) => {
+    recorded.pubcomps.push(event.detail.packetId);
   });
   broker.on('disconnect', (event) => {
     recorded.disconnects.push(event.detail.reasonCode);
@@ -161,6 +175,68 @@ Deno.test({ name: '@receive packets whose fields do not fit them', only: false }
       await waitFor(() => recorded.closed, 'the close');
       assertEquals(recorded.disconnects, []);
       assertEquals(recorded.topics, []);
+    } finally {
+      await client.disconnect(true);
+      await broker.destroy();
+    }
+  });
+});
+
+Deno.test({ name: '@receive packets whose fixed header has flags that their packet type cannot have', only: false }, async (context) => {
+  for (const [name, bytes] of packetsWithInvalidFlags) {
+    await context.step(`MQTT 5.0: on ${name}, the client does not answer it and sends DISCONNECT with Malformed Packet`, async () => {
+      const broker = new TestBroker();
+      const client = new MqttClient({ clientId: 'cid', logger });
+      try {
+        broker.listen();
+        const recorded = record(client, broker);
+        await client.connect();
+
+        await broker.sendRawBytes('cid', validPublish('topic/ok'));
+        await waitFor(() => recorded.topics.length === 1, 'the valid PUBLISH');
+
+        await broker.sendRawBytes('cid', bytes);
+        await waitFor(() => recorded.disconnects.length === 1 && recorded.closed, 'DISCONNECT and the close');
+        assertEquals(recorded.disconnects, [Mqtt.ReasonCode.MalformedPacket]);
+        assertEquals(recorded.pubcomps, []);
+        assertEquals(recorded.topics, ['topic/ok']);
+      } finally {
+        await client.disconnect(true);
+        await broker.destroy();
+      }
+    });
+  }
+
+  await context.step('MQTT 3.1.1: the client does not answer it and closes the connection without sending DISCONNECT', async () => {
+    const broker = new TestBroker();
+    const client = new MqttClient({ clientId: 'cid', logger, protocolVersion: Mqtt.ProtocolVersion.MqttV3_1_1 });
+    try {
+      broker.listen();
+      const recorded = record(client, broker);
+      await client.connect();
+
+      await broker.sendRawBytes('cid', new Uint8Array([0x60, 0x02, 0x00, 0x01])); // PUBREL with the flags 0b0000
+      await waitFor(() => recorded.closed, 'the close');
+      assertEquals(recorded.disconnects, []);
+      assertEquals(recorded.pubcomps, []);
+    } finally {
+      await client.disconnect(true);
+      await broker.destroy();
+    }
+  });
+
+  await context.step('WebSocket: the client sends DISCONNECT with Malformed Packet', async () => {
+    const broker = new TestWsBroker();
+    const client = new WebSocketMqttClient({ clientId: 'cid', url: new URL('ws://127.0.0.1:3000/'), logger });
+    try {
+      broker.listen();
+      const recorded = record(client, broker);
+      await client.connect();
+
+      broker.sendRawBytes('cid', new Uint8Array([0x60, 0x02, 0x00, 0x01])); // PUBREL with the flags 0b0000
+      await waitFor(() => recorded.disconnects.length === 1 && recorded.closed, 'DISCONNECT and the close');
+      assertEquals(recorded.disconnects, [Mqtt.ReasonCode.MalformedPacket]);
+      assertEquals(recorded.pubcomps, []);
     } finally {
       await client.disconnect(true);
       await broker.destroy();
