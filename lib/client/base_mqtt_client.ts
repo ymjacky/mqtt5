@@ -1268,6 +1268,7 @@ export abstract class BaseMqttClient {
    * A rejection of an ignored promise does not terminate the process; await the promise to handle failures.
    * @param reasonCode a {@link Mqtt.ReasonCode}, e.g. `Mqtt.ReasonCode.ContinueAuthentication` or `Mqtt.ReasonCode.ReAuthenticate`.
    * @param properties AUTH properties ({@link MqttProperties.AuthProperties}), such as `authenticationMethod` and `authenticationData`.
+   * They must include `authenticationMethod`: every AUTH carries the Authentication Method (MQTT 5.0 3.15.2.2.2).
    * The Reason String and User Properties are left out if they make AUTH larger than the Maximum Packet Size of the broker.
    * @throws {UnsupportedByProtocolVersionError} if the client uses MQTT 3.1.1, which has no AUTH. Nothing is sent.
    * @throws {InvalidArgumentError} if `reasonCode` is not one that AUTH can carry: 0x00 (Success), 0x18 (Continue
@@ -1277,6 +1278,8 @@ export abstract class BaseMqttClient {
    * @throws {SendPacketError} if the client is not connected.
    * @throws {PacketTooLargeError} if AUTH is larger than the Maximum Packet Size of the broker even without the Reason String
    * and User Properties. Nothing is sent.
+   * @throws {MqttPacketSerializeError} if `properties` has no `authenticationMethod` (its `cause` is
+   * `MqttPacketsError.MissingPropertyError`). Nothing is sent.
    */
   public auth(
     reasonCode?: Mqtt.ReasonCode,

@@ -244,7 +244,9 @@ rejects a topic filter with `+` / `#`, a `$share/...` topic filter or a `subscri
 
 The `topic` of a `publish` event is never empty: a topic alias (MQTT 5.0) is resolved, see [Topic aliases](#topic-aliases). The broker must not send an empty
 Topic Name without a topic alias, nor a packet ID of 0 with QoS 1 or 2. The client does not receive such a PUBLISH (no `publish` event, no PUBACK / PUBREC): it
-sends DISCONNECT with the Reason Code 0x82 (Protocol Error) with MQTT 5.0, or closes the connection with MQTT 3.1.1.
+sends DISCONNECT with the Reason Code 0x82 (Protocol Error) with MQTT 5.0, or closes the connection with MQTT 3.1.1. In the same way, an AUTH without an
+Authentication Method is not received (no `auth` event): every AUTH must carry one, and `auth()` rejects without sending when `authenticationMethod` is
+left out.
 
 ## Events
 

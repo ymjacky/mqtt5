@@ -36,6 +36,7 @@ const errors: Record<string, ErrorFactory> = {
   UnsupportedPacketError: (options) => new MqttPackets.MqttPacketsError.UnsupportedPacketError('m', options),
   InvalidProtocolVersionError: (options) => new MqttPackets.MqttPacketsError.InvalidProtocolVersionError('m', options),
   InvalidFieldValueError: (options) => new MqttPackets.MqttPacketsError.InvalidFieldValueError('m', options),
+  MissingPropertyError: (options) => new MqttPackets.MqttPacketsError.MissingPropertyError('m', options),
   UnsupportedPropertyError: (options) => new MqttProperties.UnsupportedPropertyError(0, options),
   InvalidPropertyValueError: (options) => new MqttProperties.InvalidPropertyValueError('m', options),
 };

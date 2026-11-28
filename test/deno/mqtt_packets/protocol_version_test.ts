@@ -42,7 +42,7 @@ const packets: AnyPacket[] = [
   { type: 'pingreq' },
   { type: 'pingresp' },
   { type: 'disconnect' },
-  { type: 'auth', reasonCode: 0x00 },
+  { type: 'auth', reasonCode: 0x00, properties: { authenticationMethod: 'M' } },
 ];
 
 /** CONNECT with the given Protocol Level: Client Identifier "c", Clean Start, and no properties in MQTT 5.0. */

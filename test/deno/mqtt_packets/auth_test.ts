@@ -6,61 +6,59 @@ import type { AuthPacket } from '../../../lib/mqtt_packets/packet_types.ts';
 import { parse, toBytes } from '../../../lib/mqtt_packets/auth.ts';
 import * as Mqtt from '../../../lib/mqtt/mod.ts';
 
-// Test basic Auth packet encoding (no reason code, no properties)
-Deno.test('encodeAuthPacketBasic', function () {
+/** The Authentication Method 'M', which every AUTH carries (MQTT 5.0 3.15.2.2.2). */
+const methodM = [0x15, 0x00, 0x01, 0x4D];
+
+// As AUTH always has a property, the Reason Code and the Property Length are always written: they can be omitted only
+// without properties (MQTT 5.0 3.15.2.1).
+Deno.test('encodeAuthPacketWithTheAuthenticationMethodOnly', function () {
+  const cases: [AuthPacket, number][] = [
+    // 0x00 (Success) is used if the Reason Code is omitted.
+    [{ type: 'auth', properties: { authenticationMethod: 'M' } }, 0x00],
+    [{ type: 'auth', reasonCode: Mqtt.ReasonCode.Success, properties: { authenticationMethod: 'M' } }, 0x00],
+    [{ type: 'auth', reasonCode: Mqtt.ReasonCode.ContinueAuthentication, properties: { authenticationMethod: 'M' } }, 0x18],
+    [{ type: 'auth', reasonCode: Mqtt.ReasonCode.ReAuthenticate, properties: { authenticationMethod: 'M' } }, 0x19],
+  ];
+  for (const [packet, reasonCode] of cases) {
+    assertEquals(
+      toBytes(packet, Mqtt.ProtocolVersion.MqttV5),
+      new Uint8Array([0xF0, 0x06, reasonCode, 0x04, ...methodM]),
+      JSON.stringify(packet),
+    );
+  }
+  // An empty string is a valid UTF-8 Encoded String.
   assertEquals(
-    toBytes(
-      {
-        type: 'auth',
-      },
-      Mqtt.ProtocolVersion.MqttV5,
-    ),
-    new Uint8Array([
-      // fixedHeader
-      0xf0, // packetType + flags
-      0x00, // remainingLength (no payload)
-    ]),
+    toBytes({ type: 'auth', reasonCode: Mqtt.ReasonCode.ContinueAuthentication, properties: { authenticationMethod: '' } }, Mqtt.ProtocolVersion.MqttV5),
+    new Uint8Array([0xF0, 0x05, 0x18, 0x03, 0x15, 0x00, 0x00]),
   );
 });
 
-// Test Auth packet encoding with success reason code
-Deno.test('encodeAuthPacketWithReasonCode', function () {
-  assertEquals(
-    toBytes(
-      {
-        type: 'auth',
-        reasonCode: Mqtt.ReasonCode.Success,
-      },
-      Mqtt.ProtocolVersion.MqttV5,
-    ),
-    new Uint8Array([
-      // fixedHeader
-      0xf0, // packetType + flags
-      0x00, // remainingLength
-      // variableHeader
-      // No variableHeader because Success (0x00) without properties doesn't add reasonCode
-    ]),
-  );
-});
-
-// Test Auth packet encoding with "continue authentication" reason code
-Deno.test('encodeAuthPacketWithContinueAuth', function () {
-  assertEquals(
-    toBytes(
-      {
-        type: 'auth',
-        reasonCode: Mqtt.ReasonCode.ContinueAuthentication,
-      },
-      Mqtt.ProtocolVersion.MqttV5,
-    ),
-    new Uint8Array([
-      // fixedHeader
-      0xf0, // packetType + flags
-      0x01, // remainingLength
-      // variableHeader
-      0x18, // reasonCode = ContinueAuthentication (24)
-    ]),
-  );
+Deno.test('encodeAuthPacketWithoutAnAuthenticationMethod', function () {
+  // The receiver, a client or a server, would take it as a Protocol Error (MQTT 5.0 3.15.2.2.2). The first two were written as
+  // F0 00, and the third as F0 01 18, a Malformed Packet.
+  const cases: AuthPacket[] = [
+    { type: 'auth' },
+    { type: 'auth', reasonCode: Mqtt.ReasonCode.Success },
+    { type: 'auth', reasonCode: Mqtt.ReasonCode.ContinueAuthentication },
+    { type: 'auth', reasonCode: Mqtt.ReasonCode.ReAuthenticate, properties: {} },
+    {
+      type: 'auth',
+      reasonCode: Mqtt.ReasonCode.ContinueAuthentication,
+      properties: { authenticationData: new Uint8Array([0x01]), reasonString: 'r', userProperties: [{ key: 'k', val: 'v' }] },
+    },
+    { type: 'auth', reasonCode: Mqtt.ReasonCode.ContinueAuthentication, properties: { authenticationMethod: undefined } },
+  ];
+  for (const packet of cases) {
+    const name = JSON.stringify(packet);
+    assertThrows(
+      () => toBytes(packet, Mqtt.ProtocolVersion.MqttV5),
+      MqttPacketsError.MissingPropertyError,
+      'missing property: AUTH must carry an authenticationMethod (MQTT 5.0 3.15.2.2.2)',
+      name,
+    );
+    const error = assertThrows(() => packetToBytes(packet, Mqtt.ProtocolVersion.MqttV5), MqttPacketsError.MqttPacketSerializeError, undefined, name);
+    assertInstanceOf(error.cause, MqttPacketsError.MissingPropertyError, name);
+  }
 });
 
 // Test Auth packet encoding with properties
@@ -213,41 +211,37 @@ Deno.test('encodeAuthPacketWithAuthData', function () {
   );
 });
 
-// Test basic Auth packet parsing (no reason code, no properties)
-Deno.test('decodeAuthPacketBasic', function () {
-  assertEquals<AuthPacket>(
-    parse(
-      new Uint8Array([]), // empty buffer for no variable header
-      0, // remainingLength
-      Mqtt.ProtocolVersion.MqttV5,
-    ),
-    {
-      type: 'auth',
-      reasonCode: Mqtt.ReasonCode.Success,
-    },
-  );
+Deno.test('decodeAuthPacketWithTheAuthenticationMethodOnly', function () {
+  assertEquals<AuthPacket>(parse(new Uint8Array([0x18, 0x04, ...methodM]), 6, Mqtt.ProtocolVersion.MqttV5), {
+    type: 'auth',
+    reasonCode: Mqtt.ReasonCode.ContinueAuthentication,
+    properties: { authenticationMethod: 'M' },
+  });
+  assertEquals<AuthPacket>(parse(new Uint8Array([0x00, 0x03, 0x15, 0x00, 0x00]), 5, Mqtt.ProtocolVersion.MqttV5), {
+    type: 'auth',
+    reasonCode: Mqtt.ReasonCode.Success,
+    properties: { authenticationMethod: '' },
+  });
 });
 
-// Test Auth packet parsing with a reason code and no properties
-Deno.test('decodeAuthPacketWithReasonCode', function () {
-  assertEquals<AuthPacket>(
-    parse(
-      new Uint8Array([
-        0x18, // reasonCode = ContinueAuthentication (24)
-        0x00, // properties length
-      ]),
-      2, // remainingLength
-      Mqtt.ProtocolVersion.MqttV5,
-    ),
-    {
-      type: 'auth',
-      reasonCode: Mqtt.ReasonCode.ContinueAuthentication,
-    },
-  );
+Deno.test('decodeAuthPacketWithoutAnAuthenticationMethod', function () {
+  // A Protocol Error (MQTT 5.0 3.15.2.2.2), for which the receiver sends DISCONNECT with 0x82. So is an AUTH with a Remaining
+  // Length of 0, which 3.15.2.1 allows for the Reason Code 0x00 (Success) without properties: it has no Authentication Method.
+  const cases: [string, number[], string][] = [
+    ['a Remaining Length of 0', [], 'protocol error: AUTH must carry the Authentication Method (it has a Remaining Length of 0)'],
+    ['0x00 with a Property Length of 0', [0x00, 0x00], 'protocol error: AUTH must carry the Authentication Method'],
+    ['0x18 with a Property Length of 0', [0x18, 0x00], 'protocol error: AUTH must carry the Authentication Method'],
+    ['0x19 with the Authentication Data only', [0x19, 0x03, 0x16, 0x00, 0x00], 'protocol error: AUTH must carry the Authentication Method'],
+    ['0x18 with a Reason String only', [0x18, 0x04, 0x1F, 0x00, 0x01, 0x72], 'protocol error: AUTH must carry the Authentication Method'],
+  ];
+  for (const [name, bytes, message] of cases) {
+    assertThrows(() => parse(new Uint8Array(bytes), bytes.length, Mqtt.ProtocolVersion.MqttV5), MqttUtilsError.ProtocolViolationError, message, name);
+  }
 });
 
 // Unlike DISCONNECT, AUTH can omit the Property Length only together with the Reason Code (Remaining Length 0,
-// MQTT 5.0 3.15.2.1): a Reason Code without a Property Length is a Malformed Packet.
+// MQTT 5.0 3.15.2.1): a Reason Code without a Property Length is a Malformed Packet, which is found before the missing
+// Authentication Method.
 Deno.test('decodeAuthPacketWithReasonCodeAndNoPropertyLength', function () {
   assertThrows(
     () => parse(new Uint8Array([0x18]), 1, Mqtt.ProtocolVersion.MqttV5),
@@ -400,50 +394,10 @@ Deno.test('decodeAuthPacketWithAuthData', function () {
   );
 });
 
-// Test Auth packet encoding with Success reason code and empty properties
-Deno.test('encodeAuthPacketWithEmptyProperties', function () {
-  assertEquals(
-    toBytes(
-      {
-        type: 'auth',
-        reasonCode: Mqtt.ReasonCode.Success,
-        properties: {},
-      },
-      Mqtt.ProtocolVersion.MqttV5,
-    ),
-    new Uint8Array([
-      // fixedHeader
-      0xf0, // packetType + flags
-      0x02, // remainingLength
-      // variableHeader
-      0x00, // reasonCode = Success
-      0x00, // properties length = 0
-    ]),
-  );
-});
-
-// Test Auth packet parsing with Success reason code and empty properties
-Deno.test('decodeAuthPacketWithEmptyProperties', function () {
-  assertEquals<AuthPacket>(
-    parse(
-      new Uint8Array([
-        0x00, // reasonCode = Success
-        0x00, // properties length = 0
-      ]),
-      2, // remainingLength
-      Mqtt.ProtocolVersion.MqttV5,
-    ),
-    {
-      type: 'auth',
-      reasonCode: Mqtt.ReasonCode.Success,
-    },
-  );
-});
-
 // MQTT 3.1.1 has no AUTH: its packet type 15 is Reserved (MQTT 3.1.1 2.2.1).
 Deno.test('AUTH cannot be encoded with MQTT 3.1.1', function () {
   assertThrows(
-    () => toBytes({ type: 'auth' }, Mqtt.ProtocolVersion.MqttV3_1_1),
+    () => toBytes({ type: 'auth', properties: { authenticationMethod: 'M' } }, Mqtt.ProtocolVersion.MqttV3_1_1),
     MqttPacketsError.UnsupportedPacketError,
     'unsupported packet: AUTH (packet type 15 is Reserved in MQTT 3.1.1)',
   );
@@ -458,7 +412,8 @@ Deno.test('AUTH cannot be decoded with MQTT 3.1.1', function () {
 });
 
 Deno.test('packetToBytes throws for AUTH with MQTT 3.1.1, and encodes it with MQTT 5.0', function () {
-  const error = assertThrows(() => packetToBytes({ type: 'auth' }, Mqtt.ProtocolVersion.MqttV3_1_1), MqttPacketsError.MqttPacketSerializeError);
+  const packet: AuthPacket = { type: 'auth', properties: { authenticationMethod: 'M' } };
+  const error = assertThrows(() => packetToBytes(packet, Mqtt.ProtocolVersion.MqttV3_1_1), MqttPacketsError.MqttPacketSerializeError);
   assertInstanceOf(error.cause, MqttPacketsError.UnsupportedPacketError);
-  assertEquals(packetToBytes({ type: 'auth' }, Mqtt.ProtocolVersion.MqttV5), new Uint8Array([0xf0, 0x00]));
+  assertEquals(packetToBytes(packet, Mqtt.ProtocolVersion.MqttV5), new Uint8Array([0xF0, 0x06, 0x00, 0x04, ...methodM]));
 });

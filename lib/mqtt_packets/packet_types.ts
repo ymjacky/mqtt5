@@ -219,9 +219,13 @@ export type DisconnectPacket = {
 export type AuthPacket = {
   type: 'auth';
   /**
-   * The Reason Code: 0x00 (Success), 0x18 (Continue authentication) or 0x19 (Re-authenticate). A received AUTH without one
-   * (Remaining Length 0) has `Mqtt.ReasonCode.Success` (0x00). When sending, 0x00 is used if omitted.
+   * The Reason Code: 0x00 (Success), 0x18 (Continue authentication) or 0x19 (Re-authenticate). When sending, 0x00 is used if
+   * omitted.
    */
   reasonCode?: number;
+  /**
+   * The properties. They must include the Authentication Method (`authenticationMethod`): an AUTH without it is a Protocol
+   * Error (MQTT 5.0 3.15.2.2.2), which `packetToBytes()` does not encode and `decode()` does not read.
+   */
   properties?: MqttProperties.AuthProperties;
 };

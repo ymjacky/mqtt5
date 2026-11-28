@@ -36,6 +36,20 @@ export class InvalidFieldValueError extends MqttClientError {
   }
 }
 
+/**
+ * A packet to encode lacks a property that it must carry: the Authentication Method of AUTH, without which AUTH is a
+ * Protocol Error (MQTT 5.0 3.15.2.2.2) for the client and for the server alike. Received, such an AUTH is a Protocol Error
+ * (`MqttUtils.MqttUtilsError.ProtocolViolationError`).
+ */
+export class MissingPropertyError extends MqttClientError {
+  /** The name of the error class. */
+  override readonly name = 'MissingPropertyError' as const;
+  /** Creates the error with the given details. Pass the underlying error as `options.cause`. */
+  constructor(message: string, options?: ErrorOptions) {
+    super(`missing property: ${message}`, options);
+  }
+}
+
 /** The packet type is not supported. */
 export class UnsupportedPacketError extends MqttClientError {
   /** The name of the error class. */

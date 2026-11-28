@@ -62,13 +62,30 @@ function validPublishWithPacketId(topic: string, qos: 1 | 2, protocolVersion: Mq
   return MqttPackets.packetToBytes({ type: 'publish', topic, payload: new Uint8Array([0x78]), dup: false, retain: false, qos, packetId: 1 }, protocolVersion);
 }
 
+/** An AUTH with the Reason Code 0x18 (Continue authentication) and the Authentication Method 'M'. */
+const validAuth = MqttPackets.packetToBytes(
+  { type: 'auth', reasonCode: Mqtt.ReasonCode.ContinueAuthentication, properties: { authenticationMethod: 'M' } },
+  Mqtt.ProtocolVersion.MqttV5,
+);
+
 /**
- * What a client receives and what the broker gets back: the topics of `publish` events, the packet IDs of PUBACK and PUBREC
- * and the DISCONNECT Reason Codes.
+ * AUTHs without the Authentication Method (a Protocol Error, MQTT 5.0 3.15.2.2.2), which the encoder does not write: with the
+ * Reason Code 0x18 and a Property Length of 0, and with a Remaining Length of 0, which 3.15.2.1 allows for 0x00 (Success)
+ * without properties.
+ */
+const authsWithoutAuthenticationMethod: [string, Uint8Array][] = [
+  ['the Reason Code 0x18 and no properties', new Uint8Array([0xF0, 0x02, 0x18, 0x00])],
+  ['a Remaining Length of 0', new Uint8Array([0xF0, 0x00])],
+];
+
+/**
+ * What a client receives and what the broker gets back: the topics of `publish` events, the Reason Codes of `auth` events,
+ * the packet IDs of PUBACK and PUBREC and the DISCONNECT Reason Codes.
  */
 function record(client: MqttClient | WebSocketMqttClient, broker: TestBroker | TestWsBroker) {
   const recorded = {
     topics: [] as string[],
+    auths: [] as (number | undefined)[],
     pubacks: [] as number[],
     pubrecs: [] as number[],
     disconnects: [] as (number | undefined)[],
@@ -77,6 +94,9 @@ function record(client: MqttClient | WebSocketMqttClient, broker: TestBroker | T
   };
   client.on('publish', (event) => {
     recorded.topics.push(event.detail.topic);
+  });
+  client.on('auth', (event) => {
+    recorded.auths.push(event.detail.reasonCode);
   });
   client.on('disconnect', (event) => {
     recorded.disconnectEvents.push(event.detail);
@@ -319,6 +339,49 @@ Deno.test({ name: '@receive PUBLISH with QoS 1 or QoS 2 and a packet ID of 0', o
       assertEquals(recorded.disconnects, [Mqtt.ReasonCode.ProtocolError]);
       assertEquals(recorded.topics, []);
       assertEquals(recorded.pubacks, []);
+    } finally {
+      await client.disconnect(true);
+      await broker.destroy();
+    }
+  });
+});
+
+Deno.test({ name: '@receive AUTH without an Authentication Method', only: false }, async (context) => {
+  for (const [name, bytes] of authsWithoutAuthenticationMethod) {
+    await context.step(`MQTT 5.0, ${name}: no auth event, and the client sends DISCONNECT with Protocol Error`, async () => {
+      const broker = new TestBroker();
+      const client = new MqttClient({ clientId: 'cid', logger });
+      try {
+        broker.listen();
+        const recorded = record(client, broker);
+        await client.connect();
+
+        await broker.sendRawBytes('cid', validAuth);
+        await waitFor(() => recorded.auths.length === 1, 'the valid AUTH');
+
+        await broker.sendRawBytes('cid', bytes);
+        await waitFor(() => recorded.disconnects.length === 1 && recorded.closed, 'DISCONNECT and the close');
+        assertEquals(recorded.disconnects, [Mqtt.ReasonCode.ProtocolError]);
+        assertEquals(recorded.auths, [Mqtt.ReasonCode.ContinueAuthentication]);
+      } finally {
+        await client.disconnect(true);
+        await broker.destroy();
+      }
+    });
+  }
+
+  await context.step('WebSocket: the client sends DISCONNECT with Protocol Error', async () => {
+    const broker = new TestWsBroker();
+    const client = new WebSocketMqttClient({ clientId: 'cid', url: new URL('ws://127.0.0.1:3000/'), logger });
+    try {
+      broker.listen();
+      const recorded = record(client, broker);
+      await client.connect();
+
+      broker.sendRawBytes('cid', new Uint8Array([0xF0, 0x02, 0x18, 0x00]));
+      await waitFor(() => recorded.disconnects.length === 1 && recorded.closed, 'DISCONNECT and the close');
+      assertEquals(recorded.disconnects, [Mqtt.ReasonCode.ProtocolError]);
+      assertEquals(recorded.auths, []);
     } finally {
       await client.disconnect(true);
       await broker.destroy();

@@ -1,6 +1,6 @@
-import { ClientErrors, Mqtt, MqttClient, type MqttProperties } from '../../../deno/mod.ts';
+import { ClientErrors, Mqtt, MqttClient, MqttPackets, type MqttProperties } from '../../../deno/mod.ts';
 import { TestBroker } from '../broker/test_broker.ts';
-import { assertEquals, assertRejects, fail } from '@std/assert';
+import { assertEquals, assertInstanceOf, assertRejects, fail } from '@std/assert';
 
 function logger(msg: string, ...args: unknown[]): void {
   console.log('[Test Client]', msg, ...args);
@@ -340,6 +340,47 @@ Deno.test({ name: '@auth with an invalid property', only: false }, async (contex
     }
   });
 }); // @auth with an invalid property
+
+Deno.test({ name: '@auth without an Authentication Method', only: false }, async (context) => {
+  await context.step('auth() rejects with MqttPacketSerializeError and sends nothing; the connection stays open', async () => {
+    const broker = new TestBroker();
+    const client = new MqttClient({ clientId: 'cid', logger });
+    try {
+      const received: string[] = [];
+      broker.on('connect', (event) => {
+        const packet = event.detail;
+        broker.sendConnack(packet.clientId, false, packet.protocolVersion);
+      });
+      broker.on('auth', (event) => {
+        received.push(`auth ${event.detail.reasonCode}`);
+      });
+      broker.on('publish', (event) => {
+        received.push(`publish ${event.detail.topic}`);
+      });
+      broker.listen();
+      await client.connect();
+
+      // Every AUTH carries the Authentication Method (MQTT 5.0 3.15.2.2.2): the broker would take it as a Protocol Error.
+      const calls: [Mqtt.ReasonCode, MqttProperties.AuthProperties | undefined][] = [
+        [Mqtt.ReasonCode.ReAuthenticate, undefined],
+        [Mqtt.ReasonCode.ContinueAuthentication, { authenticationData: new Uint8Array([0x64]) }],
+        [Mqtt.ReasonCode.ReAuthenticate, {}],
+      ];
+      for (const [reasonCode, properties] of calls) {
+        const error = await assertRejects(() => client.auth(reasonCode, properties), MqttPackets.MqttPacketsError.MqttPacketSerializeError);
+        assertInstanceOf(error.cause, MqttPackets.MqttPacketsError.MissingPropertyError);
+      }
+      // The broker gets the next packets on the same connection, and nothing before them.
+      await client.auth(Mqtt.ReasonCode.ReAuthenticate, { authenticationMethod: 'M' });
+      await client.publish('topic/after', 'x');
+      await waitFor(() => received.length > 1, 'the AUTH and the PUBLISH');
+      assertEquals(received, [`auth ${Mqtt.ReasonCode.ReAuthenticate}`, 'publish topic/after']);
+    } finally {
+      await client.disconnect(true);
+      await broker.destroy();
+    }
+  });
+}); // @auth without an Authentication Method
 
 // MQTT 3.1.1 has no AUTH: its packet type 15 is Reserved (MQTT 3.1.1 2.2.1), and the receiver of it must close the
 // connection [MQTT-4.8.0-1].
